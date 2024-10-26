@@ -1,0 +1,5 @@
+bazel_dep(name = "rules_rust", version = "0.49.3")
+
+crate = use_extension("@rules_rust//crate_universe:extension.bzl", "crate")
+
+use_repo(crate, "crates")
