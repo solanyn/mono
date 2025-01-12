@@ -1,0 +1,3 @@
+brew "rust"
+brew "uv"
+
