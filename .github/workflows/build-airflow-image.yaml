@@ -15,12 +15,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         
-      - name: Semver run
-        id: semver
-        uses: lukaszraczylo/semver-generator@v1
+      - name: Git Version
+        id: version
+        uses: codacy/git-version@2.7.1
         with:
-          config_file: semver.yaml
-          repository_local: true
+          log-path: airflow/
           
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -45,4 +44,4 @@ jobs:
           cache-to: type=gha,mode=max
           push: true
           tags: |
-            ghcr.io/solanyn/airflow:${{ steps.semver.outputs.semantic_version }}
+            ghcr.io/solanyn/airflow:${{ steps.version.outputs.version }}
