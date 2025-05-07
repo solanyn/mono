@@ -73,3 +73,5 @@ def dag():
     generate_download_tasks_task = generate_download_tasks()
 
     get_links_task >> generate_download_tasks_task
+
+dag()
