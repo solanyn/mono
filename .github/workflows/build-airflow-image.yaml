@@ -22,7 +22,7 @@ jobs:
           release-branch: main
           minor-identifier: feat
           major-identifier: feat!
-          log-path: airflow/
+          log-paths: airflow/
           
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
