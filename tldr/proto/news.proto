@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package tldr.news.v1;
+
+option go_package = "./gen/proto/news/v1;newspb";
+
+message NewsSummary {
+  string date = 1;
+}
+
+message ListNewsSummariesResponse {
+  repeated NewsSummary summaries = 1;
+}
+
+message GetNewsSummaryResponse {
+  string date = 1;
+  string content = 2;
+}
+

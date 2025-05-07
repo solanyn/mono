@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
+	newspb "tldr/gen/proto"
 	"tldr/internal/storage"
 
 	"github.com/go-chi/chi/v5"
@@ -18,11 +20,6 @@ type NewsHandler struct {
 
 func NewNewsHandler(s *storage.Client) *NewsHandler {
 	return &NewsHandler{storage: s}
-}
-
-type NewsResponse struct {
-	ID       string `json:"id"`
-	Markdown string `json:"markdown"`
 }
 
 func (h *NewsHandler) GetNews(w http.ResponseWriter, r *http.Request) {
@@ -45,9 +42,9 @@ func (h *NewsHandler) GetNews(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := NewsResponse{
-		ID:       id,
-		Markdown: string(data),
+	resp := &newspb.GetNewsSummaryResponse{
+		Date:    id,
+		Content: string(data),
 	}
 
 	logger.Info(fmt.Sprintf("Returning news object with key: %s", key))
@@ -59,13 +56,24 @@ func (h *NewsHandler) ListNews(w http.ResponseWriter, r *http.Request) {
 	logger := httplog.LogEntry(r.Context())
 	ctx := r.Context()
 
-	summaries, err := h.storage.ListNewsSummaries(ctx)
+	filenames, err := h.storage.ListNewsSummaries(ctx)
 	if err != nil {
 		logger.Error("failed to list news summaries")
 		http.Error(w, "failed to list news summaries", http.StatusInternalServerError)
 		return
 	}
 
+	var summaries []*newspb.NewsSummary
+	for _, filename := range filenames {
+		// Assuming format is "2025-05-07.md"
+		date := strings.TrimSuffix(filename, ".md")
+		summaries = append(summaries, &newspb.NewsSummary{Date: date})
+	}
+
+	resp := &newspb.ListNewsSummariesResponse{
+		Summaries: summaries,
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(summaries)
+	_ = json.NewEncoder(w).Encode(resp)
 }
