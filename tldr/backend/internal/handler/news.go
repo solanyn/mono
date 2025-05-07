@@ -54,3 +54,18 @@ func (h *NewsHandler) GetNews(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
 }
+
+func (h *NewsHandler) ListNews(w http.ResponseWriter, r *http.Request) {
+	logger := httplog.LogEntry(r.Context())
+	ctx := r.Context()
+
+	summaries, err := h.storage.ListNewsSummaries(ctx)
+	if err != nil {
+		logger.Error("failed to list news summaries")
+		http.Error(w, "failed to list news summaries", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(summaries)
+}

@@ -27,6 +27,7 @@ func NewsRouter(cfg config.Config, logger *httplog.Logger) chi.Router {
 		AllowCredentials: false,
 	}))
 
+	r.Get("/news", newsHandler.ListNews)
 	r.Get("/news/{id}", newsHandler.GetNews)
 
 	return r
