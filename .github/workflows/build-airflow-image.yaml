@@ -7,6 +7,12 @@ on:
       - "main"
     paths:
       - "airflow/**"
+    
+permissions:
+  contents: read
+  packages: write
+  attestations: write
+  id-token: write
 
 jobs:
   airflow:
@@ -43,6 +49,6 @@ jobs:
           cache-from: type=registry,ref=ghcr.io/solanyn/build_cache:airflow-amd64,mode=max
           cache-to: type=registry,ref=ghcr.io/solanyn/build_cache:airflow-amd64
           outputs: type=image,name=ghcr.io/solanyn/airflow,push-by-digest=true,name-canonical=true,push=true
-          tags: ${{ steps.version.outputs.version }}, latest
+          tags: ghcr.io/solanyn/airflow:${{ steps.version.outputs.version }}, ghcr.io/solanyn/airflow:latest
           push: true
       
