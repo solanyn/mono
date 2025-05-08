@@ -43,12 +43,10 @@ jobs:
         id: build
         uses: docker/build-push-action@v6
         with:
-          registry: ghcr.io
-          image: solanyn/airflow
           file: ./airflow/Dockerfile
           context: .
           platforms: linux/amd64
           cache-from: type=registry,ref=ghcr.io/solanyn/build_cache:airflow-amd64,mode=max
           cache-to: type=registry,ref=ghcr.io/solanyn/build_cache:airflow-amd64
-          tags: ${{ steps.version.outputs.version }}, latest
+          tags: ghcr.io/solanyn/airflow:${{ steps.version.outputs.version }},ghcr.io/solanyn/airflow:latest
           push: true
