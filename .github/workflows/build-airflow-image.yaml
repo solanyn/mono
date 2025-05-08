@@ -48,24 +48,5 @@ jobs:
           platforms: linux/amd64
           cache-from: type=registry,ref=ghcr.io/solanyn/build_cache:airflow-amd64,mode=max
           cache-to: type=registry,ref=ghcr.io/solanyn/build_cache:airflow-amd64
-          outputs: type=image,name=ghcr.io/solanyn/airflow,push-by-digest=true,name-canonical=true,push=true
-      
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
-        with:
-          images: ghcr.io/solanyn/airflow
-          tags: |
-            type=match,pattern=^v?(\d+(\.\d+)?(\.\d+)?(\.\d+)?),value=${{ steps.version.outputs.version }}
-            type=match,pattern=^v?(\d+(\.\d+)),value=${{ steps.version.outputs.version }},enable=${{ steps.version.outputs.version }}
-            type=match,pattern=^v?(\d+),value=${{ steps.version.outputs.version }},enable=${{ steps.version.outputs.version }}
-            type=raw,value=rolling
-
-      - name: Push Images
-        id: push
-        uses: Noelware/docker-manifest-action@b33ab348026b120a895167160f5605b0197f0862 # 0.4.3
-        with:
-          inputs: ${{ join(fromJSON(steps.meta.outputs.json).tags, ',') }}
-          images: >-
-            ghcr.io/${{ github.repository_owner }}/${{ inputs.app }}@${{ needs.build.outputs.amd64 }}
+          labels: ${{ steps.version.outputs.version }}, latest
           push: true
