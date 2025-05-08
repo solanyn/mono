@@ -7,14 +7,15 @@ on:
       - "main"
     paths:
       - "airflow/**"
-    
+      
+permissions:
+  contents: read
+  packages: write
+  attestations: write
+  id-token: write
+
 jobs:
   airflow:
-    permissions:
-      contents: read
-      packages: write
-      attestations: write
-      id-token: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
