@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 import httpx
 import os
 import s3fs
+from s3fs.core import S3FileSystemError
 
 NSW_PROPERTY_SALES_INFORMATION_URL = (
     "https://valuation.property.nsw.gov.au/embed/propertySalesInformation"
@@ -59,7 +60,7 @@ def fetch_zip_file_links() -> List[str]:
 
 
 @task
-@retry(retry=retry_if_exception_type((s3fs.S3Error, IOError)))
+@retry(retry=retry_if_exception_type((S3FileSystemError, IOError)))
 def download_link_to_s3(url: str) -> str:
     """Download a file from URL and upload to S3.
     
