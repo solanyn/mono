@@ -8,6 +8,20 @@
     ":timezone(Australia/Sydney)",
     ":semanticCommits",
   ],
+  "automerge": true,
+  "rebaseWhen": "conflicted",
+  // https://github.com/tensorchord/cloudnative-vectorchord/blob/main/renovate.json
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": [
+        "^versions.yaml$"
+      ],
+      "matchStrings": [
+        "datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n.*?\"(?<currentValue>.*)\"\\n"
+      ]
+    }
+  ],
   "dependencyDashboardTitle": "Renovate Dashboard 🤖",
   "suppressNotifications": ["prEditedNotification", "prIgnoreNotification"],
   "packageRules": [
@@ -45,6 +59,22 @@
       "matchUpdateTypes": ["patch"],
       "semanticCommitScope": "{{parentDir}}",
       "semanticCommitType": "fix"
+    },
+    // https://github.com/tensorchord/cloudnative-vectorchord/blob/main/renovate.json
+    {
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "matchPackageNames": [
+        "ghcr.io/cloudnative-pg/postgresql"
+      ],
+      "enabled": false
+    },
+    {
+      "matchPackageNames": [
+        "ghcr.io/cloudnative-pg/postgresql"
+      ],
+      "groupName": "postgresql"
     }
   ]
 }

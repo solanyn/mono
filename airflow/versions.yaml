@@ -1,0 +1,3 @@
+airflow:
+  # renovate: datasource=docker depName=apache/airflow
+  - "3.0.1"

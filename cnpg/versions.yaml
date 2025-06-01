@@ -1,0 +1,9 @@
+cnpg:
+  # renovate: datasource=docker depName=ghcr.io/cloudnative-pg/postgresql
+  - "17.5"
+vectorchord:
+  # renovate: datasource=github-releases depName=tensorchord/VectorChord
+  - "0.4.2"
+ferretdb:
+  # renovate: datasource=docker depName=ghcr.io/ferretdb/postgres-documentdb
+  - "17-0.103.0-ferretdb-2.2.0"
