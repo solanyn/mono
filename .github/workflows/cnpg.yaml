@@ -101,6 +101,7 @@ jobs:
             type=raw,value=${{ steps.version.outputs.pg_major }}-${{ matrix.vectorchord }},enable=${{ steps.should-release.outputs.result }}
             type=raw,value=${{ matrix.cnpg }},enable=${{ steps.should-release.outputs.result }}
             type=raw,value=${{ steps.version.outputs.pg_major }},enable=${{ steps.should-release.outputs.result }}
+            type=raw,value=${{ matrix.ferretdb }}-${{ matrix.vectorchord }},enable=${{ steps.should-release.outputs.result }}
 
       - name: Build and push image
         uses: docker/build-push-action@v6.18.0
