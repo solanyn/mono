@@ -87,8 +87,7 @@ jobs:
             # Disable latest tag
             latest=false
           images: |
-            name=ghcr.io/${{ github.repository }}
-            name=solanyn/airflow
+            name=ghcr.io/${{ github.actor }}/airflow
           tags: |
             type=raw,value=${{ matrix.airflow }},enable=${{ steps.should-release.outputs.result }}
 
