@@ -11,4 +11,5 @@ USER root
 ADD https://github.com/tensorchord/VectorChord/releases/download/$VECTORCHORD_TAG/postgresql-${CNPG_TAG%.*}-vchord_${VECTORCHORD_TAG#"v"}-1_$TARGETARCH.deb /tmp/vchord.deb
 RUN apt-get install -y /tmp/vchord.deb && rm -f /tmp/vchord.deb
 
-USER postgres
+# base image uses user 999:999
+USER 999:999
