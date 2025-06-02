@@ -94,8 +94,8 @@ jobs:
             # Disable latest tag
             latest=false
           images: |
-            name=ghcr.io/${{ github.actor }}
-            name=cnpg
+            name=ghcr.io/${{ github.repository }}
+            name=solanyn/cnpg
           tags: |
             type=raw,value=${{ matrix.cnpg }}-${{ matrix.vectorchord }},enable=${{ steps.should-release.outputs.result }}
             type=raw,value=${{ steps.version.outputs.pg_major }}-${{ matrix.vectorchord }},enable=${{ steps.should-release.outputs.result }}
