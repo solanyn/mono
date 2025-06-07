@@ -101,7 +101,7 @@ jobs:
             name=ghcr.io/${{ github.actor }}/cnpg
           tags: |
             type=raw,value=${{ steps.version.outputs.pg_major }},enable=${{ steps.should-release.outputs.result }}
-            type=raw,value=${{ matrix.documentdb }}-${{ matrix.vectorchord }},enable=${{ steps.should-release.outputs.result }}
+            type=raw,value=${{ matrix.vectorchord }}-${{ matrix.timescaledb }}-${{ matrix.documentdb }},enable=${{ steps.should-release.outputs.result }}
 
       - name: Build and push image
         uses: docker/build-push-action@v6.18.0
