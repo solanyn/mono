@@ -113,8 +113,9 @@ jobs:
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
           build-args: |
-            FERRETDB_TAG=${{ matrix.ferretdb }}
             CNPG_TAG=${{ matrix.cnpg }}
+            POSTGRES_VERSION=${{ steps.version.outputs.pg_major }}
+            DOCUMENTDB_TAG=${{ matrix.documentdb }}
             VECTORCHORD_TAG=${{ matrix.vectorchord }}
 
   results:
