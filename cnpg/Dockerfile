@@ -2,7 +2,7 @@ ARG CNPG_TAG
 
 FROM ghcr.io/cloudnative-pg/postgresql:$CNPG_TAG-bookworm
 
-ARG POSTGRES_VERSION
+ARG PG_MAJOR
 ARG CNPG_TAG
 ARG VECTORCHORD_TAG
 ARG DOCUMENTDB_TAG
@@ -21,10 +21,10 @@ RUN <<EOT
   # Source OS release info
   . /etc/os-release 2>/dev/null
 
-  curl -L -o /tmp/vchord.deb https://github.com/tensorchord/VectorChord/releases/download/${VECTORCHORD_TAG}/postgresql-${CNPG_TAG%.*}-vchord_${VECTORCHORD_TAG#"v"}-1_${TARGETARCH}.deb
+  curl -L -o /tmp/vchord.deb https://github.com/tensorchord/VectorChord/releases/download/${VECTORCHORD_TAG}/postgresql-${PG_MAJOR}}-vchord_${VECTORCHORD_TAG#"v"}-1_${TARGETARCH}.deb
   apt-get install -y /tmp/vchord.deb && rm -f /tmp/vchord.deb
 
-  curl -L -o /tmp/documentdb.deb https://github.com/microsoft/documentdb/releases/download/v${DOCUMENTDB_TAG}/deb${VERSION_ID}-postgresql-${POSTGRES_VERSION}-documentdb_${DOCUMENTDB_TAG/-/.}_$TARGETARCH.deb 
+  curl -L -o /tmp/documentdb.deb https://github.com/microsoft/documentdb/releases/download/v${DOCUMENTDB_TAG}/deb${VERSION_ID}-postgresql-${PG_MAJOR}-documentdb_${DOCUMENTDB_TAG/-/.}_$TARGETARCH.deb 
   apt-get install -y /tmp/documentdb.deb && rm -f /tmp/documentdb.deb
 
   # Add Timescale apt repo
@@ -33,7 +33,7 @@ RUN <<EOT
 
   # Install Timescale
   apt-get update
-  apt-get install -y --no-install-recommends "timescaledb-2-postgresql-${POSTGRES_VERSION}=${TIMESCALEDB_TAG}~debian${VERSION_ID}"
+  apt-get install -y --no-install-recommends "timescaledb-2-postgresql-${PG_MAJOR}=${TIMESCALEDB_TAG}~debian${VERSION_ID}"
 
   # Cleanup
   apt-get purge -y curl

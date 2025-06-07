@@ -115,7 +115,7 @@ jobs:
           labels: ${{ steps.metadata.outputs.labels }}
           build-args: |
             CNPG_TAG=${{ matrix.cnpg }}
-            POSTGRES_VERSION=${{ steps.version.outputs.pg_major }}
+            PG_MAJOR=${{ steps.version.outputs.pg_major }}
             DOCUMENTDB_TAG=${{ matrix.documentdb }}
             TIMESCALEDB_TAG=${{ matrix.timescaledb }}
             VECTORCHORD_TAG=${{ matrix.vectorchord }}
