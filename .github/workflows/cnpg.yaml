@@ -3,8 +3,9 @@ name: Build CNPG Image
 on:
   workflow_dispatch:
   push:
-    branches:
-      - "main"
+    branches: [main]
+  pull_request:
+    branches: [main]
     paths:
       - "cnpg/**"
 
@@ -100,7 +101,7 @@ jobs:
             name=ghcr.io/${{ github.actor }}/cnpg
           tags: |
             type=raw,value=${{ steps.version.outputs.pg_major }},enable=${{ steps.should-release.outputs.result }}
-            type=raw,value=${{ matrix.ferretdb }}-${{ matrix.vectorchord }},enable=${{ steps.should-release.outputs.result }}
+            type=raw,value=${{ matrix.documentdb }}-${{ matrix.vectorchord }},enable=${{ steps.should-release.outputs.result }}
 
       - name: Build and push image
         uses: docker/build-push-action@v6.18.0
@@ -113,8 +114,10 @@ jobs:
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
           build-args: |
-            FERRETDB_TAG=${{ matrix.ferretdb }}
             CNPG_TAG=${{ matrix.cnpg }}
+            PG_MAJOR=${{ steps.version.outputs.pg_major }}
+            DOCUMENTDB_TAG=${{ matrix.documentdb }}
+            TIMESCALEDB_TAG=${{ matrix.timescaledb }}
             VECTORCHORD_TAG=${{ matrix.vectorchord }}
 
   results:

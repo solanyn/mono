@@ -4,6 +4,9 @@ cnpg:
 vectorchord:
   # renovate: datasource=github-releases depName=tensorchord/VectorChord
   - "0.4.2"
-ferretdb:
-  # renovate: datasource=docker depName=ghcr.io/ferretdb/postgres-documentdb
-  - "17-0.103.0-ferretdb-2.2.0"
+documentdb:
+  # renovate: datasource=github-releases depName=ghcr.io/microsoft/documentdb
+  - "0.103-0"
+timescaledb:
+  # renovate: datasource=github-releases depName=ghcr.io/timescale/timescaledb
+  - "2.20.2"
