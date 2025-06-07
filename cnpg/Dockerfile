@@ -14,8 +14,15 @@ USER root
 ADD https://github.com/tensorchord/VectorChord/releases/download/${VECTORCHORD_TAG}/postgresql-${PG_MAJOR}-vchord_${VECTORCHORD_TAG#"v"}-1_${TARGETARCH}.deb /tmp/vchord.deb
 RUN apt-get install -y /tmp/vchord.deb && rm -f /tmp/vchord.deb
 
-ADD https://github.com/microsoft/documentdb/releases/download/v${DOCUMENTDB_TAG}/deb11-postgresql-${PG_MAJOR}-documentdb_${DOCUMENTDB_TAG/-/.}_$TARGETARCH.deb /tmp/documentdb.deb 
-RUN apt-get install -y /tmp/documentdb.deb && rm -f /tmp/documentdb.deb
+ADD https://github.com/microsoft/documentdb/releases/download/v${DOCUMENTDB_TAG}/deb11-postgresql-${PG_MAJOR}-documentdb_${DOCUMENTDB_TAG/-/.}_$TARGETARCH.deb /tmp/documentdb.deb
+RUN apt-get install -y \
+  postgresql-17-cron \
+  postgresql-17-postgis-3 \
+  postgresql-17-rum \
+  /tmp/documentdb.deb \
+  && rm -f /tmp/documentdb.deb \
+  && rm /etc/apt/sources.list.d/timescaledb.list /etc/apt/trusted.gpg.d/timescale.gpg \
+  && rm -rf /var/cache/apt/*
 
 RUN <<EOT
   set -eux
