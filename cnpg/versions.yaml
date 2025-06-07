@@ -7,3 +7,6 @@ vectorchord:
 documentdb:
   # renovate: datasource=github-releases depName=ghcr.io/microsoft/documentdb
   - "0.103-0"
+timescaledb:
+  # renovate: datasource=github-releases depName=ghcr.io/timescale/timescaledb
+  - "2.20.2"

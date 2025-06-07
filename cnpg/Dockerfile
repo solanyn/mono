@@ -1,6 +1,6 @@
 ARG CNPG_TAG
 
-FROM ghcr.io/cloudnative-pg/postgresql:$CNPG_TAG
+FROM ghcr.io/cloudnative-pg/postgresql:$CNPG_TAG-bookworm
 
 ARG POSTGRES_VERSION
 ARG CNPG_TAG
