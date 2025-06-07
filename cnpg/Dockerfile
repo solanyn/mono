@@ -18,7 +18,7 @@ RUN <<EOT
   apt-get update
   apt-get install -y --no-install-recommends curl
 
-  # Add system info environment variables
+  # Source OS release info
   . /etc/os-release 2>/dev/null
 
   curl -L -o /tmp/vchord.deb https://github.com/tensorchord/VectorChord/releases/download/${VECTORCHORD_TAG}/postgresql-${CNPG_TAG%.*}-vchord_${VECTORCHORD_TAG#"v"}-1_${TARGETARCH}.deb
@@ -33,7 +33,7 @@ RUN <<EOT
 
   # Install Timescale
   apt-get update
-  apt-get install -y --no-install-recommends "timescaledb-2-postgresql-${POSTGRES_VERSION}=${TIMESCALE_TAG}~debian${VERSION_ID}"
+  apt-get install -y --no-install-recommends "timescaledb-2-postgresql-${POSTGRES_VERSION}=${TIMESCALEDB_TAG}~debian${VERSION_ID}"
 
   # Cleanup
   apt-get purge -y curl
