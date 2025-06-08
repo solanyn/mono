@@ -1,12 +1,6 @@
 cnpg:
   # renovate: datasource=docker depName=ghcr.io/cloudnative-pg/postgresql
   - "17.5"
-vectorchord:
-  # renovate: datasource=github-releases depName=tensorchord/VectorChord
-  - "0.4.2"
-documentdb:
-  # renovate: datasource=github-releases depName=ghcr.io/microsoft/documentdb
-  - "0.103-0"
 timescaledb:
   # renovate: datasource=github-releases depName=ghcr.io/timescale/timescaledb
   - "2.20.2"
