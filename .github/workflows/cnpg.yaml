@@ -101,7 +101,7 @@ jobs:
             name=ghcr.io/${{ github.actor }}/cnpg
           tags: |
             type=raw,value=${{ steps.version.outputs.pg_major }},enable=${{ steps.should-release.outputs.result }}
-            type=raw,value=${{ matrix.vectorchord }}-${{ matrix.timescaledb }}-${{ matrix.documentdb }},enable=${{ steps.should-release.outputs.result }}
+            type=raw,value=${{ matrix.timescaledb }},enable=${{ steps.should-release.outputs.result }}
 
       - name: Build and push image
         uses: docker/build-push-action@v6.18.0
@@ -116,9 +116,7 @@ jobs:
           build-args: |
             CNPG_TAG=${{ matrix.cnpg }}
             PG_MAJOR=${{ steps.version.outputs.pg_major }}
-            DOCUMENTDB_TAG=${{ matrix.documentdb }}
             TIMESCALEDB_TAG=${{ matrix.timescaledb }}
-            VECTORCHORD_TAG=${{ matrix.vectorchord }}
 
   results:
     if: ${{ always() }}
