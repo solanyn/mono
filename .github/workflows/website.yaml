@@ -47,11 +47,11 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Build
-        run: npx quartz build
-
       - name: Test
         run: npm run test
+
+      - name: Build
+        run: npx quartz build
 
       - name: Deploy to Cloudflare Pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
