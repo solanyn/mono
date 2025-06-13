@@ -9,13 +9,13 @@ import * as Plugin from "./quartz/plugins"
 const config: QuartzConfig = {
   configuration: {
     pageTitle: "Andrew",
-    pageTitleSuffix: "Words",
+    pageTitleSuffix: " - Andrew",
     enableSPA: true,
     enablePopovers: true,
     analytics: {
       provider: "plausible",
     },
-    baseUrl: "quartz.goyangi.io",
+    baseUrl: "blog.goyangi.io",
     ignorePatterns: ["private", "templates", ".obsidian"],
     defaultDateType: "created",
     theme: {
