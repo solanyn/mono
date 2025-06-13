@@ -1,0 +1,155 @@
+name: Sync upstream Quartz tag
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 14 * * *"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync_and_pr_subdir:
+    runs-on: ubuntu-latest
+    outputs:
+      new_tag_found: ${{ steps.find_latest_tag.outputs.new_tag_found }}
+      new_tag: ${{ steps.find_latest_tag.outputs.new_tag }}
+      current_version: ${{ steps.get_current_version.outputs.original_version_string }}
+
+    steps:
+      - name: Checkout your repository
+        uses: actions/checkout@v4
+
+      - name: Get current Quartz version from website/package.json
+        id: get_current_version
+        run: |
+          PACKAGE_JSON_PATH="website/package.json"
+          if [ ! -f "$PACKAGE_JSON_PATH" ]; then
+            echo "Error: $PACKAGE_JSON_PATH not found!"
+            echo "To resolve, ensure this file exists and contains the current Quartz version."
+            # Set default/error values and allow find_latest_tag to determine no new tags
+            echo "version=0.0.0" >> $GITHUB_OUTPUT
+            echo "original_version_string=unknown (package.json missing)" >> $GITHUB_OUTPUT
+            exit 0 # Exit gracefully so find_latest_tag can run and report no new tags
+          fi
+
+          VERSION_FROM_JSON=$(jq -r .version "$PACKAGE_JSON_PATH")
+          if [ -z "$VERSION_FROM_JSON" ] || [ "$VERSION_FROM_JSON" = "null" ]; then
+            echo "Error: Could not read .version from $PACKAGE_JSON_PATH or version is null."
+            echo "To resolve, ensure .version field exists and is populated."
+            echo "version=0.0.0" >> $GITHUB_OUTPUT
+            echo "original_version_string=unknown (version field issue)" >> $GITHUB_OUTPUT
+            exit 0 # Exit gracefully
+          fi
+
+          CLEANED_VERSION=${VERSION_FROM_JSON#v} # Remove 'v' prefix if present (e.g., v4.5.1 -> 4.5.1)
+          echo "Current version read from $PACKAGE_JSON_PATH: $VERSION_FROM_JSON (cleaned for comparison: $CLEANED_VERSION)"
+          echo "version=$CLEANED_VERSION" >> $GITHUB_OUTPUT
+          echo "original_version_string=$VERSION_FROM_JSON" >> $GITHUB_OUTPUT
+
+      - name: Find latest applicable upstream tag
+        id: find_latest_tag
+        run: |
+          CURRENT_VERSION_CLEANED="${{ steps.get_current_version.outputs.version }}"
+          echo "Current cleaned version for comparison: $CURRENT_VERSION_CLEANED"
+
+          if [ "$CURRENT_VERSION_CLEANED" = "0.0.0" ]; then
+            echo "Skipping tag search due to issues reading current version."
+            echo "new_tag_found=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Fetch all tags from upstream, sort them by version (highest version number last)
+          # Remove 'refs/tags/' prefix for cleaner tag names
+          UPSTREAM_TAGS_RAW=$(git ls-remote --tags --sort='v:refname' https://github.com/jackyzha0/quartz.git | awk '{print $2}' | sed 's#refs/tags/##')
+
+          LATEST_SUITABLE_TAG="" # This will hold the tag with 'v' prefix if present
+
+          echo "Available upstream tags (raw):"
+          echo "$UPSTREAM_TAGS_RAW"
+
+          for tag_with_v_prefix in $UPSTREAM_TAGS_RAW; do
+            tag_cleaned_for_compare=${tag_with_v_prefix#v} # Remove 'v' prefix for comparison logic
+
+            # Use sort -V to compare semantic versions.
+            # We want to find a tag_cleaned_for_compare that is strictly greater than CURRENT_VERSION_CLEANED.
+            # If sort -V places CURRENT_VERSION_CLEANED before tag_cleaned_for_compare (when listed alphabetically after sorting),
+            # and they are not identical, then tag_cleaned_for_compare is newer.
+            HIGHEST_OF_PAIR=$(printf '%s\n%s\n' "$tag_cleaned_for_compare" "$CURRENT_VERSION_CLEANED" | sort -V | tail -n 1)
+
+            if [ "$HIGHEST_OF_PAIR" = "$tag_cleaned_for_compare" ] && [ "$tag_cleaned_for_compare" != "$CURRENT_VERSION_CLEANED" ]; then
+              # This tag_cleaned_for_compare is greater than CURRENT_VERSION_CLEANED.
+              # Since the tags are already sorted by version by `git ls-remote --sort`,
+              # this will be the latest one encountered so far that is newer.
+              LATEST_SUITABLE_TAG="$tag_with_v_prefix"
+            fi
+          done
+
+          if [ -n "$LATEST_SUITABLE_TAG" ]; then
+            echo "Latest suitable newer upstream tag found: $LATEST_SUITABLE_TAG"
+            echo "new_tag_found=true" >> $GITHUB_OUTPUT
+            echo "new_tag=$LATEST_SUITABLE_TAG" >> $GITHUB_OUTPUT
+          else
+            echo "No newer upstream tag found than ${{ steps.get_current_version.outputs.original_version_string }}."
+            echo "new_tag_found=false" >> $GITHUB_OUTPUT
+            echo "new_tag=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout upstream jackyzha0/quartz (specific tag)
+        if: steps.find_latest_tag.outputs.new_tag_found == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: jackyzha0/quartz
+          ref: ${{ steps.find_latest_tag.outputs.new_tag }}
+          path: /tmp/quartz_upstream
+          fetch-depth: 1 # Only need the content of this specific tag
+
+      - name: Sync upstream content into your 'website' directory
+        if: steps.find_latest_tag.outputs.new_tag_found == 'true'
+        run: |
+          mkdir -p website
+          echo "Syncing files from /tmp/quartz_upstream/ (tag: ${{ steps.find_latest_tag.outputs.new_tag }}) to website/"
+          rsync -av --delete --exclude='.git/' /tmp/quartz_upstream/ website/
+          echo "Sync complete. website/package.json should now reflect version ${{ steps.find_latest_tag.outputs.new_tag }}."
+
+      - name: Create Pull Request with synced changes
+        if: steps.find_latest_tag.outputs.new_tag_found == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: |
+            Sync: Update website/ from Quartz ${{ steps.get_current_version.outputs.original_version_string }} to ${{ steps.find_latest_tag.outputs.new_tag }}
+
+            Automated sync of files from jackyzha0/quartz@${{ steps.find_latest_tag.outputs.new_tag }}
+            into the website/ directory.
+
+          # Branch name includes the new tag to ensure uniqueness for multiple updates
+          branch: quartz-upstream-sync-${{ steps.find_latest_tag.outputs.new_tag }}
+          delete-branch: true
+
+          # IMPORTANT: Change 'main' to your repository's default branch if it's different.
+          base: main
+
+          title: "DRAFT: Sync website/ from Quartz ${{ steps.get_current_version.outputs.original_version_string }} to ${{ steps.find_latest_tag.outputs.new_tag }}"
+          body: |
+            ## ⚠️ DRAFT PULL REQUEST - MANUAL REVIEW & MERGE REQUIRED ⚠️
+
+            This PR was automatically created by a GitHub Action to update the `website/` directory from Quartz version **${{ steps.get_current_version.outputs.original_version_string }}** to **${{ steps.find_latest_tag.outputs.new_tag }}**.
+
+            **🔴 IMPORTANT: MANUAL MERGE & VERIFICATION NEEDED 🔴**
+
+            The changes in this PR were applied by **copying files directly (using `rsync`)** from the upstream repository tag `${{ steps.find_latest_tag.outputs.new_tag }}`. This process **overwrites** existing files in your `website/` directory.
+
+            *   **Thoroughly review all file changes.**
+            *   **If you have made local modifications within the `website/` directory to files originating from Quartz, they may have been overwritten by this sync.** You will need to manually reconcile your local changes with the upstream updates.
+            *   **Do NOT blindly merge this PR without careful review and manual integration of any custom changes you've made to the `website/` directory.**
+
+            Once you have reviewed and manually integrated any necessary changes, you can mark this PR as "Ready for review" and proceed with your normal merging process.
+
+            ---
+            Upstream repository: <https://github.com/jackyzha0/quartz>
+            Current version in `website/package.json` (before this sync): `${{ steps.get_current_version.outputs.original_version_string }}`
+            New upstream tag synced: `${{ steps.find_latest_tag.outputs.new_tag }}`
+          labels: automated-pr, upstream-sync, quartz-sync, version-update, draft-review-needed
+          draft: true
