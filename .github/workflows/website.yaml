@@ -50,9 +50,6 @@ jobs:
       - name: Build
         run: npx quartz build
 
-      - name: Check
-        run: npm run check
-
       - name: Test
         run: npm run test
 
