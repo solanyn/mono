@@ -2,12 +2,16 @@ use gt7::{
     constants::{PACKET_HEARTBEAT_DATA, PACKET_SIZE},
     errors::ParsePacketError,
     packet::Packet,
+    flags::PacketFlags,
 };
 use std::net::{SocketAddr, UdpSocket};
 use std::process;
 use std::env;
 use log::{info, warn, error};
 use env_logger::Env;
+
+mod pulsar_handler;
+use pulsar_handler::PulsarHandler;
 
 const TELEMETRY_SERVER_PORT: u16 = 33739;
 const HEARTBEAT_INTERVAL_PACKETS: i32 = 100;
@@ -20,6 +24,30 @@ fn main() {
         Ok(val) => val,
         Err(_) => {
             error!("Error: The PS5_IP_ADDRESS environment variable must be set.");
+            process::exit(1);
+        }
+    };
+
+    let pulsar_service_url = match env::var("PULSAR_SERVICE_URL") {
+        Ok(val) => val,
+        Err(_) => {
+            error!("Error: The PULSAR_SERVICE_URL environment variable must be set.");
+            process::exit(1);
+        }
+    };
+
+    let pulsar_topic = match env::var("PULSAR_TOPIC") {
+        Ok(val) => val,
+        Err(_) => {
+            error!("Error: The PULSAR_TOPIC environment variable must be set.");
+            process::exit(1);
+        }
+    };
+
+    let pulsar_handler = match PulsarHandler::new(pulsar_service_url, pulsar_topic) {
+        Ok(handler) => handler,
+        Err(e) => {
+            error!("Failed to initialize PulsarHandler: {}", e);
             process::exit(1);
         }
     };
@@ -80,6 +108,26 @@ fn main() {
                                 packet.meters_per_second,
                                 packet.flags
                             );
+
+                            pulsar_handler.try_send_packet(&packet);
+
+                            if let Some(flags) = packet.flags {
+                                let is_paused_or_loading = flags.intersects(PacketFlags::Paused | PacketFlags::LoadingOrProcessing);
+                                let is_not_on_track_or_race_not_started = !flags.contains(PacketFlags::CarOnTrack) || packet.laps_in_race <= 0;
+
+                                if is_paused_or_loading || is_not_on_track_or_race_not_started {
+                                    let mut reasons = Vec::new();
+                                    if flags.contains(PacketFlags::Paused) { reasons.push("Paused"); }
+                                    if flags.contains(PacketFlags::LoadingOrProcessing) { reasons.push("LoadingOrProcessing"); }
+                                    if !flags.contains(PacketFlags::CarOnTrack) { reasons.push("NotOnTrack"); }
+                                    if packet.laps_in_race <= 0 { reasons.push("RaceNotStarted"); }
+                                    if !reasons.is_empty() {
+                                        info!("Main: Packet {} conditions not met for Pulsar send ({}). Flags: {:?}, Laps: {}",
+                                            packet.packet_id, reasons.join(", "), flags, packet.laps_in_race);
+                                    }
+                                }
+                            }
+
                             if packet.packet_id > 0
                                 && packet.packet_id % HEARTBEAT_INTERVAL_PACKETS == 0
                             {
