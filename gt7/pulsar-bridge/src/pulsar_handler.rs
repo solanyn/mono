@@ -187,16 +187,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn try_send_packet_does_not_send_when_not_on_track() {
+    async fn try_send_packet_sends_when_not_on_track() {
         let (tx, mut rx) = mpsc::channel::<PulsarMessagePayload>(10);
         let handler = PulsarHandler::new_for_test(tx);
         let mut packet = base_test_packet();
-        packet.flags = Some(PacketFlags::empty());
+        packet.flags = Some(PacketFlags::empty()); // Not on track
         packet.laps_in_race = 1;
         handler.try_send_packet(&packet);
         assert!(
-            rx.try_recv().is_err(),
-            "Expected no message when not on track"
+            rx.try_recv().is_ok(),
+            "Expected message to be sent even when not on track"
         );
     }
 

@@ -370,7 +370,7 @@ mod tests {
         let key_bytes_slice = &PACKET_DECRYPTION_KEY[0..crate::cypher::EXPECTED_KEY_LEN];
         let key_slice = GenericArray::from_slice(key_bytes_slice);
 
-        let iv1 = u32::from_le_bytes(original_iv_seed_from_.try_into().unwrap());
+        let iv1 = u32::from_le_bytes(original_iv_seed_from_sample.try_into().unwrap());
         let iv2 = iv1 ^ 0xDEADBEAF;
         let mut iv_salsa20_bytes: [u8; 8] = [0u8; 8];
         iv_salsa20_bytes[0..4].copy_from_slice(&iv2.to_le_bytes());

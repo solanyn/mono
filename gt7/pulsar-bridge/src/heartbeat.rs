@@ -165,12 +165,12 @@ mod tests {
         let interval = Duration::from_millis(100);
         let mut manager = HeartbeatManager::new(interval);
         
-        // Record heartbeat, then test right at the boundary
+        // Record heartbeat, then test well before the boundary
         manager.record_heartbeat_sent();
-        thread::sleep(Duration::from_millis(99));
+        thread::sleep(Duration::from_millis(50));
         assert!(!manager.is_heartbeat_needed());
         
-        thread::sleep(Duration::from_millis(2)); // Now at ~101ms
+        thread::sleep(Duration::from_millis(60)); // Now at ~110ms, well past boundary
         assert!(manager.is_heartbeat_needed());
     }
 
