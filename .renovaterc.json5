@@ -10,6 +10,9 @@
   ],
   "automerge": true,
   "rebaseWhen": "conflicted",
+  "ignorePaths": [
+      "website/"
+  ],
   // https://github.com/tensorchord/cloudnative-vectorchord/blob/main/renovate.json
   "customManagers": [
     {
