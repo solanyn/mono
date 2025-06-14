@@ -1,0 +1,145 @@
+name: Build GT7 Pulsar Bridge
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    paths:
+      - "gt7/pulsar-bridge/**"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  packages: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            gt7/pulsar-bridge/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Run tests
+        working-directory: gt7/pulsar-bridge
+        run: cargo test
+
+      - name: Check formatting
+        working-directory: gt7/pulsar-bridge
+        run: cargo fmt -- --check
+
+      - name: Run clippy
+        working-directory: gt7/pulsar-bridge
+        run: cargo clippy -- -D warnings
+
+      - name: Build
+        working-directory: gt7/pulsar-bridge
+        run: cargo build --release
+
+  build_and_push:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3.6.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.10.0
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3.4.0
+        with:
+          registry: ghcr.io
+          username: "${{ github.actor }}"
+          password: "${{ github.token }}"
+
+      - name: Determine version change
+        id: changed-version
+        run: |
+          BASE=${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || 'HEAD~1' }}
+          CHANGED_FILES=$(git diff --name-only $BASE...HEAD)
+          echo $CHANGED_FILES
+          # Looking for changes in gt7/pulsar-bridge directory
+          if echo "$CHANGED_FILES" | grep -q "gt7/pulsar-bridge/"; then
+            echo "any_changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "any_changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Determine image push
+        uses: actions/github-script@v7
+        id: should-release
+        with:
+          script: |
+            if (context.eventName == "pull_request") return false;
+            if (context.eventName == "workflow_dispatch") return true;
+            return "${{ steps.changed-version.outputs.any_changed }}" == "true";
+
+      - name: Generate docker image tags
+        id: metadata
+        uses: docker/metadata-action@v5
+        with:
+          flavor: |
+            latest=${{ github.ref == 'refs/heads/main' }}
+          labels: |-
+            org.opencontainers.image.title=gt7-pulsar-bridge
+            org.opencontainers.image.url=https://ghcr.io/${{ github.repository_owner }}/gt7-pulsar-bridge
+            org.opencontainers.image.description=GT7 telemetry bridge to Apache Pulsar
+          images: |
+            name=ghcr.io/${{ github.actor }}/gt7-pulsar-bridge
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6.18.0
+        with:
+          context: ./gt7/pulsar-bridge
+          platforms: linux/amd64,linux/arm64
+          push: ${{ !github.event.pull_request.head.repo.fork && steps.should-release.outputs.result }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
+
+  results:
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    name: Build results
+    needs: [test, build_and_push]
+    steps:
+      - run: |
+          test_result="${{ needs.test.result }}"
+          build_result="${{ needs.build_and_push.result }}"
+          if [[ $test_result == "success" && ($build_result == "success" || $build_result == "skipped") ]]; then
+            exit 0
+          else
+            exit 1
+          fi

@@ -1,6 +1,44 @@
 # GT7 Pulsar Bridge
 
-This project bridges telemetry data from Gran Turismo 7 to an Apache Pulsar topic.
+This project bridges telemetry data from Gran Turismo 7 to an Apache Pulsar topic. It captures real-time UDP telemetry packets transmitted by GT7 and forwards them to Apache Pulsar for further processing and analysis.
+
+## About GT7 Telemetry
+
+Gran Turismo 7 always transmits UDP telemetry data - there are no game settings to enable or disable it. The game continuously sends encrypted packets that provide comprehensive real-time information about the vehicle and race state.
+
+### Telemetry Specifications
+
+- **Packet Size**: 296 bytes
+- **Transmission Rate**: 60Hz (60 packets per second)
+- **Protocol**: UDP
+- **Encryption**: Salsa20 stream cipher with 32-byte key and 8-byte nonce
+- **Port**: 33739 (default GT7 telemetry port)
+
+### Data Contents
+
+The telemetry packets include extensive vehicle and race data:
+
+- **Vehicle Physics**: 3-axis position, velocity, rotation, acceleration
+- **Engine Data**: RPM, fuel levels, throttle/brake input
+- **Performance**: Speed, gear information, tire temperatures and wear
+- **Race Information**: Lap times, lap count, race position
+- **Track Data**: Position on track, distance traveled
+- **Simulator State**: Flags indicating car on track, paused state, in gear, etc.
+
+### Connection Requirements
+
+GT7 sends encrypted telemetry packets to any device that requests them via heartbeat. The console will only send packets to the IP address that initiated the heartbeat request. The connection requires:
+
+- **Heartbeat Transmission**: Must send heartbeat packets regularly (approximately every 1.6 seconds) or the connection will cease
+- **IP-based Connection**: GT7 only sends data to the IP address that sent the heartbeat
+- **Packet Decryption**: All packets are encrypted with Salsa20 stream cipher
+
+This bridge automatically handles:
+
+- Initial connection establishment via heartbeat
+- Periodic heartbeat transmission (every 100 packets received)
+- Packet decryption and parsing
+- Data validation and error handling
 
 ## Local Development & Testing with Docker Compose
 
@@ -25,6 +63,7 @@ Key environment variables for the `gt7-pulsar-bridge` service are configured in 
 *   `PULSAR_TOPIC`: Defaults to `persistent://public/default/gt7-telemetry`.
 *   `RUST_LOG`: Controls logging. Defaults to `info,gt7_pulsar_bridge=debug`. You can adjust this for more or less verbose logging.
 *   `HTTP_BIND_ADDRESS`: Set to `0.0.0.0:8080` for the container.
+*   `HEARTBEAT_INTERVAL_SECONDS`: Controls how often heartbeat packets are sent to GT7. Defaults to `1.6` seconds, which is the recommended interval to maintain the connection. You can adjust this value, but intervals too long (>1.6s) may cause GT7 to stop sending telemetry data.
 
 ### Running the Services
 

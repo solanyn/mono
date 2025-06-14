@@ -2,23 +2,30 @@ services:
   gt7-pulsar-bridge:
     build:
       context: .
-    ports:
-      - "8080:8080"
-      - "33740:33740/udp"
+    develop:
+      watch:
+        - action: rebuild
+          path: ./src
+        - action: rebuild
+          path: ./Dockerfile
+        - action: rebuild
+          path: ./Cargo.toml
+        - action: rebuild
+          path: ./docker-compose.yml
+    network_mode: host
     environment:
       # For Docker Desktop, host.docker.internal usually resolves to the host's IP.
       # Otherwise, replace with your actual host IP if PS5 is on the same network,
       # or the PS5's IP address if it's accessible.
       PS5_IP_ADDRESS: "192.168.1.184"
-      PULSAR_SERVICE_URL: "pulsar://pulsar:6650"
-      PULSAR_TOPIC: "persistent://public/default/gt7-telemetry"
+      PULSAR_SERVICE_URL: "pulsar://localhost:6650"
+      PULSAR_TOPIC: "persistent://public/default/gt7"
       RUST_LOG: "info,gt7_pulsar_bridge=info"
       HTTP_BIND_ADDRESS: "0.0.0.0:8080"
-    depends_on:
-      pulsar:
-        condition: service_healthy
-    networks:
-      - gt7_testing_net
+      HEARTBEAT_INTERVAL_SECONDS: "1.6"
+    # depends_on:
+    #   pulsar:
+    #     condition: service_healthy
 
   pulsar:
     image: apachepulsar/pulsar:3.3.0

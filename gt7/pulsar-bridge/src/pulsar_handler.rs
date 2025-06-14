@@ -79,8 +79,8 @@ impl PulsarHandler {
 
     pub fn try_send_packet(&self, packet: &Packet) {
         if let Some(flags) = packet.flags {
+            // Send packets unless paused, loading, or race hasn't started
             if !flags.intersects(PacketFlags::Paused | PacketFlags::LoadingOrProcessing)
-                && flags.contains(PacketFlags::CarOnTrack)
                 && packet.laps_in_race > 0
             {
                 match serde_json::to_string(packet) {

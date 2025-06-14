@@ -20,7 +20,6 @@ mod pulsar_handler;
 use pulsar_handler::PulsarHandler;
 
 const TELEMETRY_SERVER_PORT: u16 = 33739;
-const HEARTBEAT_INTERVAL_PACKETS: i32 = 100;
 const BIND_ADDRESS: &str = "0.0.0.0:33740";
 const DEFAULT_HTTP_BIND_ADDRESS: &str = "0.0.0.0:8080";
 
@@ -52,6 +51,19 @@ async fn run_http_server(_runtime: Arc<Runtime>) {
 fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 
+    // Log configuration at startup
+    info!("=== GT7 Pulsar Bridge Configuration ===");
+    info!("PS5_IP_ADDRESS: {}", env::var("PS5_IP_ADDRESS").unwrap_or_else(|_| "NOT SET".to_string()));
+    info!("PULSAR_SERVICE_URL: {}", env::var("PULSAR_SERVICE_URL").unwrap_or_else(|_| "NOT SET".to_string()));
+    info!("PULSAR_TOPIC: {}", env::var("PULSAR_TOPIC").unwrap_or_else(|_| "NOT SET".to_string()));
+    info!("HTTP_BIND_ADDRESS: {}", env::var("HTTP_BIND_ADDRESS").unwrap_or_else(|_| DEFAULT_HTTP_BIND_ADDRESS.to_string()));
+    info!("LOG_PACKET_INTERVAL_SECONDS: {}", env::var("LOG_PACKET_INTERVAL_SECONDS").unwrap_or_else(|_| "5 (default)".to_string()));
+    info!("RUST_LOG: {}", env::var("RUST_LOG").unwrap_or_else(|_| "info (default)".to_string()));
+    info!("HEARTBEAT_INTERVAL_SECONDS: {}", env::var("HEARTBEAT_INTERVAL_SECONDS").unwrap_or_else(|_| "1.6 (default)".to_string()));
+    info!("UDP_BIND_ADDRESS: {}", BIND_ADDRESS);
+    info!("TELEMETRY_SERVER_PORT: {}", TELEMETRY_SERVER_PORT);
+    info!("======================================");
+
     let default_log_interval_seconds: u64 = 5;
     let log_interval_duration: Option<Duration> = match env::var("LOG_PACKET_INTERVAL_SECONDS") {
         Ok(val_str) => match val_str.parse::<u64>() {
@@ -69,7 +81,6 @@ fn main() {
             }
         },
         Err(_) => {
-            info!("LOG_PACKET_INTERVAL_SECONDS not set. Using default: {} seconds.", default_log_interval_seconds);
             Some(Duration::from_secs(default_log_interval_seconds))
         }
     };
@@ -81,6 +92,7 @@ fn main() {
     } else {
         Instant::now()
     };
+
 
     let runtime = Arc::new(Runtime::new().expect("Failed to create Tokio runtime"));
 
@@ -152,6 +164,13 @@ fn main() {
         info!("UDP socket read timeout set to 1 second.");
     }
 
+    // Enable broadcast reception
+    if let Err(e) = socket.set_broadcast(true) {
+        warn!("Failed to enable broadcast on UDP socket: {}. May not receive broadcast packets.", e);
+    } else {
+        info!("UDP socket configured to receive broadcast packets.");
+    }
+
     let destination_str = format!("{}:{}", ps5_ip_address, TELEMETRY_SERVER_PORT);
     info!("Target UDP telemetry server: {}", destination_str);
     let destination: SocketAddr = match destination_str.parse() {
@@ -172,16 +191,12 @@ fn main() {
         info!("UDP heartbeat sent successfully.");
     }
 
-    let mut last_heartbeat_time = Instant::now();
-    let heartbeat_interval = Duration::from_secs(1);
 
     loop {
+        // Send heartbeat to maintain connection
         if let Err(e) = socket.send_to(PACKET_HEARTBEAT_DATA, destination) {
-            error!(
-                "Failed to send UDP heartbeat/request packet: {}. Continuing after a short delay...",
-                e
-            );
-            thread::sleep(Duration::from_secs(1));
+            error!("Failed to send UDP heartbeat: {}. Retrying...", e);
+            thread::sleep(Duration::from_millis(100));
             continue;
         }
 
@@ -191,6 +206,12 @@ fn main() {
                 if number_of_bytes == PACKET_SIZE {
                     match Packet::try_from(&buf) {
                         Ok(packet) => {
+                            info!("Received packet ID: {}, Flags: {:?}, Laps: {}, On Track: {}", 
+                                packet.packet_id, 
+                                packet.flags, 
+                                packet.laps_in_race,
+                                packet.flags.map(|f| f.contains(PacketFlags::CarOnTrack)).unwrap_or(false)
+                            );
                             pulsar_handler.try_send_packet(&packet);
 
                             if let Some(interval) = log_interval_duration {
@@ -237,18 +258,6 @@ fn main() {
                                 }
                             }
 
-                            if packet.packet_id > 0
-                                && packet.packet_id % HEARTBEAT_INTERVAL_PACKETS == 0
-                            {
-                                info!(
-                                    "Sending periodic UDP heartbeat (Packet ID: {})",
-                                    packet.packet_id
-                                );
-                                if let Err(e) = socket.send_to(PACKET_HEARTBEAT_DATA, destination) {
-                                    error!("Failed to send periodic UDP heartbeat: {}", e);
-                                }
-                                last_heartbeat_time = Instant::now();
-                            }
                         }
                         Err(e) => match e {
                             ParsePacketError::InvalidMagicValue(val) => {
@@ -286,14 +295,6 @@ fn main() {
                     error!("Failed to receive packet: {}. Retrying...", e);
                 }
                 
-                // Send heartbeat if enough time has passed since last heartbeat
-                if last_heartbeat_time.elapsed() >= heartbeat_interval {
-                    debug!("Sending heartbeat due to timeout (PS5 may be disconnected)");
-                    if let Err(e) = socket.send_to(PACKET_HEARTBEAT_DATA, destination) {
-                        error!("Failed to send timeout heartbeat: {}", e);
-                    }
-                    last_heartbeat_time = Instant::now();
-                }
             }
         }
     }

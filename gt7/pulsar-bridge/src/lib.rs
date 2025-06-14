@@ -3,3 +3,5 @@ mod cypher;
 pub mod errors;
 pub mod flags;
 pub mod packet;
+pub mod config;
+pub mod heartbeat;
