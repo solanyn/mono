@@ -10,6 +10,7 @@ use std::env;
 use std::net::{SocketAddr, UdpSocket};
 use std::process;
 use std::sync::Arc;
+use std::thread;
 use std::time::{Duration, Instant};
 use tokio::runtime::Runtime;
 
@@ -144,6 +145,13 @@ fn main() {
         }
     };
 
+    // Set a read timeout on the socket
+    if let Err(e) = socket.set_read_timeout(Some(Duration::from_secs(1))) {
+        warn!("Failed to set read timeout on UDP socket: {}. Proceeding with blocking socket.", e);
+    } else {
+        info!("UDP socket read timeout set to 1 second.");
+    }
+
     let destination_str = format!("{}:{}", ps5_ip_address, TELEMETRY_SERVER_PORT);
     info!("Target UDP telemetry server: {}", destination_str);
     let destination: SocketAddr = match destination_str.parse() {
@@ -159,17 +167,21 @@ fn main() {
 
     info!("Sending initial UDP heartbeat to {}", destination);
     if let Err(e) = socket.send_to(PACKET_HEARTBEAT_DATA, destination) {
-        error!("Failed to send initial UDP heartbeat: {}", e);
-        process::exit(1);
+        error!("Failed to send UDP heartbeat: {}. Will retry.", e);
+    } else {
+        info!("UDP heartbeat sent successfully.");
     }
-    info!("Initial UDP heartbeat sent.");
+
+    let mut last_heartbeat_time = Instant::now();
+    let heartbeat_interval = Duration::from_secs(1);
 
     loop {
         if let Err(e) = socket.send_to(PACKET_HEARTBEAT_DATA, destination) {
             error!(
-                "Failed to send UDP heartbeat/request packet: {}. Continuing...",
+                "Failed to send UDP heartbeat/request packet: {}. Continuing after a short delay...",
                 e
             );
+            thread::sleep(Duration::from_secs(1));
             continue;
         }
 
@@ -179,16 +191,6 @@ fn main() {
                 if number_of_bytes == PACKET_SIZE {
                     match Packet::try_from(&buf) {
                         Ok(packet) => {
-                            debug!(
-                                "Packet ID: {}, Lap: {}/{}, RPM: {:.0}, Speed: {:.1} m/s, Flags: {:?}",
-                                packet.packet_id,
-                                packet.lap_count,
-                                packet.laps_in_race,
-                                packet.engine_rpm,
-                                packet.meters_per_second,
-                                packet.flags
-                            );
-
                             pulsar_handler.try_send_packet(&packet);
 
                             if let Some(interval) = log_interval_duration {
@@ -245,6 +247,7 @@ fn main() {
                                 if let Err(e) = socket.send_to(PACKET_HEARTBEAT_DATA, destination) {
                                     error!("Failed to send periodic UDP heartbeat: {}", e);
                                 }
+                                last_heartbeat_time = Instant::now();
                             }
                         }
                         Err(e) => match e {
@@ -276,7 +279,21 @@ fn main() {
                 }
             }
             Err(e) => {
-                error!("Failed to receive packet: {}. Retrying...", e);
+                // This will now also catch timeout errors if set_read_timeout was successful
+                if e.kind() == std::io::ErrorKind::WouldBlock || e.kind() == std::io::ErrorKind::TimedOut {
+                    debug!("Socket receive timeout. Retrying..."); // Log timeouts at debug level
+                } else {
+                    error!("Failed to receive packet: {}. Retrying...", e);
+                }
+                
+                // Send heartbeat if enough time has passed since last heartbeat
+                if last_heartbeat_time.elapsed() >= heartbeat_interval {
+                    debug!("Sending heartbeat due to timeout (PS5 may be disconnected)");
+                    if let Err(e) = socket.send_to(PACKET_HEARTBEAT_DATA, destination) {
+                        error!("Failed to send timeout heartbeat: {}", e);
+                    }
+                    last_heartbeat_time = Instant::now();
+                }
             }
         }
     }
