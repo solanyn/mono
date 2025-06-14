@@ -1,42 +1,116 @@
 use gt7::{
     constants::{PACKET_HEARTBEAT_DATA, PACKET_SIZE},
+    errors::ParsePacketError,
     packet::Packet,
 };
 use std::net::{SocketAddr, UdpSocket};
+use std::process;
+
+const TELEMETRY_SERVER_PORT: u16 = 33739;
+const HEARTBEAT_INTERVAL_PACKETS: i32 = 100;
+const BIND_ADDRESS: &str = "0.0.0.0:33740";
+const PS5_IP_ADDRESS: &str = "192.168.1.184"; // TODO: Make this configurable
 
 fn main() {
-    // Create a UDP socket bound to any available address
-    let socket = UdpSocket::bind("0.0.0.0:33740").expect("Failed to bind socket");
+    println!("Attempting to bind to socket: {}", BIND_ADDRESS);
+    let socket = match UdpSocket::bind(BIND_ADDRESS) {
+        Ok(s) => {
+            println!("Successfully bound to socket: {}", BIND_ADDRESS);
+            s
+        }
+        Err(e) => {
+            eprintln!("Failed to bind socket {}: {}", BIND_ADDRESS, e);
+            process::exit(1);
+        }
+    };
 
-    // IP address and port to send/receive packets
-    let ip_address = "192.168.1.184"; // This will be the address of your PS5
-    let port = 33739; // Do NOT change this port, as the telemetry server listens to incoming packets on this port
-    let destination: SocketAddr = format!("{}:{}", ip_address, port)
-        .parse()
-        .expect("Invalid IP address or port");
+    let destination_str = format!("{}:{}", PS5_IP_ADDRESS, TELEMETRY_SERVER_PORT);
+    println!("Target telemetry server: {}", destination_str);
+    let destination: SocketAddr = match destination_str.parse() {
+        Ok(addr) => addr,
+        Err(e) => {
+            eprintln!(
+                "Invalid IP address or port format '{}': {}",
+                destination_str, e
+            );
+            process::exit(1);
+        }
+    };
 
-    // Send heartbeat packet to the telemetry server
-    socket
-        .send_to(PACKET_HEARTBEAT_DATA, destination)
-        .expect("Failed to send packet");
+    println!("Sending initial heartbeat to {}", destination);
+    if let Err(e) = socket.send_to(PACKET_HEARTBEAT_DATA, destination) {
+        eprintln!("Failed to send initial heartbeat: {}", e);
+        process::exit(1);
+    }
+    println!("Initial heartbeat sent.");
 
-    // Send a packet
     loop {
-        socket
-            .send_to(PACKET_HEARTBEAT_DATA, destination)
-            .expect("Failed to send packet");
+        if let Err(e) = socket.send_to(PACKET_HEARTBEAT_DATA, destination) {
+            eprintln!(
+                "Failed to send heartbeat/request packet: {}. Continuing...",
+                e
+            );
+            continue;
+        }
+
         let mut buf = [0u8; PACKET_SIZE];
-        socket
-            .recv_from(&mut buf)
-            .expect("Failed to receive packet");
-        // println!("Received packet: {:?}", buf);
-        let packet = Packet::try_from(&buf).expect("Failed to parse packet");
-        println!("{:#?}", packet);
-        // Send hearbeat packet every 100 packets, otherwise the telemetry server will assume this client is dead
-        if packet.packet_id % 100 == 0 {
-            socket
-                .send_to(PACKET_HEARTBEAT_DATA, destination)
-                .expect("Failed to send packet");
+        match socket.recv_from(&mut buf) {
+            Ok((number_of_bytes, src_addr)) => {
+                if number_of_bytes == PACKET_SIZE {
+                    match Packet::try_from(&buf) {
+                        Ok(packet) => {
+                            println!(
+                                "Packet ID: {}, Lap: {}/{}, RPM: {:.0}, Speed: {:.1} m/s, Flags: {:?}",
+                                packet.packet_id,
+                                packet.lap_count,
+                                packet.laps_in_race,
+                                packet.engine_rpm,
+                                packet.meters_per_second,
+                                packet.flags
+                            );
+                            if packet.packet_id > 0
+                                && packet.packet_id % HEARTBEAT_INTERVAL_PACKETS == 0
+                            {
+                                println!(
+                                    "Sending periodic heartbeat (Packet ID: {})",
+                                    packet.packet_id
+                                );
+                                if let Err(e) = socket.send_to(PACKET_HEARTBEAT_DATA, destination) {
+                                    eprintln!("Failed to send periodic heartbeat: {}", e);
+                                }
+                            }
+                        }
+                        Err(e) => match e {
+                            ParsePacketError::InvalidMagicValue(val) => {
+                                eprintln!(
+                                    "Packet parse error from {}: Invalid magic value {:#X}",
+                                    src_addr, val
+                                );
+                            }
+                            ParsePacketError::ReadError(io_err) => {
+                                eprintln!(
+                                    "Packet parse error from {}: Read error: {}",
+                                    src_addr, io_err
+                                );
+                            }
+                            ParsePacketError::DecryptionError(dec_err) => {
+                                eprintln!(
+                                    "Packet parse error from {}: Decryption error: {}",
+                                    src_addr, dec_err
+                                );
+                            }
+                        },
+                    }
+                } else {
+                    eprintln!(
+                        "Received packet of unexpected size: {} bytes from {}",
+                        number_of_bytes, src_addr
+                    );
+                }
+            }
+            Err(e) => {
+                eprintln!("Failed to receive packet: {}. Retrying...", e);
+            }
         }
     }
 }
