@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   gt7-pulsar-bridge:
     build:
@@ -43,7 +41,11 @@ services:
       PULSAR_PREFIX_bookkeeper_ml_bardziej_Xmx: "256m"
       PULSAR_PREFIX_bookkeeper_ml_bardziej_Xms: "256m"
     healthcheck:
-      test: ["CMD-SHELL", "curl -s -f http://localhost:8080/admin/v2/brokers/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -s -f http://localhost:8080/admin/v2/brokers/health || exit 1",
+        ]
       interval: 20s
       timeout: 10s
       retries: 5
