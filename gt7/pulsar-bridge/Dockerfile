@@ -2,6 +2,10 @@
 FROM rust:bullseye AS builder
 WORKDIR /usr/src/app
 
+# Install protobuf-compiler, needed by the pulsar crate's build script
+RUN apt-get update && apt-get install -y --no-install-recommends protobuf-compiler && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY Cargo.toml Cargo.lock ./
 RUN mkdir src && echo "fn main() {println!(\"Building dependencies...\");}" > src/main.rs && \
     cargo build --release --locked
