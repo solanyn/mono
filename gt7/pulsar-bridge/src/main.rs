@@ -1,5 +1,5 @@
 use env_logger::Env;
-use gt7::{
+use gt7_pulsar_bridge::{
     constants::{PACKET_HEARTBEAT_DATA, PACKET_SIZE},
     errors::ParsePacketError,
     flags::PacketFlags,
@@ -133,8 +133,6 @@ fn main() {
     }
     info!("Initial UDP heartbeat sent.");
 
-    // The main loop for UDP packet processing
-    // This loop will keep the main thread alive, and thus the Tokio runtime and its spawned tasks.
     loop {
         if let Err(e) = socket.send_to(PACKET_HEARTBEAT_DATA, destination) {
             error!(
@@ -235,5 +233,39 @@ fn main() {
                 error!("Failed to receive packet: {}. Retrying...", e);
             }
         }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::{
+        body::Body,
+        http::{Request, StatusCode},
+    };
+    use http_body_util::BodyExt;
+    use tower::util::ServiceExt;
+
+    // Helper function to create the app for testing
+    fn test_app() -> Router {
+        Router::new().route("/healthz", get(health_check_handler))
+    }
+
+    #[tokio::test]
+    async fn health_check_works() {
+        let app = test_app();
+
+        // `Router` implements `tower::Service<Request<Body>>` so we can
+        // call it like any tower service, no need to run an HTTP server.
+        let response = app
+            .oneshot(Request::builder().uri("/healthz").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        assert_eq!(&body[..], b"OK");
     }
 }

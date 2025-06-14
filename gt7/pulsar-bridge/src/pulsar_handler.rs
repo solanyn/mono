@@ -5,8 +5,8 @@ use std::sync::Arc;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 
-use gt7::flags::PacketFlags;
-use gt7::packet::Packet;
+use gt7_pulsar_bridge::flags::PacketFlags;
+use gt7_pulsar_bridge::packet::Packet;
 
 type PulsarMessagePayload = Vec<u8>;
 
@@ -119,8 +119,8 @@ impl PulsarHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gt7::flags::PacketFlags;
-    use gt7::packet::Packet;
+    use gt7_pulsar_bridge::flags::PacketFlags;
+    use gt7_pulsar_bridge::packet::Packet;
     use tokio::sync::mpsc;
 
     impl PulsarHandler {

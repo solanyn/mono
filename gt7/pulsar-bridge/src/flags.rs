@@ -2,7 +2,6 @@ use bitflags::bitflags;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 bitflags! {
-    // Serde derive removed from here
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct PacketFlags: u16 {
         const None = 0;

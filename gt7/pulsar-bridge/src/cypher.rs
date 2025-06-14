@@ -15,7 +15,6 @@ pub fn decrypt(data: &[u8; PACKET_SIZE]) -> Result<[u8; PACKET_SIZE], CypherErro
     if PACKET_DECRYPTION_KEY.len() < EXPECTED_KEY_LEN {
         return Err(CypherError::InvalidKeyLength(PACKET_DECRYPTION_KEY.len()));
     }
-    // Ensure key is correct length before creating GenericArray
     let key_bytes_slice = &PACKET_DECRYPTION_KEY[0..EXPECTED_KEY_LEN];
     let key_slice = GenericArray::from_slice(key_bytes_slice);
 
@@ -49,7 +48,7 @@ pub fn decrypt(data: &[u8; PACKET_SIZE]) -> Result<[u8; PACKET_SIZE], CypherErro
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::constants::PACKET_MAGIC_VALUE; // For checking decrypted output
+    use crate::constants::PACKET_MAGIC_VALUE;
 
     const SAMPLE_ENCRYPTED_PACKET_FOR_CYPHER_TEST: [u8; PACKET_SIZE] = [
         0x66, 0x83, 0x09, 0x68, 0x05, 0xc8, 0xf5, 0xa9, 0x77, 0x48, 0x09, 0x9a, 0xaf, 0x1e, 0x9f,

@@ -7,7 +7,7 @@ use byteorder::{LittleEndian, ReadBytesExt};
 
 use crate::{
     constants::{PACKET_MAGIC_VALUE, PACKET_SIZE},
-    cypher, // Now cypher::decrypt is used, and its public constants are used in tests via crate::cypher::*
+    cypher, 
     errors::ParsePacketError,
     flags::PacketFlags,
 };
@@ -306,10 +306,8 @@ fn verify_magic_value(magic: u32) -> Result<(), ParsePacketError> {
 mod tests {
     use super::*;
     use crate::constants::PACKET_DECRYPTION_KEY;
-    // PACKET_MAGIC_VALUE is used from crate::constants via super::* or directly
-    use crate::errors::ParsePacketError; // Explicitly used
-                                         // PacketFlags is used from crate::flags via super::*
-    use salsa20::cipher::{generic_array::GenericArray, KeyIvInit, StreamCipher}; // For test utility
+    use crate::errors::ParsePacketError; 
+    use salsa20::cipher::{generic_array::GenericArray, KeyIvInit, StreamCipher};
 
     const SAMPLE_ENCRYPTED_PACKET: [u8; PACKET_SIZE] = [
         0x66, 0x83, 0x09, 0x68, 0x05, 0xc8, 0xf5, 0xa9, 0x77, 0x48, 0x09, 0x9a, 0xaf, 0x1e, 0x9f,
@@ -372,7 +370,7 @@ mod tests {
         let key_bytes_slice = &PACKET_DECRYPTION_KEY[0..crate::cypher::EXPECTED_KEY_LEN];
         let key_slice = GenericArray::from_slice(key_bytes_slice);
 
-        let iv1 = u32::from_le_bytes(original_iv_seed_from_sample);
+        let iv1 = u32::from_le_bytes(original_iv_seed_from_.try_into().unwrap());
         let iv2 = iv1 ^ 0xDEADBEAF;
         let mut iv_salsa20_bytes: [u8; 8] = [0u8; 8];
         iv_salsa20_bytes[0..4].copy_from_slice(&iv2.to_le_bytes());
