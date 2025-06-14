@@ -1,5 +1,5 @@
 [package]
-name = "gt7"
+name = "gt7-pulsar-bridge"
 version = "0.1.0"
 edition = "2021"
 
@@ -26,4 +26,3 @@ axum = "0.7.5"
 # "pulsar-publish" is now a default feature.
 default = ["pulsar-publish"]
 pulsar-publish = ["dep:pulsar"]
-
