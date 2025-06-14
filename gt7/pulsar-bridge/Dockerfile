@@ -18,7 +18,7 @@ RUN touch src/main.rs && cargo build --release --locked
 RUN strip /usr/src/app/target/release/gt7-pulsar-bridge
 
 # Stage 2: Create the runtime image
-FROM gcr.io/distroless/base-debian12
+FROM gcr.io/distroless/cc-debian12
 
 COPY --from=builder /usr/src/app/target/release/gt7-pulsar-bridge /gt7-pulsar-bridge
 

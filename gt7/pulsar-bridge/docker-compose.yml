@@ -9,7 +9,7 @@ services:
       # For Docker Desktop, host.docker.internal usually resolves to the host's IP.
       # Otherwise, replace with your actual host IP if PS5 is on the same network,
       # or the PS5's IP address if it's accessible.
-      PS5_IP_ADDRESS: "host.docker.internal"
+      PS5_IP_ADDRESS: "192.168.1.184"
       PULSAR_SERVICE_URL: "pulsar://pulsar:6650"
       PULSAR_TOPIC: "persistent://public/default/gt7-telemetry"
       RUST_LOG: "info,gt7_pulsar_bridge=debug" # Adjust log levels as needed
