@@ -1,6 +1,5 @@
 use log::{error, info, warn};
 use pulsar::{Producer, Pulsar, TokioExecutor};
-use serde_json;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
@@ -26,8 +25,10 @@ async fn pulsar_worker_task(
                             actual_message_id.ledger_id, actual_message_id.entry_id
                         );
                     } else {
-                        info!("PulsarWorker: Sent payload (no MessageId in receipt, ProducerID: {}, SequenceID: {})",
-                                  send_receipt.producer_id, send_receipt.sequence_id);
+                        info!(
+                            "PulsarWorker: Sent payload (no MessageId in receipt, ProducerID: {}, SequenceID: {})",
+                            send_receipt.producer_id, send_receipt.sequence_id
+                        );
                     }
                 }
                 Err(e_ack) => {
@@ -35,7 +36,10 @@ async fn pulsar_worker_task(
                 }
             },
             Err(e_initial_send) => {
-                error!("PulsarWorker: Pulsar failed to initiate send (send_non_blocking future error): {}", e_initial_send);
+                error!(
+                    "PulsarWorker: Pulsar failed to initiate send (send_non_blocking future error): {}",
+                    e_initial_send
+                );
             }
         }
     }
@@ -95,7 +99,10 @@ impl PulsarHandler {
                                 );
                             }
                             Err(mpsc::error::TrySendError::Closed(_payload_bytes)) => {
-                                error!("PulsarHandler: Worker channel closed. Packet (ID: {}) dropped. Worker may have terminated.", packet.packet_id);
+                                error!(
+                                    "PulsarHandler: Worker channel closed. Packet (ID: {}) dropped. Worker may have terminated.",
+                                    packet.packet_id
+                                );
                             }
                         }
                     }

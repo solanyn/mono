@@ -7,7 +7,7 @@ use byteorder::{LittleEndian, ReadBytesExt};
 
 use crate::{
     constants::{PACKET_MAGIC_VALUE, PACKET_SIZE},
-    cypher, 
+    cypher,
     errors::ParsePacketError,
     flags::PacketFlags,
 };
@@ -306,8 +306,8 @@ fn verify_magic_value(magic: u32) -> Result<(), ParsePacketError> {
 mod tests {
     use super::*;
     use crate::constants::PACKET_DECRYPTION_KEY;
-    use crate::errors::ParsePacketError; 
-    use salsa20::cipher::{generic_array::GenericArray, KeyIvInit, StreamCipher};
+    use crate::errors::ParsePacketError;
+    use salsa20::cipher::{KeyIvInit, StreamCipher, generic_array::GenericArray};
 
     const SAMPLE_ENCRYPTED_PACKET: [u8; PACKET_SIZE] = [
         0x66, 0x83, 0x09, 0x68, 0x05, 0xc8, 0xf5, 0xa9, 0x77, 0x48, 0x09, 0x9a, 0xaf, 0x1e, 0x9f,

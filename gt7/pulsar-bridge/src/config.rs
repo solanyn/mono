@@ -21,8 +21,8 @@ impl Config {
         let pulsar_topic = env::var("PULSAR_TOPIC")
             .map_err(|_| "PULSAR_TOPIC environment variable must be set".to_string())?;
 
-        let http_bind_address = env::var("HTTP_BIND_ADDRESS")
-            .unwrap_or_else(|_| "0.0.0.0:8080".to_string());
+        let http_bind_address =
+            env::var("HTTP_BIND_ADDRESS").unwrap_or_else(|_| "0.0.0.0:8080".to_string());
 
         let heartbeat_interval_seconds = env::var("HEARTBEAT_INTERVAL_SECONDS")
             .unwrap_or_else(|_| "1.6".to_string())

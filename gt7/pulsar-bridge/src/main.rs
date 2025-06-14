@@ -14,7 +14,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 use tokio::runtime::Runtime;
 
-use axum::{routing::get, Router};
+use axum::{Router, routing::get};
 
 mod pulsar_handler;
 use pulsar_handler::PulsarHandler;
@@ -53,13 +53,34 @@ fn main() {
 
     // Log configuration at startup
     info!("=== GT7 Pulsar Bridge Configuration ===");
-    info!("PS5_IP_ADDRESS: {}", env::var("PS5_IP_ADDRESS").unwrap_or_else(|_| "NOT SET".to_string()));
-    info!("PULSAR_SERVICE_URL: {}", env::var("PULSAR_SERVICE_URL").unwrap_or_else(|_| "NOT SET".to_string()));
-    info!("PULSAR_TOPIC: {}", env::var("PULSAR_TOPIC").unwrap_or_else(|_| "NOT SET".to_string()));
-    info!("HTTP_BIND_ADDRESS: {}", env::var("HTTP_BIND_ADDRESS").unwrap_or_else(|_| DEFAULT_HTTP_BIND_ADDRESS.to_string()));
-    info!("LOG_PACKET_INTERVAL_SECONDS: {}", env::var("LOG_PACKET_INTERVAL_SECONDS").unwrap_or_else(|_| "5 (default)".to_string()));
-    info!("RUST_LOG: {}", env::var("RUST_LOG").unwrap_or_else(|_| "info (default)".to_string()));
-    info!("HEARTBEAT_INTERVAL_SECONDS: {}", env::var("HEARTBEAT_INTERVAL_SECONDS").unwrap_or_else(|_| "1.6 (default)".to_string()));
+    info!(
+        "PS5_IP_ADDRESS: {}",
+        env::var("PS5_IP_ADDRESS").unwrap_or_else(|_| "NOT SET".to_string())
+    );
+    info!(
+        "PULSAR_SERVICE_URL: {}",
+        env::var("PULSAR_SERVICE_URL").unwrap_or_else(|_| "NOT SET".to_string())
+    );
+    info!(
+        "PULSAR_TOPIC: {}",
+        env::var("PULSAR_TOPIC").unwrap_or_else(|_| "NOT SET".to_string())
+    );
+    info!(
+        "HTTP_BIND_ADDRESS: {}",
+        env::var("HTTP_BIND_ADDRESS").unwrap_or_else(|_| DEFAULT_HTTP_BIND_ADDRESS.to_string())
+    );
+    info!(
+        "LOG_PACKET_INTERVAL_SECONDS: {}",
+        env::var("LOG_PACKET_INTERVAL_SECONDS").unwrap_or_else(|_| "5 (default)".to_string())
+    );
+    info!(
+        "RUST_LOG: {}",
+        env::var("RUST_LOG").unwrap_or_else(|_| "info (default)".to_string())
+    );
+    info!(
+        "HEARTBEAT_INTERVAL_SECONDS: {}",
+        env::var("HEARTBEAT_INTERVAL_SECONDS").unwrap_or_else(|_| "1.6 (default)".to_string())
+    );
     info!("UDP_BIND_ADDRESS: {}", BIND_ADDRESS);
     info!("TELEMETRY_SERVER_PORT: {}", TELEMETRY_SERVER_PORT);
     info!("======================================");
@@ -67,32 +88,41 @@ fn main() {
     let default_log_interval_seconds: u64 = 5;
     let log_interval_duration: Option<Duration> = match env::var("LOG_PACKET_INTERVAL_SECONDS") {
         Ok(val_str) => match val_str.parse::<u64>() {
-            Ok(0) => { // 0 means disable this periodic log
-                info!("Periodic packet detail logging is disabled (LOG_PACKET_INTERVAL_SECONDS=0).");
+            Ok(0) => {
+                // 0 means disable this periodic log
+                info!(
+                    "Periodic packet detail logging is disabled (LOG_PACKET_INTERVAL_SECONDS=0)."
+                );
                 None
             }
             Ok(seconds) if seconds > 0 => {
-                info!("Periodic packet detail logging interval set to every {} seconds (from LOG_PACKET_INTERVAL_SECONDS).", seconds);
+                info!(
+                    "Periodic packet detail logging interval set to every {} seconds (from LOG_PACKET_INTERVAL_SECONDS).",
+                    seconds
+                );
                 Some(Duration::from_secs(seconds))
             }
-            _ => { // Parsed to a non-positive number (other than 0), or failed to parse, or other invalid u64
-                info!("Invalid or non-positive LOG_PACKET_INTERVAL_SECONDS ('{}'). Using default: {} seconds.", val_str, default_log_interval_seconds);
+            _ => {
+                // Parsed to a non-positive number (other than 0), or failed to parse, or other invalid u64
+                info!(
+                    "Invalid or non-positive LOG_PACKET_INTERVAL_SECONDS ('{}'). Using default: {} seconds.",
+                    val_str, default_log_interval_seconds
+                );
                 Some(Duration::from_secs(default_log_interval_seconds))
             }
         },
-        Err(_) => {
-            Some(Duration::from_secs(default_log_interval_seconds))
-        }
+        Err(_) => Some(Duration::from_secs(default_log_interval_seconds)),
     };
 
     // Initialize last_periodic_log_time. If logging is enabled, set it to the past
     // so that the first eligible packet triggers a log if enough time has passed since theoretical epoch start.
     let mut last_periodic_log_time: Instant = if let Some(interval) = log_interval_duration {
-        Instant::now().checked_sub(interval).unwrap_or_else(Instant::now)
+        Instant::now()
+            .checked_sub(interval)
+            .unwrap_or_else(Instant::now)
     } else {
         Instant::now()
     };
-
 
     let runtime = Arc::new(Runtime::new().expect("Failed to create Tokio runtime"));
 
@@ -159,14 +189,20 @@ fn main() {
 
     // Set a read timeout on the socket
     if let Err(e) = socket.set_read_timeout(Some(Duration::from_secs(1))) {
-        warn!("Failed to set read timeout on UDP socket: {}. Proceeding with blocking socket.", e);
+        warn!(
+            "Failed to set read timeout on UDP socket: {}. Proceeding with blocking socket.",
+            e
+        );
     } else {
         info!("UDP socket read timeout set to 1 second.");
     }
 
     // Enable broadcast reception
     if let Err(e) = socket.set_broadcast(true) {
-        warn!("Failed to enable broadcast on UDP socket: {}. May not receive broadcast packets.", e);
+        warn!(
+            "Failed to enable broadcast on UDP socket: {}. May not receive broadcast packets.",
+            e
+        );
     } else {
         info!("UDP socket configured to receive broadcast packets.");
     }
@@ -191,7 +227,6 @@ fn main() {
         info!("UDP heartbeat sent successfully.");
     }
 
-
     loop {
         // Send heartbeat to maintain connection
         if let Err(e) = socket.send_to(PACKET_HEARTBEAT_DATA, destination) {
@@ -206,11 +241,15 @@ fn main() {
                 if number_of_bytes == PACKET_SIZE {
                     match Packet::try_from(&buf) {
                         Ok(packet) => {
-                            info!("Received packet ID: {}, Flags: {:?}, Laps: {}, On Track: {}", 
-                                packet.packet_id, 
-                                packet.flags, 
+                            info!(
+                                "Received packet ID: {}, Flags: {:?}, Laps: {}, On Track: {}",
+                                packet.packet_id,
+                                packet.flags,
                                 packet.laps_in_race,
-                                packet.flags.map(|f| f.contains(PacketFlags::CarOnTrack)).unwrap_or(false)
+                                packet
+                                    .flags
+                                    .map(|f| f.contains(PacketFlags::CarOnTrack))
+                                    .unwrap_or(false)
                             );
                             pulsar_handler.try_send_packet(&packet);
 
@@ -252,12 +291,16 @@ fn main() {
                                         reasons.push("RaceNotStarted");
                                     }
                                     if !reasons.is_empty() {
-                                        info!("Main: Packet {} conditions not met for Pulsar send ({}). Flags: {:?}, Laps: {}",
-                                            packet.packet_id, reasons.join(", "), flags, packet.laps_in_race);
+                                        info!(
+                                            "Main: Packet {} conditions not met for Pulsar send ({}). Flags: {:?}, Laps: {}",
+                                            packet.packet_id,
+                                            reasons.join(", "),
+                                            flags,
+                                            packet.laps_in_race
+                                        );
                                     }
                                 }
                             }
-
                         }
                         Err(e) => match e {
                             ParsePacketError::InvalidMagicValue(val) => {
@@ -289,17 +332,17 @@ fn main() {
             }
             Err(e) => {
                 // This will now also catch timeout errors if set_read_timeout was successful
-                if e.kind() == std::io::ErrorKind::WouldBlock || e.kind() == std::io::ErrorKind::TimedOut {
+                if e.kind() == std::io::ErrorKind::WouldBlock
+                    || e.kind() == std::io::ErrorKind::TimedOut
+                {
                     debug!("Socket receive timeout. Retrying..."); // Log timeouts at debug level
                 } else {
                     error!("Failed to receive packet: {}. Retrying...", e);
                 }
-                
             }
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -323,7 +366,12 @@ mod tests {
         // `Router` implements `tower::Service<Request<Body>>` so we can
         // call it like any tower service, no need to run an HTTP server.
         let response = app
-            .oneshot(Request::builder().uri("/healthz").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/healthz")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
 

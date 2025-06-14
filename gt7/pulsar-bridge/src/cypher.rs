@@ -2,8 +2,8 @@ use crate::{
     constants::{PACKET_DECRYPTION_KEY, PACKET_SIZE},
     errors::CypherError,
 };
-use salsa20::cipher::{generic_array::GenericArray, KeyIvInit, StreamCipher};
 use salsa20::Salsa20;
+use salsa20::cipher::{KeyIvInit, StreamCipher, generic_array::GenericArray};
 
 // Public constants for potential use in packet.rs tests or other modules if necessary
 pub const EXPECTED_KEY_LEN: usize = 32;
