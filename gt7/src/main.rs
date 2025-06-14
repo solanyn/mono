@@ -6,14 +6,15 @@ use gt7::{
 use std::net::{SocketAddr, UdpSocket};
 use std::process;
 use std::env;
-use log::{info, warn, error, debug};
+use log::{info, warn, error};
+use env_logger::Env;
 
 const TELEMETRY_SERVER_PORT: u16 = 33739;
 const HEARTBEAT_INTERVAL_PACKETS: i32 = 100;
 const BIND_ADDRESS: &str = "0.0.0.0:33740";
 
 fn main() {
-    env_logger::init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 
     let ps5_ip_address = match env::var("PS5_IP_ADDRESS") {
         Ok(val) => val,
