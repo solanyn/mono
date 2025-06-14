@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use serde::{Serialize, Deserialize, Serializer, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 bitflags! {
     // Serde derive removed from here
@@ -68,7 +68,7 @@ mod tests {
         flags.remove(PacketFlags::CarOnTrack);
         assert!(!flags.contains(PacketFlags::CarOnTrack));
         assert!(flags.contains(PacketFlags::Paused));
-        
+
         flags.toggle(PacketFlags::Paused);
         assert!(!flags.contains(PacketFlags::Paused));
         flags.toggle(PacketFlags::Paused);
@@ -79,24 +79,35 @@ mod tests {
     fn test_from_bits_and_bits() {
         let raw_value: u16 = PacketFlags::CarOnTrack.bits() | PacketFlags::InGear.bits();
         let flags = PacketFlags::from_bits_truncate(raw_value);
-        
+
         assert!(flags.contains(PacketFlags::CarOnTrack));
         assert!(flags.contains(PacketFlags::InGear));
         assert!(!flags.contains(PacketFlags::Paused));
         assert_eq!(flags.bits(), raw_value);
 
-        let all_defined_flags = PacketFlags::CarOnTrack | PacketFlags::Paused | PacketFlags::LoadingOrProcessing |
-                                PacketFlags::InGear | PacketFlags::HasTurbo | PacketFlags::RevLimiterBlinkAlertActive |
-                                PacketFlags::HandBrakeActive | PacketFlags::LightsActive | PacketFlags::HighBeamActive |
-                                PacketFlags::LowBeamActive | PacketFlags::ASMActive | PacketFlags::TCSActive;
+        let all_defined_flags = PacketFlags::CarOnTrack
+            | PacketFlags::Paused
+            | PacketFlags::LoadingOrProcessing
+            | PacketFlags::InGear
+            | PacketFlags::HasTurbo
+            | PacketFlags::RevLimiterBlinkAlertActive
+            | PacketFlags::HandBrakeActive
+            | PacketFlags::LightsActive
+            | PacketFlags::HighBeamActive
+            | PacketFlags::LowBeamActive
+            | PacketFlags::ASMActive
+            | PacketFlags::TCSActive;
         assert_eq!(PacketFlags::all().bits(), all_defined_flags.bits());
 
         let truncated = PacketFlags::from_bits_truncate(0xFFFF);
         assert_eq!(truncated, PacketFlags::all());
 
-        let invalid_bits = PacketFlags::from_bits(0xF000); 
-        assert!(invalid_bits.is_none(), "Expected None for unrecognised high bits if not truncating/retaining");
-        
+        let invalid_bits = PacketFlags::from_bits(0xF000);
+        assert!(
+            invalid_bits.is_none(),
+            "Expected None for unrecognised high bits if not truncating/retaining"
+        );
+
         let valid_bits_some = PacketFlags::from_bits(PacketFlags::CarOnTrack.bits());
         assert_eq!(valid_bits_some, Some(PacketFlags::CarOnTrack));
     }
@@ -105,7 +116,7 @@ mod tests {
     fn test_serde_flags() {
         let flags = PacketFlags::CarOnTrack | PacketFlags::LightsActive; // 1 | 128 = 129
         let serialized = serde_json::to_string(&flags).unwrap();
-        
+
         let expected_numeric_value = flags.bits().to_string(); // "129"
         assert_eq!(serialized, expected_numeric_value);
 

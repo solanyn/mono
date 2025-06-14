@@ -16,7 +16,9 @@ pub enum CypherError {
     InputTooShortForIv(usize),
     #[error("Failed to parse IV structure from packet data")]
     InvalidIvStructure,
-    #[error("Decryption key is invalid or has incorrect length (expected 32 bytes, key length {0})")]
+    #[error(
+        "Decryption key is invalid or has incorrect length (expected 32 bytes, key length {0})"
+    )]
     InvalidKeyLength(usize),
     #[error("Salsa20 cipher operation failed")]
     CipherOperationFailed,
