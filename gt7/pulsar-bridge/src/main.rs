@@ -5,11 +5,12 @@ use gt7_pulsar_bridge::{
     flags::PacketFlags,
     packet::Packet,
 };
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use std::env;
 use std::net::{SocketAddr, UdpSocket};
 use std::process;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::runtime::Runtime;
 
 use axum::{routing::get, Router};
@@ -49,6 +50,36 @@ async fn run_http_server(_runtime: Arc<Runtime>) {
 
 fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+
+    let default_log_interval_seconds: u64 = 5;
+    let log_interval_duration: Option<Duration> = match env::var("LOG_PACKET_INTERVAL_SECONDS") {
+        Ok(val_str) => match val_str.parse::<u64>() {
+            Ok(0) => { // 0 means disable this periodic log
+                info!("Periodic packet detail logging is disabled (LOG_PACKET_INTERVAL_SECONDS=0).");
+                None
+            }
+            Ok(seconds) if seconds > 0 => {
+                info!("Periodic packet detail logging interval set to every {} seconds (from LOG_PACKET_INTERVAL_SECONDS).", seconds);
+                Some(Duration::from_secs(seconds))
+            }
+            _ => { // Parsed to a non-positive number (other than 0), or failed to parse, or other invalid u64
+                info!("Invalid or non-positive LOG_PACKET_INTERVAL_SECONDS ('{}'). Using default: {} seconds.", val_str, default_log_interval_seconds);
+                Some(Duration::from_secs(default_log_interval_seconds))
+            }
+        },
+        Err(_) => {
+            info!("LOG_PACKET_INTERVAL_SECONDS not set. Using default: {} seconds.", default_log_interval_seconds);
+            Some(Duration::from_secs(default_log_interval_seconds))
+        }
+    };
+
+    // Initialize last_periodic_log_time. If logging is enabled, set it to the past
+    // so that the first eligible packet triggers a log if enough time has passed since theoretical epoch start.
+    let mut last_periodic_log_time: Instant = if let Some(interval) = log_interval_duration {
+        Instant::now().checked_sub(interval).unwrap_or_else(Instant::now)
+    } else {
+        Instant::now()
+    };
 
     let runtime = Arc::new(Runtime::new().expect("Failed to create Tokio runtime"));
 
@@ -148,7 +179,7 @@ fn main() {
                 if number_of_bytes == PACKET_SIZE {
                     match Packet::try_from(&buf) {
                         Ok(packet) => {
-                            info!(
+                            debug!(
                                 "Packet ID: {}, Lap: {}/{}, RPM: {:.0}, Speed: {:.1} m/s, Flags: {:?}",
                                 packet.packet_id,
                                 packet.lap_count,
@@ -159,6 +190,21 @@ fn main() {
                             );
 
                             pulsar_handler.try_send_packet(&packet);
+
+                            if let Some(interval) = log_interval_duration {
+                                if last_periodic_log_time.elapsed() >= interval {
+                                    info!(
+                                        "[Periodic Packet Detail] ID: {}, Lap: {}/{}, RPM: {:.0}, Speed: {:.1} m/s, Flags: {:?}",
+                                        packet.packet_id,
+                                        packet.lap_count,
+                                        packet.laps_in_race,
+                                        packet.engine_rpm,
+                                        packet.meters_per_second,
+                                        packet.flags
+                                    );
+                                    last_periodic_log_time = Instant::now();
+                                }
+                            }
 
                             if let Some(flags) = packet.flags {
                                 let is_paused_or_loading = flags.intersects(
