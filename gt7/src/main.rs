@@ -5,13 +5,21 @@ use gt7::{
 };
 use std::net::{SocketAddr, UdpSocket};
 use std::process;
+use std::env;
 
 const TELEMETRY_SERVER_PORT: u16 = 33739;
 const HEARTBEAT_INTERVAL_PACKETS: i32 = 100;
 const BIND_ADDRESS: &str = "0.0.0.0:33740";
-const PS5_IP_ADDRESS: &str = "192.168.1.184"; // TODO: Make this configurable
 
 fn main() {
+    let ps5_ip_address = match env::var("PS5_IP_ADDRESS") {
+        Ok(val) => val,
+        Err(_) => {
+            eprintln!("Error: The PS5_IP_ADDRESS environment variable must be set.");
+            process::exit(1);
+        }
+    };
+
     println!("Attempting to bind to socket: {}", BIND_ADDRESS);
     let socket = match UdpSocket::bind(BIND_ADDRESS) {
         Ok(s) => {
@@ -24,14 +32,14 @@ fn main() {
         }
     };
 
-    let destination_str = format!("{}:{}", PS5_IP_ADDRESS, TELEMETRY_SERVER_PORT);
+    let destination_str = format!("{}:{}", ps5_ip_address, TELEMETRY_SERVER_PORT);
     println!("Target telemetry server: {}", destination_str);
     let destination: SocketAddr = match destination_str.parse() {
         Ok(addr) => addr,
         Err(e) => {
             eprintln!(
-                "Invalid IP address or port format '{}': {}",
-                destination_str, e
+                "Invalid IP address or port format for PS5_IP_ADDRESS ('{}'): {}",
+                ps5_ip_address, e
             );
             process::exit(1);
         }
