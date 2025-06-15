@@ -129,7 +129,7 @@ jobs:
           tags: |
             type=raw,value=${{ steps.version.outputs.version }}
             type=ref,event=branch
-            type=ref,event=pr
+            type=ref,event=pr,prefix=pr,suffix=,pattern={{.number}}
             type=sha
 
       - name: Build and push image
