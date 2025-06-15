@@ -28,7 +28,7 @@ services:
     #     condition: service_healthy
 
   pulsar:
-    image: apachepulsar/pulsar:3.3.0
+    image: apachepulsar/pulsar:3.3.7
     hostname: pulsar
     command: >
       sh -c "bin/apply-config-from-env.py conf/standalone.conf &&
