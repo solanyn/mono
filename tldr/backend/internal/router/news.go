@@ -1,24 +1,23 @@
 package router
 
 import (
-	"fmt"
-	"tldr/internal/config"
-	"tldr/internal/handler"
-	"tldr/internal/storage"
+	"log"
+	"github.com/solanyn/goyangi/tldr/backend/internal/config"
+	"github.com/solanyn/goyangi/tldr/backend/internal/handler"
+	"github.com/solanyn/goyangi/tldr/backend/internal/storage"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
-	"github.com/go-chi/httplog/v2"
 )
 
-func NewsRouter(cfg config.Config, logger *httplog.Logger) chi.Router {
+func NewsRouter(cfg config.Config) chi.Router {
 	r := chi.NewRouter()
 
 	client := storage.NewMinIOClient(cfg.MinIO)
-	logger.Info(fmt.Sprintf("Connected to MinIO at %s", cfg.MinIO.Endpoint))
+	log.Printf("Connected to MinIO at %s", cfg.MinIO.Endpoint)
 	newsHandler := handler.NewNewsHandler(client)
 
-	r.Use(httplog.RequestLogger(logger))
+	// TODO: Re-enable httplog.RequestLogger when httplog v3 is properly configured
 
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   cfg.AllowedCORS,

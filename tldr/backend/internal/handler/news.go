@@ -8,10 +8,10 @@ import (
 	"net/http"
 	"strings"
 	// newspb "tldr/gen/proto"
-	"tldr/internal/storage"
+	"github.com/solanyn/goyangi/tldr/backend/internal/storage"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/httplog/v3"
+	// "github.com/go-chi/httplog/v3" // TODO: Re-enable when httplog v3 usage is fixed
 )
 
 type NewsHandler struct {
@@ -23,11 +23,12 @@ func NewNewsHandler(s *storage.Client) *NewsHandler {
 }
 
 func (h *NewsHandler) GetNews(w http.ResponseWriter, r *http.Request) {
-	logger := httplog.LogEntry(r.Context())
+	// TODO: Fix httplog v3 API usage
+	// logger := httplog.LogEntry(r.Context())
 	id := chi.URLParam(r, "id")
 	key := fmt.Sprintf("news/%s.md", id)
 
-	logger.Info(fmt.Sprintf("Fetching news object with key: %s", key))
+	// logger.Info(fmt.Sprintf("Fetching news object with key: %s", key))
 	obj, err := h.storage.GetObject(context.Background(), key)
 	if err != nil {
 		http.Error(w, `{"error": "Not found"}`, http.StatusNotFound)
@@ -35,43 +36,45 @@ func (h *NewsHandler) GetNews(w http.ResponseWriter, r *http.Request) {
 	}
 	defer obj.Close()
 
-	logger.Info(fmt.Sprintf("Reading news object with key: %s", key))
+	// logger.Info(fmt.Sprintf("Reading news object with key: %s", key))
 	data, err := io.ReadAll(obj)
 	if err != nil {
 		http.Error(w, `{"error": "Failed to read file"}`, http.StatusInternalServerError)
 		return
 	}
 
-	resp := &newspb.GetNewsSummaryResponse{
-		Date:    id,
-		Content: string(data),
+	// TODO: Re-enable proto when proto rules are added
+	resp := map[string]interface{}{
+		"date":    id,
+		"content": string(data),
 	}
 
-	logger.Info(fmt.Sprintf("Returning news object with key: %s", key))
+	// logger.Info(fmt.Sprintf("Returning news object with key: %s", key))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
 }
 
 func (h *NewsHandler) ListNews(w http.ResponseWriter, r *http.Request) {
-	logger := httplog.LogEntry(r.Context())
+	// TODO: Fix httplog v3 API usage  
+	// logger := httplog.LogEntry(r.Context())
 	ctx := r.Context()
 
 	filenames, err := h.storage.ListNewsSummaries(ctx)
 	if err != nil {
-		logger.Error("failed to list news summaries")
+		// logger.Error("failed to list news summaries")
 		http.Error(w, "failed to list news summaries", http.StatusInternalServerError)
 		return
 	}
 
-	var summaries []*newspb.NewsSummary
+	var summaries []map[string]interface{}
 	for _, filename := range filenames {
 		// Assuming format is "2025-05-07.md"
 		date := strings.TrimSuffix(filename, ".md")
-		summaries = append(summaries, &newspb.NewsSummary{Date: date})
+		summaries = append(summaries, map[string]interface{}{"date": date})
 	}
 
-	resp := &newspb.ListNewsSummariesResponse{
-		Summaries: summaries,
+	resp := map[string]interface{}{
+		"summaries": summaries,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

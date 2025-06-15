@@ -6,7 +6,8 @@ go_library(
     importpath = "github.com/solanyn/goyangi/tldr/backend/internal/handler",
     visibility = ["//tldr/backend:__subpackages__"],
     deps = [
+        "//tldr/backend/internal/storage",
         "@com_github_go_chi_chi_v5//:chi",
-        "@com_github_go_chi_httplog_v3//:httplog",
+        # "@com_github_go_chi_httplog_v3//:httplog", # TODO: Re-enable when httplog v3 usage is fixed
     ],
 )

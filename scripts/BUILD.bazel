@@ -1,0 +1,5 @@
+sh_binary(
+    name = "test-build",
+    srcs = ["test-build.sh"],
+    visibility = ["//visibility:public"],
+)

@@ -33,3 +33,9 @@ go_rules_dependencies()
 go_register_toolchains(version = "1.24.2")
 
 gazelle_dependencies()
+
+# TODO: Add JavaScript/TypeScript rules later
+
+# TODO: Add Python rules later
+
+# TODO: Add protocol buffer support later

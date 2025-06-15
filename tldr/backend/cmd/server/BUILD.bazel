@@ -5,7 +5,10 @@ go_library(
     srcs = ["main.go"],
     importpath = "github.com/solanyn/goyangi/tldr/backend/cmd/server",
     visibility = ["//visibility:private"],
-    deps = ["@com_github_go_chi_httplog_v3//:httplog"],
+    deps = [
+        "//tldr/backend/internal/config",
+        "//tldr/backend/internal/router",
+    ],
 )
 
 go_binary(

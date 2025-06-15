@@ -2,20 +2,20 @@ package router
 
 import (
 	"net/http"
-	"tldr/internal/config"
+	"github.com/solanyn/goyangi/tldr/backend/internal/config"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
-	"github.com/go-chi/httplog/v2"
 )
 
-func New(cfg config.Config, logger *httplog.Logger) http.Handler {
+func New(cfg config.Config) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
-	r.Use(httplog.RequestLogger(logger))
+	// TODO: Re-enable httplog.RequestLogger when httplog v3 is properly configured
+	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Heartbeat("/healthz"))
 	r.Use(middleware.Heartbeat("/readyz"))
@@ -26,7 +26,7 @@ func New(cfg config.Config, logger *httplog.Logger) http.Handler {
 		AllowCredentials: false,
 	}))
 
-	r.Mount("/api", NewsRouter(cfg, logger))
+	r.Mount("/api", NewsRouter(cfg))
 
 	return r
 }
