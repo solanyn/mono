@@ -15,7 +15,7 @@ log = "0.4"
 env_logger = "0.11"
 tokio = { version = "1", features = ["full"] }
 axum = { version = "0.8.4", features = ["ws"] }
-axum-extra = { version = "0.9.6", features = ["typed-header"] }
+axum-extra = { version = "0.10.0", features = ["typed-header"] }
 futures-util = "0.3"
 openssl = { version = "0.10.59", features = ["vendored"] }
 
