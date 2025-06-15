@@ -29,6 +29,10 @@
   "suppressNotifications": ["prEditedNotification", "prIgnoreNotification"],
   "packageRules": [
     {
+      "matchManagers": ["cargo"],
+      "postUpdateOptions": ["cargoUpdateLockfile"]
+    },
+    {
       "addLabels": ["renovate/container", "type/major"],
       "additionalBranchPrefix": "{{parentDir}}-",
       "commitMessageExtra": " ( {{currentVersion}} → {{newVersion}} )",
