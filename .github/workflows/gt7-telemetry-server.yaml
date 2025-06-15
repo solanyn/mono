@@ -106,6 +106,13 @@ jobs:
             if (context.eventName == "workflow_dispatch") return true;
             return "${{ steps.changed-version.outputs.any_changed }}" == "true";
 
+      - name: Generate version
+        id: version
+        run: |
+          chmod +x ./tools/get-version.sh
+          VERSION=$(./tools/get-version.sh gt7/telemetry-server)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Generate docker image tags
         id: metadata
         uses: docker/metadata-action@v5
@@ -116,9 +123,11 @@ jobs:
             org.opencontainers.image.title=gt7-telemetry-server
             org.opencontainers.image.url=https://ghcr.io/${{ github.repository_owner }}/gt7-telemetry-server
             org.opencontainers.image.description=GT7 telemetry server with WebSocket and Pulsar support
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
           images: |
             name=ghcr.io/${{ github.actor }}/gt7-telemetry-server
           tags: |
+            type=raw,value=${{ steps.version.outputs.version }}
             type=ref,event=branch
             type=ref,event=pr
             type=sha,prefix={{branch}}-
