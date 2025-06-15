@@ -1,11 +1,11 @@
+use crate::pulsar_handler::PulsarHandler;
 use gt7_telemetry_server::{
+    config::Config,
     constants::{PACKET_HEARTBEAT_DATA, PACKET_SIZE},
     errors::ParsePacketError,
     flags::PacketFlags,
     packet::Packet,
-    config::Config,
 };
-use crate::pulsar_handler::PulsarHandler;
 use log::{debug, error, info, warn};
 use std::net::{SocketAddr, UdpSocket};
 use std::process;
@@ -75,15 +75,24 @@ pub fn run_telemetry_loop(
 }
 
 fn setup_udp_socket(bind_address: &str) -> UdpSocket {
-    info!("Attempting to bind UDP telemetry socket to: {}", bind_address);
-    
+    info!(
+        "Attempting to bind UDP telemetry socket to: {}",
+        bind_address
+    );
+
     let socket = match UdpSocket::bind(bind_address) {
         Ok(s) => {
-            info!("Successfully bound UDP telemetry socket to: {}", bind_address);
+            info!(
+                "Successfully bound UDP telemetry socket to: {}",
+                bind_address
+            );
             s
         }
         Err(e) => {
-            error!("Failed to bind UDP telemetry socket {}: {}", bind_address, e);
+            error!(
+                "Failed to bind UDP telemetry socket {}: {}",
+                bind_address, e
+            );
             process::exit(1);
         }
     };
@@ -111,11 +120,14 @@ fn setup_udp_socket(bind_address: &str) -> UdpSocket {
 
 fn parse_destination(target_address: &str) -> SocketAddr {
     info!("Target UDP telemetry server: {}", target_address);
-    
+
     match target_address.parse() {
         Ok(addr) => addr,
         Err(e) => {
-            error!("Invalid target address format ('{}'): {}", target_address, e);
+            error!(
+                "Invalid target address format ('{}'): {}",
+                target_address, e
+            );
             process::exit(1);
         }
     }
@@ -149,7 +161,7 @@ fn handle_packet(
     );
 
     pulsar_handler.try_send_packet(&packet);
-    
+
     let packet_json = serde_json::to_string(&packet).unwrap_or_else(|_| "{}".to_string());
     let _ = ws_tx.send(packet_json);
 
@@ -174,12 +186,10 @@ fn handle_packet(
 }
 
 fn check_packet_conditions(packet: Packet, flags: PacketFlags) {
-    let is_paused_or_loading = flags.intersects(
-        PacketFlags::Paused | PacketFlags::LoadingOrProcessing,
-    );
-    let is_not_on_track_or_race_not_started = !flags
-        .contains(PacketFlags::CarOnTrack)
-        || packet.laps_in_race <= 0;
+    let is_paused_or_loading =
+        flags.intersects(PacketFlags::Paused | PacketFlags::LoadingOrProcessing);
+    let is_not_on_track_or_race_not_started =
+        !flags.contains(PacketFlags::CarOnTrack) || packet.laps_in_race <= 0;
 
     if is_paused_or_loading || is_not_on_track_or_race_not_started {
         let mut reasons = Vec::new();

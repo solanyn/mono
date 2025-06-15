@@ -6,14 +6,13 @@ use std::sync::Arc;
 use tokio::runtime::Runtime;
 use tokio::sync::broadcast;
 
-mod pulsar_handler;
 mod http_server;
+mod pulsar_handler;
 mod telemetry_loop;
 
-use pulsar_handler::PulsarHandler;
 use http_server::run_http_server;
+use pulsar_handler::PulsarHandler;
 use telemetry_loop::run_telemetry_loop;
-
 
 fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
@@ -47,4 +46,3 @@ fn main() {
 
     run_telemetry_loop(config, ws_tx, pulsar_handler);
 }
-

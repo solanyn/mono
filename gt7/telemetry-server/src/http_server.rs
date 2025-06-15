@@ -1,8 +1,13 @@
-use axum::{Router, routing::get, extract::ws::{WebSocket, WebSocketUpgrade, Message}, response::Response};
+use axum::{
+    Router,
+    extract::ws::{Message, WebSocket, WebSocketUpgrade},
+    response::Response,
+    routing::get,
+};
 use futures_util::{SinkExt, StreamExt};
-use tokio::sync::broadcast;
-use log::{info, error};
+use log::{error, info};
 use std::process;
+use tokio::sync::broadcast;
 
 async fn health_check_handler() -> &'static str {
     "OK"
@@ -18,7 +23,7 @@ async fn websocket_handler(
 async fn websocket_connection(socket: WebSocket, tx: broadcast::Sender<String>) {
     let mut rx = tx.subscribe();
     let (mut sender, mut receiver) = socket.split();
-    
+
     let mut send_task = tokio::spawn(async move {
         while let Ok(msg) = rx.recv().await {
             if sender.send(Message::Text(msg.into())).await.is_err() {
@@ -26,7 +31,7 @@ async fn websocket_connection(socket: WebSocket, tx: broadcast::Sender<String>) 
             }
         }
     });
-    
+
     let mut recv_task = tokio::spawn(async move {
         while let Some(msg) = receiver.next().await {
             if let Ok(Message::Close(_)) = msg {
@@ -34,7 +39,7 @@ async fn websocket_connection(socket: WebSocket, tx: broadcast::Sender<String>) 
             }
         }
     });
-    
+
     tokio::select! {
         _ = (&mut send_task) => {
             recv_task.abort();
@@ -74,9 +79,9 @@ mod tests {
         http::{Request, StatusCode},
     };
     use http_body_util::BodyExt;
-    use tower::util::ServiceExt;
-    use tokio_tungstenite::{connect_async, tungstenite::Message};
     use std::time::Duration;
+    use tokio_tungstenite::{connect_async, tungstenite::Message};
+    use tower::util::ServiceExt;
 
     fn test_app() -> Router {
         Router::new().route("/healthz", get(health_check_handler))
@@ -108,35 +113,35 @@ mod tests {
         let app = Router::new()
             .route("/ws", get(websocket_handler))
             .with_state(ws_tx.clone());
-        
+
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
-        
+
         tokio::spawn(async move {
             axum::serve(listener, app).await.unwrap();
         });
-        
+
         tokio::time::sleep(Duration::from_millis(100)).await;
-        
+
         let ws_url = format!("ws://127.0.0.1:{}/ws", addr.port());
         let (ws_stream, _) = connect_async(&ws_url).await.unwrap();
         let (mut write, mut read) = ws_stream.split();
-        
+
         let test_packet = gt7_telemetry_server::packet::Packet::default();
         let test_json = serde_json::to_string(&test_packet).unwrap();
-        
+
         ws_tx.send(test_json.clone()).unwrap();
-        
+
         let timeout = tokio::time::timeout(Duration::from_secs(1), read.next()).await;
         match timeout {
             Ok(Some(Ok(Message::Text(received)))) => {
-                let received_packet: gt7_telemetry_server::packet::Packet = 
+                let received_packet: gt7_telemetry_server::packet::Packet =
                     serde_json::from_str(&received).unwrap();
                 assert_eq!(received_packet, test_packet);
             }
             _ => panic!("Did not receive expected WebSocket message"),
         }
-        
+
         write.close().await.unwrap();
     }
 }

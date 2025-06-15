@@ -1,6 +1,6 @@
+use log::info;
 use std::env;
 use std::time::Duration;
-use log::info;
 
 const DEFAULT_HTTP_PORT: &str = "8080";
 const DEFAULT_HEARTBEAT_INTERVAL: f64 = 1.6;
@@ -41,15 +41,23 @@ impl Config {
         let log_packet_interval_duration = match env::var("LOG_PACKET_INTERVAL_SECONDS") {
             Ok(val_str) => match val_str.parse::<u64>() {
                 Ok(0) => {
-                    info!("Periodic packet detail logging is disabled (LOG_PACKET_INTERVAL_SECONDS=0).");
+                    info!(
+                        "Periodic packet detail logging is disabled (LOG_PACKET_INTERVAL_SECONDS=0)."
+                    );
                     None
                 }
                 Ok(seconds) if seconds > 0 => {
-                    info!("Periodic packet detail logging interval set to every {} seconds.", seconds);
+                    info!(
+                        "Periodic packet detail logging interval set to every {} seconds.",
+                        seconds
+                    );
                     Some(Duration::from_secs(seconds))
                 }
                 _ => {
-                    info!("Invalid LOG_PACKET_INTERVAL_SECONDS ('{}'), using default: {} seconds.", val_str, DEFAULT_LOG_INTERVAL);
+                    info!(
+                        "Invalid LOG_PACKET_INTERVAL_SECONDS ('{}'), using default: {} seconds.",
+                        val_str, DEFAULT_LOG_INTERVAL
+                    );
                     Some(Duration::from_secs(DEFAULT_LOG_INTERVAL))
                 }
             },
@@ -77,10 +85,16 @@ impl Config {
         info!("PULSAR_SERVICE_URL: {}", self.pulsar_service_url);
         info!("PULSAR_TOPIC: {}", self.pulsar_topic);
         info!("HTTP_PORT: {}", self.http_port);
-        info!("HEARTBEAT_INTERVAL_SECONDS: {}", self.heartbeat_interval_seconds);
+        info!(
+            "HEARTBEAT_INTERVAL_SECONDS: {}",
+            self.heartbeat_interval_seconds
+        );
         info!("UDP_BIND_ADDRESS: {}", self.udp_bind_address);
         info!("TELEMETRY_SERVER_PORT: {}", self.telemetry_server_port);
-        info!("RUST_LOG: {}", env::var("RUST_LOG").unwrap_or_else(|_| "info (default)".to_string()));
+        info!(
+            "RUST_LOG: {}",
+            env::var("RUST_LOG").unwrap_or_else(|_| "info (default)".to_string())
+        );
         if let Some(duration) = self.log_packet_interval_duration {
             info!("LOG_PACKET_INTERVAL_SECONDS: {}", duration.as_secs());
         } else {
