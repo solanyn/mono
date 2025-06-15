@@ -1,4 +1,4 @@
-name: Build GT7 Pulsar Bridge
+name: Build GT7 Telemetry Server
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - "gt7/pulsar-bridge/**"
+      - "gt7/telemetry-server/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -41,25 +41,25 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            gt7/pulsar-bridge/target
+            gt7/telemetry-server/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
 
       - name: Run tests
-        working-directory: gt7/pulsar-bridge
+        working-directory: gt7/telemetry-server
         run: cargo test
 
       - name: Check formatting
-        working-directory: gt7/pulsar-bridge
+        working-directory: gt7/telemetry-server
         run: cargo fmt -- --check
 
       - name: Run clippy
-        working-directory: gt7/pulsar-bridge
+        working-directory: gt7/telemetry-server
         run: cargo clippy -- -D warnings
 
       - name: Build
-        working-directory: gt7/pulsar-bridge
+        working-directory: gt7/telemetry-server
         run: cargo build --release
 
   build_and_push:
@@ -90,8 +90,8 @@ jobs:
           BASE=${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || 'HEAD~1' }}
           CHANGED_FILES=$(git diff --name-only $BASE...HEAD)
           echo $CHANGED_FILES
-          # Looking for changes in gt7/pulsar-bridge directory
-          if echo "$CHANGED_FILES" | grep -q "gt7/pulsar-bridge/"; then
+          # Looking for changes in gt7/telemetry-server directory
+          if echo "$CHANGED_FILES" | grep -q "gt7/telemetry-server/"; then
             echo "any_changed=true" >> $GITHUB_OUTPUT
           else
             echo "any_changed=false" >> $GITHUB_OUTPUT
@@ -113,11 +113,11 @@ jobs:
           flavor: |
             latest=${{ github.ref == 'refs/heads/main' }}
           labels: |-
-            org.opencontainers.image.title=gt7-pulsar-bridge
-            org.opencontainers.image.url=https://ghcr.io/${{ github.repository_owner }}/gt7-pulsar-bridge
-            org.opencontainers.image.description=GT7 telemetry bridge to Apache Pulsar
+            org.opencontainers.image.title=gt7-telemetry-server
+            org.opencontainers.image.url=https://ghcr.io/${{ github.repository_owner }}/gt7-telemetry-server
+            org.opencontainers.image.description=GT7 telemetry server with WebSocket and Pulsar support
           images: |
-            name=ghcr.io/${{ github.actor }}/gt7-pulsar-bridge
+            name=ghcr.io/${{ github.actor }}/gt7-telemetry-server
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -126,7 +126,7 @@ jobs:
       - name: Build and push image
         uses: docker/build-push-action@v6.18.0
         with:
-          context: ./gt7/pulsar-bridge
+          context: ./gt7/telemetry-server
           platforms: linux/amd64,linux/arm64
           push: ${{ !github.event.pull_request.head.repo.fork && steps.should-release.outputs.result }}
           cache-from: type=gha
