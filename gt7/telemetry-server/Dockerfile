@@ -15,14 +15,14 @@ COPY src ./src
 RUN touch src/main.rs && cargo build --release --locked
 
 # Strip the binary to reduce size
-RUN strip /usr/src/app/target/release/gt7-pulsar-bridge
+RUN strip /usr/src/app/target/release/gt7-telemetry-server
 
 # Stage 2: Create the runtime image
 FROM gcr.io/distroless/cc-debian12
 
-COPY --from=builder /usr/src/app/target/release/gt7-pulsar-bridge /gt7-pulsar-bridge
+COPY --from=builder /usr/src/app/target/release/gt7-telemetry-server /gt7-telemetry-server
 
 EXPOSE 33740/udp
 EXPOSE 8080/tcp
 
-ENTRYPOINT ["/gt7-pulsar-bridge"]
+ENTRYPOINT ["/gt7-telemetry-server"]
