@@ -1,0 +1,17 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "router",
+    srcs = [
+        "news.go",
+        "router.go",
+    ],
+    importpath = "github.com/solanyn/goyangi/tldr/backend/internal/router",
+    visibility = ["//tldr/backend:__subpackages__"],
+    deps = [
+        "@com_github_go_chi_chi_v5//:chi",
+        "@com_github_go_chi_chi_v5//middleware",
+        "@com_github_go_chi_cors//:cors",
+        "@com_github_go_chi_httplog_v3//:httplog",
+    ],
+)

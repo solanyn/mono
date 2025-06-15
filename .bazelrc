@@ -1,0 +1,27 @@
+# Build configuration
+build --symlink_prefix=dist/
+build --show_timestamps
+build --announce_rc
+build --experimental_ui_max_stdouterr_bytes=1048576
+
+# Test configuration
+test --test_output=errors
+
+# Common flags for all commands
+common --enable_bzlmod=false
+common --enable_workspace
+
+# Remote cache (uncomment when ready)
+# build --remote_cache=https://storage.googleapis.com/your-cache-bucket
+
+# Performance optimizations
+build --local_ram_resources=HOST_RAM*.75
+build --local_cpu_resources=HOST_CPUS*.75
+
+# Development settings
+build:dev --compilation_mode=fastbuild
+build:dev --strip=never
+
+# Production settings
+build:prod --compilation_mode=opt
+build:prod --strip=always

@@ -7,11 +7,11 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	newspb "tldr/gen/proto"
+	// newspb "tldr/gen/proto"
 	"tldr/internal/storage"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/httplog/v2"
+	"github.com/go-chi/httplog/v3"
 )
 
 type NewsHandler struct {

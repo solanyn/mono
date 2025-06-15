@@ -1,0 +1,12 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "storage",
+    srcs = ["minio.go"],
+    importpath = "github.com/solanyn/goyangi/tldr/backend/internal/storage",
+    visibility = ["//tldr/backend:__subpackages__"],
+    deps = [
+        "@com_github_minio_minio_go_v7//:minio-go",
+        "@com_github_minio_minio_go_v7//pkg/credentials",
+    ],
+)

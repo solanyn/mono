@@ -1,0 +1,26 @@
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load("@rules_python//python:pip.bzl", "compile_pip_requirements")
+
+compile_pip_requirements(
+    name = "requirements",
+    src = "requirements.txt",
+    requirements_txt = "requirements_lock.txt",
+)
+
+py_library(
+    name = "bps_lib",
+    srcs = ["bps.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@pypi//beautifulsoup4",
+        "@pypi//httpx",
+        "@pypi//s3fs",
+    ],
+)
+
+py_binary(
+    name = "bps",
+    srcs = ["bps.py"],
+    visibility = ["//visibility:public"],
+    deps = [":bps_lib"],
+)

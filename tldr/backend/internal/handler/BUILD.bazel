@@ -1,0 +1,12 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "handler",
+    srcs = ["news.go"],
+    importpath = "github.com/solanyn/goyangi/tldr/backend/internal/handler",
+    visibility = ["//tldr/backend:__subpackages__"],
+    deps = [
+        "@com_github_go_chi_chi_v5//:chi",
+        "@com_github_go_chi_httplog_v3//:httplog",
+    ],
+)
