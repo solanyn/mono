@@ -102,15 +102,15 @@ jobs:
         with:
           repository: jackyzha0/quartz
           ref: ${{ steps.find_latest_tag.outputs.new_tag }}
-          path: /tmp/quartz_upstream
+          path: quartz_upstream
           fetch-depth: 1 # Only need the content of this specific tag
 
       - name: Sync upstream content into your 'website' directory
         if: steps.find_latest_tag.outputs.new_tag_found == 'true'
         run: |
           mkdir -p website
-          echo "Syncing files from /tmp/quartz_upstream/ (tag: ${{ steps.find_latest_tag.outputs.new_tag }}) to website/"
-          rsync -av --delete --exclude='.git/' /tmp/quartz_upstream/ website/
+          echo "Syncing files from quartz_upstream/ (tag: ${{ steps.find_latest_tag.outputs.new_tag }}) to website/"
+          rsync -av --delete --exclude='.git/' quartz_upstream/ website/
           echo "Sync complete. website/package.json should now reflect version ${{ steps.find_latest_tag.outputs.new_tag }}."
 
       - name: Create Pull Request with synced changes
