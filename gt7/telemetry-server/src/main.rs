@@ -1,5 +1,5 @@
 use env_logger::Env;
-use gt7_pulsar_bridge::{
+use gt7_telemetry_server::{
     constants::{PACKET_HEARTBEAT_DATA, PACKET_SIZE},
     errors::ParsePacketError,
     flags::PacketFlags,
@@ -14,24 +14,66 @@ use std::thread;
 use std::time::{Duration, Instant};
 use tokio::runtime::Runtime;
 
-use axum::{Router, routing::get};
+use axum::{Router, routing::get, extract::ws::{WebSocket, WebSocketUpgrade, Message}, response::Response};
+use futures_util::{SinkExt, StreamExt};
+use tokio::sync::broadcast;
 
 mod pulsar_handler;
 use pulsar_handler::PulsarHandler;
 
 const TELEMETRY_SERVER_PORT: u16 = 33739;
 const BIND_ADDRESS: &str = "0.0.0.0:33740";
-const DEFAULT_HTTP_BIND_ADDRESS: &str = "0.0.0.0:8080";
+const DEFAULT_HTTP_PORT: &str = "8080";
 
 async fn health_check_handler() -> &'static str {
     "OK"
 }
 
-async fn run_http_server(_runtime: Arc<Runtime>) {
-    let http_bind_address =
-        env::var("HTTP_BIND_ADDRESS").unwrap_or_else(|_| DEFAULT_HTTP_BIND_ADDRESS.to_string());
+async fn websocket_handler(
+    ws: WebSocketUpgrade,
+    axum::extract::State(tx): axum::extract::State<broadcast::Sender<String>>,
+) -> Response {
+    ws.on_upgrade(|socket| websocket_connection(socket, tx))
+}
 
-    let app = Router::new().route("/healthz", get(health_check_handler));
+async fn websocket_connection(socket: WebSocket, tx: broadcast::Sender<String>) {
+    let mut rx = tx.subscribe();
+    let (mut sender, mut receiver) = socket.split();
+    
+    let mut send_task = tokio::spawn(async move {
+        while let Ok(msg) = rx.recv().await {
+            if sender.send(Message::Text(msg.into())).await.is_err() {
+                break;
+            }
+        }
+    });
+    
+    let mut recv_task = tokio::spawn(async move {
+        while let Some(msg) = receiver.next().await {
+            if let Ok(Message::Close(_)) = msg {
+                break;
+            }
+        }
+    });
+    
+    tokio::select! {
+        _ = (&mut send_task) => {
+            recv_task.abort();
+        },
+        _ = (&mut recv_task) => {
+            send_task.abort();
+        }
+    }
+}
+
+async fn run_http_server(_runtime: Arc<Runtime>, ws_tx: broadcast::Sender<String>) {
+    let http_port = env::var("HTTP_PORT").unwrap_or_else(|_| DEFAULT_HTTP_PORT.to_string());
+    let http_bind_address = format!("0.0.0.0:{}", http_port);
+
+    let app = Router::new()
+        .route("/healthz", get(health_check_handler))
+        .route("/ws", get(websocket_handler))
+        .with_state(ws_tx);
 
     info!("HTTP server listening on {}", http_bind_address);
 
@@ -66,8 +108,8 @@ fn main() {
         env::var("PULSAR_TOPIC").unwrap_or_else(|_| "NOT SET".to_string())
     );
     info!(
-        "HTTP_BIND_ADDRESS: {}",
-        env::var("HTTP_BIND_ADDRESS").unwrap_or_else(|_| DEFAULT_HTTP_BIND_ADDRESS.to_string())
+        "HTTP_PORT: {}",
+        env::var("HTTP_PORT").unwrap_or_else(|_| DEFAULT_HTTP_PORT.to_string())
     );
     info!(
         "LOG_PACKET_INTERVAL_SECONDS: {}",
@@ -125,6 +167,7 @@ fn main() {
     };
 
     let runtime = Arc::new(Runtime::new().expect("Failed to create Tokio runtime"));
+    let (ws_tx, _ws_rx) = broadcast::channel::<String>(1000);
 
     let ps5_ip_address = match env::var("PS5_IP_ADDRESS") {
         Ok(val) => val,
@@ -164,7 +207,8 @@ fn main() {
     };
 
     let http_server_runtime_clone = Arc::clone(&runtime);
-    http_server_runtime_clone.spawn(run_http_server(http_server_runtime_clone.clone()));
+    let ws_tx_clone = ws_tx.clone();
+    http_server_runtime_clone.spawn(run_http_server(http_server_runtime_clone.clone(), ws_tx_clone));
 
     info!(
         "Attempting to bind UDP telemetry socket to: {}",
@@ -252,6 +296,9 @@ fn main() {
                                     .unwrap_or(false)
                             );
                             pulsar_handler.try_send_packet(&packet);
+                            
+                            let packet_json = serde_json::to_string(&packet).unwrap_or_else(|_| "{}".to_string());
+                            let _ = ws_tx.send(packet_json);
 
                             if let Some(interval) = log_interval_duration {
                                 if last_periodic_log_time.elapsed() >= interval {

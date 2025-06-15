@@ -4,8 +4,8 @@ use std::sync::Arc;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 
-use gt7_pulsar_bridge::flags::PacketFlags;
-use gt7_pulsar_bridge::packet::Packet;
+use gt7_telemetry_server::flags::PacketFlags;
+use gt7_telemetry_server::packet::Packet;
 
 type PulsarMessagePayload = Vec<u8>;
 
