@@ -126,8 +126,8 @@ impl PulsarHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gt7_pulsar_bridge::flags::PacketFlags;
-    use gt7_pulsar_bridge::packet::Packet;
+    use gt7_telemetry_server::flags::PacketFlags;
+    use gt7_telemetry_server::packet::Packet;
     use tokio::sync::mpsc;
 
     impl PulsarHandler {
