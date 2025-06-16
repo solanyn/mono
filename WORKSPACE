@@ -34,7 +34,8 @@ go_register_toolchains(version = "1.24.2")
 
 gazelle_dependencies()
 
-# TODO: Add JavaScript/TypeScript rules later
+# TODO: Add JavaScript/TypeScript rules later 
+# Note: aspect_rules_js and rules_ts configurations prepared but need shell toolchain setup
 
 # TODO: Add Python rules later
 
