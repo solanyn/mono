@@ -110,38 +110,20 @@ python_register_toolchains(
     python_version = "3.11",
 )
 
-# TODO: Add Rust support later (blocked on edition2024 compatibility)
 # Rules for Rust
-# http_archive(
-#     name = "rules_rust",
-#     integrity = "sha256-U8G6x+xI985IxMHGqgBvJ1Fa3SrrBXJZNyJObgDsfOo=",
-#     urls = ["https://github.com/bazelbuild/rules_rust/releases/download/0.61.0/rules_rust-0.61.0.tar.gz"],
-# )
-#
-# load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains")
-#
-# rules_rust_dependencies()
-#
-# rust_register_toolchains(
-#     edition = "2021",
-#     versions = ["1.80.0"],
-# )
-#
-# load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencies")
-#
-# crate_universe_dependencies()
-#
-# load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
-#
-# crates_repository(
-#     name = "crate_index",
-#     cargo_lockfile = "//gt7/telemetry-server:Cargo.lock",
-#     lockfile = "//gt7/telemetry-server:Cargo.Bazel.lock",
-#     manifests = ["//gt7/telemetry-server:Cargo.toml"],
-# )
-#
-# load("@crate_index//:defs.bzl", "crate_repositories")
-#
-# crate_repositories()
+http_archive(
+    name = "rules_rust",
+    integrity = "sha256-U8G6x+xI985IxMHGqgBvJ1Fa3SrrBXJZNyJObgDsfOo=",
+    urls = ["https://github.com/bazelbuild/rules_rust/releases/download/0.61.0/rules_rust-0.61.0.tar.gz"],
+)
+
+load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains")
+
+rules_rust_dependencies()
+
+rust_register_toolchains(
+    edition = "2021", 
+    versions = ["1.80.0"],
+)
 
 # Protocol buffer support is provided by rules_go

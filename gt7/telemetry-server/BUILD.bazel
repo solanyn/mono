@@ -1,0 +1,13 @@
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library")
+
+# Simple hello world binary to demonstrate Rust build system
+rust_binary(
+    name = "hello",
+    srcs = ["src/hello.rs"],
+    edition = "2021",
+    visibility = ["//visibility:public"],
+)
+
+# Note: Full telemetry server requires external dependencies
+# which need crate_universe configuration that is currently
+# blocked by edition2024 compatibility issues in the dependency tree
