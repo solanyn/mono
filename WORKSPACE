@@ -42,9 +42,54 @@ go_register_toolchains(version = "1.24.2")
 
 gazelle_dependencies()
 
-# TODO: Add JavaScript/TypeScript rules later
-# Note: rules_nodejs ecosystem has been restructured; need to use rules_js/rules_ts from Aspect
-# Current attempt commented out due to configuration complexity
+# Rules for JavaScript/TypeScript (Aspect rules_js)
+http_archive(
+    name = "aspect_rules_js",
+    sha256 = "83e5af4d17385d1c3268c31ae217dbfc8525aa7bcf52508dc6864baffc8b9501",
+    strip_prefix = "rules_js-2.3.7",
+    url = "https://github.com/aspect-build/rules_js/releases/download/v2.3.7/rules_js-v2.3.7.tar.gz",
+)
+
+load("@aspect_rules_js//js:repositories.bzl", "rules_js_dependencies")
+rules_js_dependencies()
+
+load("@aspect_rules_js//js:toolchains.bzl", "DEFAULT_NODE_VERSION", "rules_js_register_toolchains")
+rules_js_register_toolchains(node_version = DEFAULT_NODE_VERSION)
+
+load("@aspect_rules_js//npm:repositories.bzl", "npm_translate_lock")
+npm_translate_lock(
+    name = "npm",
+    pnpm_lock = "//tldr/frontend:pnpm-lock.yaml",
+    verify_node_modules_ignored = "//:.bazelignore",
+)
+
+load("@npm//:repositories.bzl", "npm_repositories")
+npm_repositories()
+
+# Rules for TypeScript (Aspect rules_ts)
+http_archive(
+    name = "aspect_rules_ts",
+    sha256 = "6b15ac1c69f2c0f1282e41ab469fd63cd40eb2e2d83075e19b68a6a76669773f",
+    strip_prefix = "rules_ts-3.6.0",
+    url = "https://github.com/aspect-build/rules_ts/releases/download/v3.6.0/rules_ts-v3.6.0.tar.gz",
+)
+
+load("@aspect_rules_ts//ts:repositories.bzl", "rules_ts_dependencies")
+rules_ts_dependencies(
+    ts_version_from = "//tldr/frontend:package.json",
+)
+
+# Rules for Shell (required by rules_ts)
+http_archive(
+    name = "rules_shell",
+    sha256 = "b15cc2e698a3c553d773ff4af35eb4b3ce2983c319163707dddd9e70faaa062d",
+    strip_prefix = "rules_shell-0.5.0",
+    url = "https://github.com/bazelbuild/rules_shell/releases/download/v0.5.0/rules_shell-v0.5.0.tar.gz",
+)
+
+load("@rules_shell//shell:repositories.bzl", "rules_shell_dependencies", "rules_shell_toolchains")
+rules_shell_dependencies()
+rules_shell_toolchains()
 
 # Rules for Python
 http_archive(

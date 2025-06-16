@@ -26,5 +26,5 @@ build:dev --strip=never
 build:prod --compilation_mode=opt
 build:prod --strip=always
 
-# TODO: TypeScript performance settings (for when rules_ts is added)
-# common --@aspect_rules_ts//ts:skipLibCheck=always
+# TypeScript performance settings
+common --@aspect_rules_ts//ts:skipLibCheck=always

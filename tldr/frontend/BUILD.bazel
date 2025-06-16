@@ -1,0 +1,46 @@
+load("@aspect_rules_js//js:defs.bzl", "js_library")
+load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
+
+# Exports for npm dependency management
+exports_files([
+    "package.json",
+    "pnpm-lock.yaml",
+    "tsconfig.bazel.json",
+])
+
+# TypeScript compilation
+ts_project(
+    name = "src_ts",
+    srcs = glob([
+        "src/**/*.ts",
+        "src/**/*.tsx",
+    ], allow_empty = True),
+    declaration = True,
+    source_map = True,
+    transpiler = "tsc",
+    tsconfig = ":tsconfig.bazel.json",
+    visibility = ["//visibility:public"],
+)
+
+# JavaScript source files (non-TypeScript)
+js_library(
+    name = "src_js",
+    srcs = glob([
+        "src/**/*.js",
+        "src/**/*.jsx",
+    ], allow_empty = True),
+    visibility = ["//visibility:public"],
+)
+
+# Configuration files
+filegroup(
+    name = "config",
+    srcs = [
+        "tsconfig.json",
+        "tsconfig.app.json", 
+        "tsconfig.node.json",
+        "vite.config.ts",
+        "eslint.config.js",
+    ],
+    visibility = ["//visibility:public"],
+)
