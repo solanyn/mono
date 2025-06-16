@@ -1,21 +1,21 @@
 [package]
 name = "gt7-telemetry-server"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
-bitflags = { version = "2.9.1", features = ["serde"] }
+bitflags = { version = "2.4", features = ["serde"] }
 byteorder = "1.5.0"
 salsa20 = "0.10.2"
-thiserror = "2.0.12"
+thiserror = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-pulsar = "6.3.1"
+pulsar = "6.0"
 log = "0.4"
-env_logger = "0.11"
+env_logger = "0.10"
 tokio = { version = "1", features = ["full"] }
-axum = { version = "0.8.4", features = ["ws"] }
-axum-extra = { version = "0.10.0", features = ["typed-header"] }
+axum = { version = "0.7", features = ["ws"] }
+axum-extra = { version = "0.9", features = ["typed-header"] }
 futures-util = "0.3"
 openssl = { version = "0.10.59", features = ["vendored"] }
 

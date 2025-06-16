@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 import httpx
 import os
 import s3fs
+from urllib.request import urlopen
 
 NSW_PROPERTY_SALES_INFORMATION_URL = (
     "https://valuation.property.nsw.gov.au/embed/propertySalesInformation"

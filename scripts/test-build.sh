@@ -14,8 +14,14 @@ bazel build //tools:get-version
 echo "✅ Building Go backend server..."
 bazel build //tldr/backend/cmd/server:server
 
+echo "✅ Building protocol buffers..."
+bazel build //tldr/proto:news_proto_go
+
+echo "✅ Building Python airflow..."
+bazel build //airflow:bps
+
 echo "✅ Testing Bazel query..."
-bazel query "//tools/... + //tldr/backend/..." > /dev/null
+bazel query "//tools/... + //tldr/backend/... + //tldr/proto/... + //airflow/..." > /dev/null
 
 echo ""
 echo "🎉 All working targets built successfully!"
@@ -23,7 +29,7 @@ echo ""
 echo "📋 Summary:"
 echo "   ✅ Shell scripts: //tools:get-version"
 echo "   ✅ Go backend: //tldr/backend/cmd/server:server"
-echo "   ⏳ TypeScript/React: Not yet implemented"
-echo "   ⏳ Python: Not yet implemented"  
-echo "   ⏳ Rust: Not yet implemented"
-echo "   ⏳ Protocol buffers: Not yet implemented"
+echo "   ✅ Protocol buffers: //tldr/proto:news_proto_go"
+echo "   ✅ Python: //airflow:bps"
+echo "   ⏳ TypeScript/React: Not yet implemented (shell toolchain issues)"
+echo "   ⏳ Rust: Not yet implemented (edition2024 compatibility issues)"
