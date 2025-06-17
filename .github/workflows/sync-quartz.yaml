@@ -62,7 +62,8 @@ jobs:
 
           # Fetch all tags from upstream, sort them by version (highest version number last)
           # Remove 'refs/tags/' prefix for cleaner tag names
-          UPSTREAM_TAGS_RAW=$(git ls-remote --tags --sort='v:refname' https://github.com/jackyzha0/quartz.git | awk '{print $2}' | sed 's#refs/tags/##')
+          # Filter out dereferenced annotated tags (those ending with ^{})
+          UPSTREAM_TAGS_RAW=$(git ls-remote --tags --sort='v:refname' https://github.com/jackyzha0/quartz.git | awk '{print $2}' | sed 's#refs/tags/##' | grep -v '\^{}$')
 
           LATEST_SUITABLE_TAG="" # This will hold the tag with 'v' prefix if present
 
