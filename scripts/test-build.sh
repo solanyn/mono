@@ -26,6 +26,10 @@ bazel build //tldr/frontend:src_ts || echo "   (TypeScript build shows npm depen
 echo "✅ Building Rust hello binary..."
 bazel build //gt7/telemetry-server:hello
 
+echo "✅ Building container images..."
+bazel build //tldr/backend/cmd/server:server_image
+bazel build //gt7/telemetry-server:telemetry_image
+
 echo "✅ Testing Bazel query..."
 bazel query "//tools/... + //tldr/backend/... + //tldr/proto/... + //airflow/... + //tldr/frontend/... + //gt7/telemetry-server/..." > /dev/null
 
@@ -39,5 +43,6 @@ echo "   ✅ Protocol buffers: //tldr/proto:news_proto_go"
 echo "   ✅ Python: //airflow:bps"
 echo "   ✅ Rust: //gt7/telemetry-server:hello"
 echo "   🔧 TypeScript: //tldr/frontend:src_ts (build system works, npm deps needed)"
+echo "   ✅ Containers: Go backend & Rust telemetry images"
 echo ""
-echo "🎉 ALL MAJOR LANGUAGE ECOSYSTEMS IMPLEMENTED! 🎉"
+echo "🎉 ALL MAJOR LANGUAGE ECOSYSTEMS + CONTAINERS IMPLEMENTED! 🎉"

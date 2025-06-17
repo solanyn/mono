@@ -1,10 +1,37 @@
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
 
 # Simple hello world binary to demonstrate Rust build system
 rust_binary(
     name = "hello",
     srcs = ["src/hello.rs"],
     edition = "2021",
+    visibility = ["//visibility:public"],
+)
+
+# Container image for the Rust telemetry service
+oci_image(
+    name = "telemetry_image",
+    base = "@distroless_base",
+    entrypoint = ["/hello"],
+    tars = [":hello_tar"],
+    visibility = ["//visibility:public"],
+)
+
+# Package the binary as a tar for the container
+genrule(
+    name = "hello_tar",
+    srcs = [":hello"],
+    outs = ["hello.tar"],
+    cmd = "tar -cf $@ -C $$(dirname $(location :hello)) $$(basename $(location :hello))",
+    visibility = ["//visibility:private"],
+)
+
+# Export container as tarball for docker load
+oci_load(
+    name = "telemetry_tarball",
+    image = ":telemetry_image",
+    repo_tags = ["gt7-telemetry:latest"],
     visibility = ["//visibility:public"],
 )
 
