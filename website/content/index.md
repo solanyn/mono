@@ -1,6 +1,5 @@
 ---
 title: About Me
-date: 2025-06-13
 ---
 
 <div class="welcome">
@@ -16,8 +15,8 @@ Here I write about things I'm working on, things I'm learning and things I find 
 
 I'm always changing (breaking) this website but here are some things you might be interested in:
 
-- [Posts](/posts), words that I've write
-- [Projects](/projects), things that I've built or am building
+- [Posts](/posts), words that I write
+- [Projects](/projects), things that I build
 
 ## Work
 
