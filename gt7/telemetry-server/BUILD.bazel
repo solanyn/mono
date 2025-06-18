@@ -1,29 +1,71 @@
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
 
-# Simple hello world binary to demonstrate Rust build system
-rust_binary(
-    name = "hello",
-    srcs = ["src/hello.rs"],
+# Core telemetry library
+rust_library(
+    name = "gt7_telemetry_core",
+    srcs = [
+        "src/lib.rs",
+        "src/config.rs",
+        "src/constants.rs", 
+        "src/errors.rs",
+        "src/flags.rs",
+        "src/heartbeat.rs",
+        "src/packet.rs",
+    ],
     edition = "2021",
+    deps = [
+        "@crate_index//:bitflags",
+        "@crate_index//:byteorder", 
+        "@crate_index//:salsa20",
+        "@crate_index//:thiserror",
+        "@crate_index//:serde",
+        "@crate_index//:serde_json",
+        "@crate_index//:log",
+    ],
     visibility = ["//visibility:public"],
 )
+
+# Main telemetry server binary
+rust_binary(
+    name = "telemetry_server",
+    srcs = [
+        "src/main.rs",
+        "src/http_server.rs",
+        "src/pulsar_handler.rs", 
+        "src/telemetry_loop.rs",
+        "src/cypher.rs",
+    ],
+    edition = "2021",
+    deps = [
+        ":gt7_telemetry_core",
+        "@crate_index//:pulsar",
+        "@crate_index//:env_logger",
+        "@crate_index//:tokio",
+        "@crate_index//:axum",
+        "@crate_index//:axum-extra",
+        "@crate_index//:futures-util",
+        "@crate_index//:openssl",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 
 # Container image for the Rust telemetry service
 oci_image(
     name = "telemetry_image",
     base = "@distroless_base",
-    entrypoint = ["/hello"],
-    tars = [":hello_tar"],
+    entrypoint = ["/telemetry_server"],
+    tars = [":telemetry_server_tar"],
     visibility = ["//visibility:public"],
 )
 
 # Package the binary as a tar for the container
 genrule(
-    name = "hello_tar",
-    srcs = [":hello"],
-    outs = ["hello.tar"],
-    cmd = "tar -cf $@ -C $$(dirname $(location :hello)) $$(basename $(location :hello))",
+    name = "telemetry_server_tar",
+    srcs = [":telemetry_server"],
+    outs = ["telemetry_server.tar"],
+    cmd = "tar -cf $@ -C $$(dirname $(location :telemetry_server)) $$(basename $(location :telemetry_server))",
     visibility = ["//visibility:private"],
 )
 
@@ -31,10 +73,6 @@ genrule(
 oci_load(
     name = "telemetry_tarball",
     image = ":telemetry_image",
-    repo_tags = ["gt7-telemetry:latest"],
+    repo_tags = ["gt7-telemetry-server:latest"],
     visibility = ["//visibility:public"],
 )
-
-# Note: Full telemetry server requires external dependencies
-# which need crate_universe configuration that is currently
-# blocked by edition2024 compatibility issues in the dependency tree

@@ -1,0 +1,38 @@
+[workspace]
+members = [
+    "gt7/telemetry-server",
+    "tldr/backend"
+]
+resolver = "2"
+
+[workspace.dependencies]
+# Shared dependencies across Rust projects
+bitflags = { version = "2.4", features = ["serde"] }
+byteorder = "1.5.0"
+salsa20 = "0.10.2"
+thiserror = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+log = "0.4"
+env_logger = "0.10"
+tokio = { version = "1", features = ["full"] }
+axum = { version = "0.7", features = ["ws"] }
+axum-extra = { version = "0.9", features = ["typed-header"] }
+futures-util = "0.3"
+openssl = { version = "0.10.59", features = ["vendored"] }
+
+# GT7 specific dependencies
+pulsar = "6.0"
+
+# Backend specific dependencies  
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid"] }
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["v4", "serde"] }
+clap = { version = "4.0", features = ["derive"] }
+dotenv = "0.15"
+anyhow = "1.0"
+
+# Dev dependencies
+http-body-util = "0.1.3"
+tower = "0.5.2"
+tokio-tungstenite = "0.27"

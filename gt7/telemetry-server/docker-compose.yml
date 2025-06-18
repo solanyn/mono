@@ -1,5 +1,5 @@
 services:
-  gt7-pulsar-bridge:
+  gt7-telemetry-server:
     build:
       context: .
     develop:
@@ -20,7 +20,7 @@ services:
       PS5_IP_ADDRESS: "192.168.1.184"
       PULSAR_SERVICE_URL: "pulsar://localhost:6650"
       PULSAR_TOPIC: "persistent://public/default/gt7"
-      RUST_LOG: "info,gt7_pulsar_bridge=info"
+      RUST_LOG: "info,gt7_telemetry_server=info"
       HTTP_BIND_ADDRESS: "0.0.0.0:8080"
       HEARTBEAT_INTERVAL_SECONDS: "1.6"
     # depends_on:

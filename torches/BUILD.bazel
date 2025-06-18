@@ -1,0 +1,44 @@
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load("@rules_python//python:pip.bzl", "compile_pip_requirements")
+
+# Compile requirements.txt into a lock file
+compile_pip_requirements(
+    name = "requirements",
+    extra_args = ["--allow-unsafe"],
+    requirements_in = "//:requirements.txt",
+    requirements_txt = "//:requirements_lock.txt",
+)
+
+# Python library for PyTorch utilities
+py_library(
+    name = "torch_utils",
+    srcs = ["torch_utils.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//torches:torch_deps",
+    ],
+)
+
+# Main PyTorch application
+py_binary(
+    name = "main",
+    srcs = ["main.py"],
+    main = "main.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":torch_utils",
+        "//torches:torch_deps",
+    ],
+)
+
+
+# Dependencies target for PyTorch
+py_library(
+    name = "torch_deps",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@pip//torch",
+        "@pip//torchvision",
+        "@pip//numpy",
+    ],
+)

@@ -3,3 +3,5 @@ tldr/frontend/node_modules
 dist
 bazel-*
 .git
+cnpg
+airflow

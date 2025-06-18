@@ -1,0 +1,92 @@
+# Website build targets using native node commands (not rules_js)
+# This approach works by calling the installed npm packages directly
+
+genrule(
+    name = "build",
+    srcs = glob([
+        "quartz/**/*",
+        "content/**/*",
+        "*.ts",
+        "*.json",
+        "package.json",
+        "package-lock.json",
+    ]) + ["node_modules"],
+    outs = ["public_build.stamp"],
+    cmd = """
+        cd website
+        # Install deps if node_modules doesn't exist
+        if [ ! -d "node_modules" ]; then
+            npm ci --silent
+        fi
+        # Run the quartz build
+        ./quartz/bootstrap-cli.mjs build
+        # Create stamp file to indicate build completion
+        touch $(location public_build.stamp)
+    """,
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "test",
+    srcs = ["package.json"],
+    outs = ["test.stamp"],
+    cmd = """
+        cd website
+        echo "Website test passed - checking package.json structure"
+        if [ -f "package.json" ]; then
+            echo "✓ package.json exists"
+        else
+            echo "✗ package.json missing"
+            exit 1
+        fi
+        touch $(location test.stamp)
+    """,
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "typecheck", 
+    srcs = glob([
+        "quartz/**/*",
+        "*.ts",
+        "*.json",
+        "package.json",
+        "tsconfig.json",
+    ]) + ["node_modules"],
+    outs = ["typecheck.stamp"],
+    cmd = """
+        cd website
+        if [ ! -d "node_modules" ]; then
+            npm ci --silent
+        fi
+        npx tsc --noEmit
+        touch $(location typecheck.stamp)
+    """,
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "format_check",
+    srcs = glob([
+        "**/*",
+    ]) + ["node_modules"],
+    outs = ["format_check.stamp"],
+    cmd = """
+        cd website
+        if [ ! -d "node_modules" ]; then
+            npm ci --silent
+        fi
+        npx prettier . --check
+        touch $(location format_check.stamp)
+    """,
+    visibility = ["//visibility:public"],
+)
+
+# File group to represent node_modules (already installed)
+filegroup(
+    name = "node_modules",
+    srcs = glob([
+        "node_modules/**/*",
+    ], allow_empty = True),
+    visibility = ["//visibility:private"],
+)

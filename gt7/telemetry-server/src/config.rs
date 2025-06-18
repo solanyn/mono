@@ -80,7 +80,7 @@ impl Config {
     }
 
     pub fn log_configuration(&self) {
-        info!("=== GT7 Pulsar Bridge Configuration ===");
+        info!("=== GT7 Telemetry Server Configuration ===");
         info!("PS5_IP_ADDRESS: {}", self.ps5_ip_address);
         info!("PULSAR_SERVICE_URL: {}", self.pulsar_service_url);
         info!("PULSAR_TOPIC: {}", self.pulsar_topic);

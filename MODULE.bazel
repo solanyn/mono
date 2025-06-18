@@ -1,0 +1,77 @@
+module(
+    name = "goyangi",
+    version = "0.1.0",
+)
+
+bazel_dep(name = "rules_rust", version = "0.61.0")
+bazel_dep(name = "rules_go", version = "0.49.0")
+bazel_dep(name = "gazelle", version = "0.36.0")
+bazel_dep(name = "aspect_rules_js", version = "2.3.7")
+bazel_dep(name = "rules_shell", version = "0.5.0")
+bazel_dep(name = "rules_python", version = "0.40.0")
+
+# Python configuration
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(python_version = "3.11")
+
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+pip.parse(
+    hub_name = "pip",
+    python_version = "3.11",
+    requirements_lock = "//:requirements_lock.txt",
+)
+use_repo(pip, "pip")
+
+bazel_dep(name = "rules_oci", version = "2.2.6")
+
+# Rust configuration
+rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
+rust.toolchain(edition = "2021")
+
+# Crate universe for Rust dependencies
+crate = use_extension("@rules_rust//crate_universe:extension.bzl", "crate")
+crate.from_cargo(
+    name = "crate_index",
+    cargo_lockfile = "//:Cargo.lock",
+    manifests = [
+        "//:Cargo.toml",
+        "//gt7/telemetry-server:Cargo.toml",
+        "//tldr/backend:Cargo.toml",
+    ],
+)
+use_repo(crate, "crate_index")
+
+# Go configuration
+go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
+go_sdk.download(version = "1.24.2")
+
+# NPM configuration for JavaScript projects
+npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm", dev_dependency = True)
+npm.npm_translate_lock(
+    name = "npm",
+    npm_package_lock = "//:package-lock.json",
+)
+use_repo(npm, "npm")
+
+# OCI configuration
+oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
+oci.pull(
+    name = "distroless_base",
+    digest = "sha256:ccaef5ee2f1850270d453fdf700a5392534f8d1a8ca2acda391fbb6a06b81c86",
+    image = "gcr.io/distroless/base",
+    platforms = [
+        "linux/amd64",
+        "linux/arm64",
+    ],
+)
+oci.pull(
+    name = "distroless_java",
+    digest = "sha256:161a1d97d592b3f1919801578c3a47c8e932071168a96267698f4b669c24c76d",
+    image = "gcr.io/distroless/java17",
+    platforms = [
+        "linux/amd64",
+        "linux/arm64",
+    ],
+)
+use_repo(oci, "distroless_base", "distroless_base_linux_amd64", "distroless_base_linux_arm64", "distroless_java", "distroless_java_linux_amd64", "distroless_java_linux_arm64")
+

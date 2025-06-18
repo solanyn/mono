@@ -1,46 +1,62 @@
-load("@aspect_rules_js//js:defs.bzl", "js_library")
-load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
+load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_library")
+load("@npm//:defs.bzl", "npm_link_all_packages")
 
-# Exports for npm dependency management
-exports_files([
-    "package.json",
-    "pnpm-lock.yaml",
-    "tsconfig.bazel.json",
-])
+npm_link_all_packages(name = "node_modules")
 
-# TypeScript compilation
-ts_project(
-    name = "src_ts",
-    srcs = glob([
-        "src/**/*.ts",
-        "src/**/*.tsx",
-    ], allow_empty = True),
-    declaration = True,
-    source_map = True,
-    transpiler = "tsc",
-    tsconfig = ":tsconfig.bazel.json",
-    visibility = ["//visibility:public"],
-)
-
-# JavaScript source files (non-TypeScript)
+# Core Svelte application library
 js_library(
-    name = "src_js",
+    name = "svelte_app",
     srcs = glob([
+        "src/**/*.svelte",
         "src/**/*.js",
-        "src/**/*.jsx",
-    ], allow_empty = True),
+        "src/**/*.css",
+        "src/app.html",
+        "svelte.config.js",
+        "vite.config.js",
+    ]),
+    deps = [
+        ":node_modules/@sveltejs/adapter-static",
+        ":node_modules/@sveltejs/kit", 
+        ":node_modules/@sveltejs/vite-plugin-svelte",
+        ":node_modules/svelte",
+        ":node_modules/vite",
+        ":node_modules/marked",
+    ],
     visibility = ["//visibility:public"],
 )
 
-# Configuration files
-filegroup(
-    name = "config",
-    srcs = [
-        "tsconfig.json",
-        "tsconfig.app.json", 
-        "tsconfig.node.json",
-        "vite.config.ts",
-        "eslint.config.js",
+# Development server
+js_binary(
+    name = "dev",
+    data = [
+        ":svelte_app",
+        "package.json",
     ],
+    entry_point = "node_modules/vite/bin/vite.js",
+    args = ["dev"],
+    visibility = ["//visibility:public"],
+)
+
+# Production build
+js_binary(
+    name = "build",
+    data = [
+        ":svelte_app", 
+        "package.json",
+    ],
+    entry_point = "node_modules/vite/bin/vite.js",
+    args = ["build"],
+    visibility = ["//visibility:public"],
+)
+
+# Preview production build
+js_binary(
+    name = "preview",
+    data = [
+        ":svelte_app",
+        "package.json", 
+    ],
+    entry_point = "node_modules/vite/bin/vite.js",
+    args = ["preview"],
     visibility = ["//visibility:public"],
 )

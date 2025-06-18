@@ -1,4 +1,4 @@
-# GT7 Pulsar Bridge
+# GT7 Telemetry Server
 
 This project bridges telemetry data from Gran Turismo 7 to an Apache Pulsar topic. It captures real-time UDP telemetry packets transmitted by GT7 and forwards them to Apache Pulsar for further processing and analysis.
 
@@ -36,7 +36,7 @@ GT7 sends encrypted telemetry packets to any device that requests them via heart
 This bridge automatically handles:
 
 - Initial connection establishment via heartbeat
-- Periodic heartbeat transmission (every 100 packets received)
+- Continuous heartbeat transmission (configurable interval, defaults to 1.6 seconds)
 - Packet decryption and parsing
 - Data validation and error handling
 
@@ -51,9 +51,9 @@ This guide explains how to run the application and an Apache Pulsar instance loc
 
 ### Configuration
 
-The Docker Compose setup (`docker-compose.yml`) includes the `gt7-pulsar-bridge` application and an Apache Pulsar standalone service.
+The Docker Compose setup (`docker-compose.yml`) includes the `gt7-telemetry-server` application and an Apache Pulsar standalone service.
 
-Key environment variables for the `gt7-pulsar-bridge` service are configured in `docker-compose.yml`:
+Key environment variables for the `gt7-telemetry-server` service are configured in `docker-compose.yml`:
 
 *   `PS5_IP_ADDRESS`:
     *   This needs to be the IP address of your PlayStation 5 on your local network, or an address that your Docker container can use to reach the PS5 (e.g., your host's IP if the PS5 sends data there and port forwarding is set up from the container to the host for the telemetry UDP port if needed, though the current setup assumes direct UDP send from the container).
@@ -71,7 +71,7 @@ Key environment variables for the `gt7-pulsar-bridge` service are configured in 
     Open your terminal and change to the root directory of this project (where the `docker-compose.yml` file is located).
 
     ```bash
-    cd path/to/gt7-pulsar-bridge
+    cd path/to/gt7-telemetry-server
     ```
 
 2.  **Start the services**:
@@ -80,12 +80,12 @@ Key environment variables for the `gt7-pulsar-bridge` service are configured in 
     ```bash
     docker-compose up --build
     ```
-    *   `--build`: This flag tells Docker Compose to rebuild the `gt7-pulsar-bridge` image if there have been any changes to its source code or `Dockerfile`.
+    *   `--build`: This flag tells Docker Compose to rebuild the `gt7-telemetry-server` image if there have been any changes to its source code or `Dockerfile`.
     *   The first time you run this, Docker will download the `apachepulsar/pulsar` image, which might take some time. Pulsar itself also takes a minute or two to initialize fully. The application is configured to wait for Pulsar to be healthy before starting.
 
 ### Accessing Services
 
-*   **GT7 Pulsar Bridge Health Check**:
+*   **GT7 Telemetry Server Health Check**:
     Once the services are running, you can check if the application is up by accessing its health check endpoint in your browser or with `curl`:
     `http://localhost:8080/healthz`
 
@@ -107,5 +107,5 @@ If you defined and used a named volume for Pulsar data (currently commented out 
 
 ### Troubleshooting
 
-*   **Pulsar Initialization Time**: Apache Pulsar standalone can take a significant amount of time (sometimes a few minutes, especially on the first run) to initialize completely. The `gt7-pulsar-bridge` service is set to depend on Pulsar's health check. If you see connection errors from the bridge to Pulsar, it might be that Pulsar hasn't fully started yet. Check the logs from the `pulsar` container: `docker-compose logs pulsar`.
+*   **Pulsar Initialization Time**: Apache Pulsar standalone can take a significant amount of time (sometimes a few minutes, especially on the first run) to initialize completely. The `gt7-telemetry-server` service is set to depend on Pulsar's health check. If you see connection errors from the server to Pulsar, it might be that Pulsar hasn't fully started yet. Check the logs from the `pulsar` container: `docker-compose logs pulsar`.
 *   **PS5 Connectivity**: Ensure the `PS5_IP_ADDRESS` is correctly configured and that your Docker container's network can reach the PS5 or the designated UDP telemetry endpoint. UDP networking with Docker can sometimes require specific host network configurations depending on your OS and Docker setup if the telemetry source is external to the Docker host.

@@ -23,44 +23,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Protocol Buffers compiler
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y protobuf-compiler
-
-      - name: Setup Rust
-        uses: actions-rs/toolchain@v1
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@0.8.5
         with:
-          toolchain: stable
-          override: true
-          components: rustfmt, clippy
-
-      - name: Cache Cargo dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            gt7/telemetry-server/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}
+          repository-cache: true
 
       - name: Run tests
-        working-directory: gt7/telemetry-server
-        run: cargo test
+        run: bazel test //gt7/telemetry-server:all
 
       - name: Check formatting
-        working-directory: gt7/telemetry-server
-        run: cargo fmt -- --check
+        run: bazel run @rules_rust//:rustfmt_test
 
       - name: Run clippy
-        working-directory: gt7/telemetry-server
-        run: cargo clippy -- -D warnings
+        run: bazel run @rules_rust//:clippy_test
 
       - name: Build
-        working-directory: gt7/telemetry-server
-        run: cargo build --release
+        run: bazel build //gt7/telemetry-server:telemetry_server
 
   build_and_push:
     runs-on: ubuntu-latest
@@ -132,16 +112,24 @@ jobs:
             type=ref,event=pr,prefix=pr,suffix=,pattern={{.number}}
             type=sha
 
-      - name: Build and push image
-        uses: docker/build-push-action@v6.18.0
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@0.8.5
         with:
-          context: ./gt7/telemetry-server
-          platforms: linux/amd64,linux/arm64
-          push: ${{ !github.event.pull_request.head.repo.fork && steps.should-release.outputs.result }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          tags: ${{ steps.metadata.outputs.tags }}
-          labels: ${{ steps.metadata.outputs.labels }}
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}
+          repository-cache: true
+
+      - name: Build container image with Bazel
+        run: bazel run //gt7/telemetry-server:telemetry_tarball
+
+      - name: Load and push image
+        if: ${{ !github.event.pull_request.head.repo.fork && steps.should-release.outputs.result }}
+        run: |
+          docker load -i dist/bin/gt7/telemetry-server/telemetry_tarball/tarball.tar
+          for tag in $(echo '${{ steps.metadata.outputs.tags }}' | tr '\n' ' '); do
+            docker tag gt7-telemetry-server:latest $tag
+            docker push $tag
+          done
 
   results:
     if: ${{ always() }}

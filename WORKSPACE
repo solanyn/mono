@@ -118,6 +118,7 @@ http_archive(
 )
 
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains")
+load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencies")
 
 rules_rust_dependencies()
 
@@ -125,6 +126,23 @@ rust_register_toolchains(
     edition = "2021", 
     versions = ["1.80.0"],
 )
+
+crate_universe_dependencies()
+
+load("@rules_rust//crate_universe:defs.bzl", "crates_repository", "render_config")
+
+crates_repository(
+    name = "crate_index",
+    cargo_lockfile = "//gt7/telemetry-server:Cargo.lock",
+    lockfile = "//gt7/telemetry-server:Cargo.Bazel.lock",
+    manifests = ["//gt7/telemetry-server:Cargo.toml"],
+    render_config = render_config(
+        default_package_name = ""
+    ),
+)
+
+load("@crate_index//:defs.bzl", "crate_repositories")
+crate_repositories()
 
 # Rules for OCI containers
 http_archive(
