@@ -1,15 +1,2 @@
-load("@bazel_gazelle//:def.bzl", "gazelle")
-
-# gazelle:prefix github.com/solanyn/goyangi
-
-gazelle(name = "gazelle")
-
-gazelle(
-    name = "gazelle-update-repos",
-    args = [
-        "-from_file=tldr/backend/go.mod",
-        "-to_macro=deps.bzl%go_dependencies",
-        "-prune",
-    ],
-    command = "update-repos",
-)
+# Workspace root BUILD file
+# No build targets needed at root level
