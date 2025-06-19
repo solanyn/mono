@@ -17,9 +17,11 @@ log = "0.4"
 env_logger = "0.10"
 tokio = { version = "1", features = ["full"] }
 axum = { version = "0.7", features = ["ws"] }
-axum-extra = { version = "0.9", features = ["typed-header"] }
+axum-extra = { version = "0.9", features = ["typed-header"], default-features = false }
+axum-server = { version = "0.7", features = ["tls-rustls"] }
 futures-util = "0.3"
-openssl = { version = "0.10.59", features = ["vendored"] }
+rustls = "0.23"
+rustls-pemfile = "2.0"
 
 # GT7 specific dependencies
 pulsar = "6.0"

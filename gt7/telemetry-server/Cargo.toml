@@ -17,7 +17,8 @@ tokio = { workspace = true }
 axum = { workspace = true }
 axum-extra = { workspace = true }
 futures-util = { workspace = true }
-openssl = { workspace = true }
+rustls = { workspace = true }
+rustls-pemfile = { workspace = true }
 
 [dev-dependencies]
 http-body-util = { workspace = true }

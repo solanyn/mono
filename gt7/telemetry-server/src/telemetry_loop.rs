@@ -1,5 +1,5 @@
 use crate::pulsar_handler::PulsarHandler;
-use gt7_telemetry_server::{
+use gt7_telemetry_core::{
     config::Config,
     constants::{PACKET_HEARTBEAT_DATA, PACKET_SIZE},
     errors::ParsePacketError,
