@@ -1,5 +1,6 @@
-load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_library")
+load("@aspect_rules_js//js:defs.bzl", "js_library", "js_run_binary")
 load("@npm//:defs.bzl", "npm_link_all_packages")
+load("@npm//tldr/frontend:vite/package_json.bzl", vite_bin = "bin")
 
 npm_link_all_packages(name = "node_modules")
 
@@ -13,50 +14,41 @@ js_library(
         "src/app.html",
         "svelte.config.js",
         "vite.config.js",
+        "package.json",
     ], allow_empty = True),
     deps = [
-        ":node_modules/@sveltejs/adapter-static",
-        ":node_modules/@sveltejs/kit", 
-        ":node_modules/@sveltejs/vite-plugin-svelte",
-        ":node_modules/svelte",
-        ":node_modules/vite",
-        ":node_modules/marked",
+        "//:node_modules",
     ],
     visibility = ["//visibility:public"],
 )
 
 # Development server
-js_binary(
+vite_bin.vite_binary(
     name = "dev",
-    data = [
-        ":svelte_app",
-        "package.json",
-    ],
-    entry_point = "node_modules/vite/bin/vite.js",
     args = ["dev"],
+    chdir = package_name(),
+    data = [":svelte_app"],
     visibility = ["//visibility:public"],
 )
 
-# Production build
-js_binary(
+# Production build  
+vite_bin.vite_binary(
     name = "build",
+    args = ["build"],
+    chdir = package_name(),
     data = [
         ":svelte_app", 
-        "package.json",
+        ":node_modules",
+        "//:node_modules"
     ],
-    entry_point = "node_modules/vite/bin/vite.js",
-    args = ["build"],
     visibility = ["//visibility:public"],
 )
 
 # Preview production build
-js_binary(
+vite_bin.vite_binary(
     name = "preview",
-    data = [
-        ":svelte_app",
-        "package.json", 
-    ],
-    entry_point = "node_modules/vite/bin/vite.js",
     args = ["preview"],
+    chdir = package_name(),
+    data = [":svelte_app"],
     visibility = ["//visibility:public"],
 )

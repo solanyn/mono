@@ -1,2 +1,10 @@
-# Workspace root BUILD file
-# No build targets needed at root level
+load("@npm//:defs.bzl", "npm_link_all_packages")
+
+# Link npm packages at workspace root
+npm_link_all_packages(name = "node_modules")
+
+# Export requirements files for Python projects
+exports_files([
+    "requirements.txt",
+    "requirements_lock.txt"
+])

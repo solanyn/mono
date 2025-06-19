@@ -14,25 +14,6 @@
     "website:check": "cd website && tsc --noEmit && npx prettier . --check",
     "website:format": "cd website && npx prettier . --write"
   },
-  "dependencies": {
-    "marked": "^15.0.3",
-    "@clack/prompts": "^0.11.0",
-    "@floating-ui/dom": "^1.7.0",
-    "@tweenjs/tween.js": "^25.0.0",
-    "d3": "^7.9.0",
-    "micromorph": "^0.4.5",
-    "preact": "^10.26.7",
-    "preact-render-to-string": "^6.5.13"
-  },
-  "devDependencies": {
-    "@sveltejs/adapter-static": "^3.0.6",
-    "@sveltejs/kit": "^2.8.5", 
-    "@sveltejs/vite-plugin-svelte": "^3.1.2",
-    "svelte": "^4.2.19",
-    "vite": "^5.4.10",
-    "typescript": "^5.8.3",
-    "prettier": "^3.5.3",
-    "esbuild": "^0.25.5",
-    "tsx": "^4.19.4"
-  }
+  "dependencies": {},
+  "devDependencies": {}
 }

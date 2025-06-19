@@ -144,7 +144,7 @@ numpy==2.2.1 \
     --hash=sha256:f9b57eaa3b0cd8db52049ed0330747b0364e899e8a606a624813452b8203d5f7 \
     --hash=sha256:fce4f615f8ca31b2e61aa0eb5865a21e14f5629515c9151850aa936c02a1ee51
     # via
-    #   -r torches/requirements.txt
+    #   -r requirements.txt
     #   torchvision
 pillow==11.2.1 \
     --hash=sha256:014ca0050c85003620526b0ac1ac53f56fc93af128f7546623cc8e31875ab928 \
@@ -259,7 +259,7 @@ torch==2.7.1 \
     --hash=sha256:e0d81e9a12764b6f3879a866607c8ae93113cbcad57ce01ebde63eb48a576369 \
     --hash=sha256:fe955951bdf32d182ee8ead6c3186ad54781492bf03d547d31771a01b3d6fb7d
     # via
-    #   -r torches/requirements.txt
+    #   -r requirements.txt
     #   torchvision
 torchvision==0.22.1 \
     --hash=sha256:043d9e35ed69c2e586aff6eb9e2887382e7863707115668ac9d140da58f42cba \
@@ -286,7 +286,7 @@ torchvision==0.22.1 \
     --hash=sha256:e01631046fda25a1eca2f58d5fdc9a152b93740eb82435cdb27c5151b8d20c02 \
     --hash=sha256:ef46e065502f7300ad6abc98554131c35dc4c837b978d91306658f1a65c00baa \
     --hash=sha256:ef7dee376f42900c0e7b0e34624f391d9ece70ab90ee74b42de0c1fffe371284
-    # via -r torches/requirements.txt
+    # via -r requirements.txt
 typing-extensions==4.14.0 \
     --hash=sha256:8676b788e32f02ab42d9e7c61324048ae4c6d844a399eebace3d4979d75ceef4 \
     --hash=sha256:a1514509136dd0b477638fc68d6a91497af5076466ad0fa6c338e44e359944af
