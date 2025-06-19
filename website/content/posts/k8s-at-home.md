@@ -1,7 +1,7 @@
 ---
 date: "2025-02-28T15:49:14+11:00"
 title: "Kubernetes at Home"
-tags: ["kubernetes"]
+tags: ["kubernetes", "home-ops"]
 ---
 
 # Running Kubernetes at Home

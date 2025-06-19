@@ -21,13 +21,13 @@ export default ((userOpts?: Partial<Options>) => {
             <h3 style={{ marginTop: 0, marginBottom: 0 }}>
               <a href="/posts">Posts</a>
             </h3>
-            <i>where I share notes</i>
+            <i>words I write</i>
           </li>
           <li>
             <h3 style={{ marginTop: 0, marginBottom: 0 }}>
               <a href="/projects">Projects</a>
             </h3>
-            <i>cool things I've made</i>
+            <i>things I've made</i>
           </li>
         </ul>
       </div>
