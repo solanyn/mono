@@ -4,8 +4,7 @@
   "type": "module",
   "private": true,
   "workspaces": [
-    "tldr/frontend",
-    "website"
+    "tldr/frontend"
   ],
   "scripts": {
     "frontend:dev": "cd tldr/frontend && npm run dev",
