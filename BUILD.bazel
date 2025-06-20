@@ -1,4 +1,5 @@
 load("@npm//:defs.bzl", "npm_link_all_packages")
+load("@rules_uv//uv:pip.bzl", "pip_compile")
 
 # Link npm packages at workspace root
 npm_link_all_packages(name = "node_modules")
@@ -6,5 +7,21 @@ npm_link_all_packages(name = "node_modules")
 # Export requirements files for Python projects
 exports_files([
     "requirements.txt",
-    "requirements_lock.txt"
+    "requirements_gpu.txt",
+    "requirements_lock.txt",
+    "requirements_gpu_lock.txt",
 ])
+
+# CPU PyTorch dependencies (default)
+pip_compile(
+    name = "requirements_cpu",
+    requirements_in = "requirements.txt",
+    requirements_txt = "requirements_lock.txt",
+)
+
+# GPU PyTorch dependencies
+pip_compile(
+    name = "requirements_gpu",
+    requirements_in = "requirements_gpu.txt", 
+    requirements_txt = "requirements_gpu_lock.txt",
+)

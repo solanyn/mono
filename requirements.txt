@@ -1,4 +1,4 @@
-# PyTorch and ML dependencies
-torch==2.7.1
-torchvision==0.22.1
+# PyTorch and ML dependencies (CPU-only by default)
+torch==2.7.1+cpu
+torchvision==0.22.1+cpu
 numpy==2.2.1
