@@ -1,6 +1,10 @@
 load("@npm//:defs.bzl", "npm_link_all_packages")
 load("@rules_uv//uv:pip.bzl", "pip_compile")
 
+# gazelle:map_kind py_library py_library @aspect_rules_py//py:defs.bzl
+# gazelle:map_kind py_binary py_binary @aspect_rules_py//py:defs.bzl
+# gazelle:map_kind py_test py_test @aspect_rules_py//py:defs.bzl
+
 # Link npm packages at workspace root
 npm_link_all_packages(name = "node_modules")
 
