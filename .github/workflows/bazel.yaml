@@ -1,4 +1,4 @@
-name: Bazel Build and Test
+name: Bazel
 
 on:
   workflow_dispatch:
@@ -123,3 +123,4 @@ jobs:
           else
             exit 1
           fi
+
