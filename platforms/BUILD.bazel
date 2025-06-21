@@ -1,6 +1,3 @@
-load("@platforms//os:defs.bzl", "os")
-load("@platforms//cpu:defs.bzl", "cpu")
-
 package(default_visibility = ["//visibility:public"])
 
 # Linux x86_64 (CPU-only)
