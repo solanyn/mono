@@ -37,10 +37,6 @@ rust_binary(
         "src/telemetry_loop.rs",
     ],
     edition = "2021",
-    env = {
-        "PROTOC": "$(execpath @protobuf//:protoc)",
-    },
-    tools = ["@protobuf//:protoc"],
     visibility = ["//visibility:public"],
     deps = [
         ":gt7_telemetry_core",
