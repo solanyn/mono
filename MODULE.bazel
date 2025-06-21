@@ -25,6 +25,7 @@ pip.parse(
     # Handle problematic CUDA packages
     whl_modifications = {
         "nvidia_nvtx_cu12": "//third_party:nvidia_nvtx_cu12.BUILD",
+        "triton": "//third_party:triton.BUILD",
     },
     # Ignore missing optional dependencies
     experimental_index_url = "https://pypi.org/simple",
