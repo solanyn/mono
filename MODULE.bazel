@@ -22,6 +22,12 @@ pip.parse(
     hub_name = "pip",
     python_version = "3.11",
     requirements_lock = "//:requirements_lock.txt",
+    # Handle problematic CUDA packages
+    whl_modifications = {
+        "nvidia_nvtx_cu12": "//third_party:nvidia_nvtx_cu12.BUILD",
+    },
+    # Ignore missing optional dependencies
+    experimental_index_url = "https://pypi.org/simple",
 )
 use_repo(pip, "pip")
 
