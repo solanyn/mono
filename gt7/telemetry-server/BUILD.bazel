@@ -1,7 +1,6 @@
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
 
-# Core telemetry library
 rust_library(
     name = "gt7_telemetry_core",
     srcs = [
@@ -27,7 +26,6 @@ rust_library(
     ],
 )
 
-# Main telemetry server binary
 rust_binary(
     name = "telemetry_server",
     srcs = [
@@ -37,6 +35,7 @@ rust_binary(
         "src/telemetry_loop.rs",
     ],
     edition = "2021",
+    toolchains = ["@toolchains_protoc//:protoc_toolchain"],
     visibility = ["//visibility:public"],
     deps = [
         ":gt7_telemetry_core",
@@ -53,7 +52,6 @@ rust_binary(
     ],
 )
 
-# Container image for the Rust telemetry service
 oci_image(
     name = "telemetry_image",
     base = "@distroless_base",
@@ -62,7 +60,6 @@ oci_image(
     visibility = ["//visibility:public"],
 )
 
-# Package the binary as a tar for the container
 genrule(
     name = "telemetry_server_tar",
     srcs = [":telemetry_server"],
@@ -71,7 +68,6 @@ genrule(
     visibility = ["//visibility:private"],
 )
 
-# Export container as tarball for docker load
 oci_load(
     name = "telemetry_tarball",
     image = ":telemetry_image",

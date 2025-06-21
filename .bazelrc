@@ -14,18 +14,10 @@ common --host_per_file_copt=external/.*protobuf.*@--PROTOBUF_WAS_NOT_SUPPOSED_TO
 common --per_file_copt=external/.*grpc.*@--GRPC_WAS_NOT_SUPPOSED_TO_BE_BUILT
 common --host_per_file_copt=external/.*grpc.*@--GRPC_WAS_NOT_SUPPOSED_TO_BE_BUILT
 
-# Use hermetic CC toolchain (configured in MODULE.bazel)
-
-# Platform configurations
+build --extra_toolchains=@toolchains_protoc//:protoc_toolchain
 build:linux --platforms=//platforms:linux_x86_64
 build:linux-cuda --platforms=//platforms:linux_x86_64_cuda
 build:macos --platforms=//platforms:darwin_arm64
 
-# Default to current host platform if no config specified
-# build --platforms=//platforms:darwin_arm64  # Uncomment to set default
-
-# Load any settings & overrides specific to the current user from `.aspect/bazelrc/user.bazelrc`.
-# This file should appear in `.gitignore` so that settings are not shared with team members. This
-# should be last statement in this config so the user configuration is able to overwrite flags from
-# this file. See https://bazel.build/configure/best-practices#bazelrc-file.
+# build --platforms=//platforms:darwin_arm64
 try-import %workspace%/.aspect/bazelrc/user.bazelrc

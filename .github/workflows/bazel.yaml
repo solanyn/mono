@@ -13,6 +13,15 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform:
+          - name: "Linux CPU"
+            config: "linux"
+            targets: "//..."
+          - name: "Linux CUDA"
+            config: "linux-cuda"
+            targets: "//torches:..."
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,17 +31,15 @@ jobs:
           bazelisk-cache: true
           disk-cache: ${{ github.workflow }}
           repository-cache: true
-      - name: Run all tests (Linux CPU)
-        run: bazel test //... --config=linux
-      - name: Build all targets (Linux CPU)
-        run: bazel build //... --config=linux
-      - name: Test PyTorch targets (Linux CUDA)
-        run: bazel test //torches:... --config=linux-cuda
-      - name: Build PyTorch targets (Linux CUDA)  
-        run: bazel build //torches:... --config=linux-cuda
+      - name: Test ${{ matrix.platform.name }}
+        run: bazel test ${{ matrix.platform.targets }} --config=${{ matrix.platform.config }}
+      - name: Build ${{ matrix.platform.name }}
+        run: bazel build ${{ matrix.platform.targets }} --config=${{ matrix.platform.config }}
       - name: Check formatting (Rust)
+        if: matrix.platform.config == 'linux'
         run: bazel run @rules_rust//:rustfmt_test
       - name: Run clippy (Rust)
+        if: matrix.platform.config == 'linux'
         run: bazel run @rules_rust//:clippy_test
   build-images:
     runs-on: ubuntu-latest
