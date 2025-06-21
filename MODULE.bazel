@@ -50,6 +50,7 @@ pip.parse(
         "triton": "//tools/whl_modifications:triton.BUILD",
     },
 )
+use_repo(pip, "pip")
 
 bazel_dep(name = "rules_oci", version = "2.2.6")
 
