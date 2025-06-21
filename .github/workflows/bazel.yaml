@@ -32,15 +32,15 @@ jobs:
           disk-cache: ${{ github.workflow }}
           repository-cache: true
       - name: Test ${{ matrix.platform.name }}
-        run: bazel test ${{ matrix.platform.targets }} --config=${{ matrix.platform.config }}
+        run: bazel test ${{ matrix.platform.targets }} --config=${{ matrix.platform.config }} --bazelrc=ci.bazelrc
       - name: Build ${{ matrix.platform.name }}
-        run: bazel build ${{ matrix.platform.targets }} --config=${{ matrix.platform.config }}
+        run: bazel build ${{ matrix.platform.targets }} --config=${{ matrix.platform.config }} --bazelrc=ci.bazelrc
       - name: Check formatting (Rust)
         if: matrix.platform.config == 'linux'
-        run: bazel run @rules_rust//:rustfmt_test
+        run: bazel run @rules_rust//:rustfmt_test --bazelrc=ci.bazelrc
       - name: Run clippy (Rust)
         if: matrix.platform.config == 'linux'
-        run: bazel run @rules_rust//:clippy_test
+        run: bazel run @rules_rust//:clippy_test --bazelrc=ci.bazelrc
   build-images:
     runs-on: ubuntu-latest
     needs: test
@@ -92,7 +92,7 @@ jobs:
           repository-cache: true
       - name: Build container images
         run: |
-          bazel run //gt7/telemetry-server:telemetry_tarball
+          bazel run //gt7/telemetry-server:telemetry_tarball --bazelrc=ci.bazelrc
       - name: Load and push image
         if: ${{ !github.event.pull_request.head.repo.fork }}
         run: |

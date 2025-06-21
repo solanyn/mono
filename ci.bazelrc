@@ -1,0 +1,2 @@
+# CI-specific Bazel configuration
+build --platforms=//platforms:linux_x86_64
