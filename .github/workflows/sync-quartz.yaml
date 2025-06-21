@@ -1,14 +1,11 @@
 name: Sync upstream Quartz tag
-
 on:
   workflow_dispatch:
   schedule:
     - cron: "0 14 * * *"
-
 permissions:
   contents: write
   pull-requests: write
-
 jobs:
   sync_and_pr_subdir:
     runs-on: ubuntu-latest
@@ -16,11 +13,9 @@ jobs:
       new_tag_found: ${{ steps.find_latest_tag.outputs.new_tag_found }}
       new_tag: ${{ steps.find_latest_tag.outputs.new_tag }}
       current_version: ${{ steps.get_current_version.outputs.original_version_string }}
-
     steps:
       - name: Checkout your repository
         uses: actions/checkout@v4
-
       - name: Get current Quartz version from website/package.json
         id: get_current_version
         run: |
@@ -47,7 +42,6 @@ jobs:
           echo "Current version read from $PACKAGE_JSON_PATH: $VERSION_FROM_JSON (cleaned for comparison: $CLEANED_VERSION)"
           echo "version=$CLEANED_VERSION" >> $GITHUB_OUTPUT
           echo "original_version_string=$VERSION_FROM_JSON" >> $GITHUB_OUTPUT
-
       - name: Find latest applicable upstream tag
         id: find_latest_tag
         run: |
@@ -96,7 +90,6 @@ jobs:
             echo "new_tag_found=false" >> $GITHUB_OUTPUT
             echo "new_tag=" >> $GITHUB_OUTPUT
           fi
-
       - name: Checkout upstream jackyzha0/quartz (specific tag)
         if: steps.find_latest_tag.outputs.new_tag_found == 'true'
         uses: actions/checkout@v4
@@ -105,7 +98,6 @@ jobs:
           ref: ${{ steps.find_latest_tag.outputs.new_tag }}
           path: quartz_upstream
           fetch-depth: 1 # Only need the content of this specific tag
-
       - name: Sync upstream content into your 'website' directory
         if: steps.find_latest_tag.outputs.new_tag_found == 'true'
         run: |
@@ -113,7 +105,6 @@ jobs:
           echo "Syncing files from quartz_upstream/ (tag: ${{ steps.find_latest_tag.outputs.new_tag }}) to website/"
           rsync -av --delete --exclude='.git/' quartz_upstream/ website/
           echo "Sync complete. website/package.json should now reflect version ${{ steps.find_latest_tag.outputs.new_tag }}."
-
       - name: Create Pull Request with synced changes
         if: steps.find_latest_tag.outputs.new_tag_found == 'true'
         uses: peter-evans/create-pull-request@v7
@@ -124,14 +115,11 @@ jobs:
 
             Automated sync of files from jackyzha0/quartz@${{ steps.find_latest_tag.outputs.new_tag }}
             into the website/ directory.
-
           # Branch name includes the new tag to ensure uniqueness for multiple updates
           branch: quartz-upstream-sync-${{ steps.find_latest_tag.outputs.new_tag }}
           delete-branch: true
-
           # IMPORTANT: Change 'main' to your repository's default branch if it's different.
           base: main
-
           title: "DRAFT: Sync website/ from Quartz ${{ steps.get_current_version.outputs.original_version_string }} to ${{ steps.find_latest_tag.outputs.new_tag }}"
           body: |
             ## ⚠️ DRAFT PULL REQUEST - MANUAL REVIEW & MERGE REQUIRED ⚠️

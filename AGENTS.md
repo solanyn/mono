@@ -281,4 +281,3 @@ For questions about this setup:
 1. Check the Aspect CLI documentation: <https://docs.aspect.build/cli>
 2. Review rules_lint documentation: <https://github.com/aspect-build/rules_lint>
 3. Consult Bazel Bzlmod guide: <https://bazel.build/external/migration>
-

@@ -22,14 +22,13 @@ py_binary(
     ],
 )
 
-
 # Dependencies target for PyTorch
 py_library(
     name = "torch_deps",
     visibility = ["//visibility:public"],
     deps = [
+        "@pip//numpy",
         "@pip//torch",
         "@pip//torchvision",
-        "@pip//numpy",
     ],
 )

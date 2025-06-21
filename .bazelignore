@@ -1,6 +1,4 @@
 node_modules
-tldr/frontend/node_modules
-dist
 bazel-*
 .git
 cnpg

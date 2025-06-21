@@ -6,14 +6,10 @@
   "workspaces": [
     "tldr/frontend"
   ],
-  "scripts": {
-    "frontend:dev": "cd tldr/frontend && npm run dev",
-    "frontend:build": "cd tldr/frontend && npm run build",
-    "frontend:preview": "cd tldr/frontend && npm run preview",
-    "website:quartz": "cd website && ./quartz/bootstrap-cli.mjs",
-    "website:check": "cd website && tsc --noEmit && npx prettier . --check",
-    "website:format": "cd website && npx prettier . --write"
-  },
+  "scripts": {},
   "dependencies": {},
-  "devDependencies": {}
+  "devDependencies": {
+    "@types/node": "^18",
+    "typescript": "4.9.5"
+  }
 }

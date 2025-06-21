@@ -23,15 +23,16 @@ services:
       RUST_LOG: "info,gt7_telemetry_server=info"
       HTTP_BIND_ADDRESS: "0.0.0.0:8080"
       HEARTBEAT_INTERVAL_SECONDS: "1.6"
-    # depends_on:
-    #   pulsar:
-    #     condition: service_healthy
-
+      # depends_on:
+      #   pulsar:
+      #     condition: service_healthy
   pulsar:
     image: apachepulsar/pulsar:4.0.5
     hostname: pulsar
     command: >
       sh -c "bin/apply-config-from-env.py conf/standalone.conf &&
+
+
              bin/pulsar standalone"
     ports:
       - "6650:6650"
@@ -48,18 +49,13 @@ services:
       PULSAR_PREFIX_bookkeeper_ml_bardziej_Xmx: "256m"
       PULSAR_PREFIX_bookkeeper_ml_bardziej_Xms: "256m"
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "curl -s -f http://localhost:8080/admin/v2/brokers/health || exit 1",
-        ]
+      test: ["CMD-SHELL", "curl -s -f http://localhost:8080/admin/v2/brokers/health || exit 1"]
       interval: 20s
       timeout: 10s
       retries: 5
       start_period: 75s # Pulsar standalone can take a significant time to initialize fully
     networks:
       - gt7_testing_net
-
 networks:
   gt7_testing_net:
     driver: bridge

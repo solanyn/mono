@@ -5,54 +5,57 @@ load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
 rust_library(
     name = "gt7_telemetry_core",
     srcs = [
-        "src/lib.rs",
         "src/config.rs",
-        "src/constants.rs", 
+        "src/constants.rs",
         "src/cypher.rs",
         "src/errors.rs",
         "src/flags.rs",
         "src/heartbeat.rs",
+        "src/lib.rs",
         "src/packet.rs",
     ],
     edition = "2021",
+    visibility = ["//visibility:public"],
     deps = [
         "@crate_index//:bitflags",
-        "@crate_index//:byteorder", 
+        "@crate_index//:byteorder",
+        "@crate_index//:log",
         "@crate_index//:salsa20",
-        "@crate_index//:thiserror",
         "@crate_index//:serde",
         "@crate_index//:serde_json",
-        "@crate_index//:log",
+        "@crate_index//:thiserror",
     ],
-    visibility = ["//visibility:public"],
 )
 
 # Main telemetry server binary
 rust_binary(
     name = "telemetry_server",
     srcs = [
-        "src/main.rs",
         "src/http_server.rs",
-        "src/pulsar_handler.rs", 
+        "src/main.rs",
+        "src/pulsar_handler.rs",
         "src/telemetry_loop.rs",
     ],
     edition = "2021",
+    env = {
+        "PROTOC": "$(execpath @protobuf//:protoc)",
+    },
+    tools = ["@protobuf//:protoc"],
+    visibility = ["//visibility:public"],
     deps = [
         ":gt7_telemetry_core",
-        "@crate_index//:pulsar",
-        "@crate_index//:env_logger",
-        "@crate_index//:log",
-        "@crate_index//:serde_json",
-        "@crate_index//:tokio",
         "@crate_index//:axum",
         "@crate_index//:axum-extra",
+        "@crate_index//:env_logger",
         "@crate_index//:futures-util",
+        "@crate_index//:log",
+        "@crate_index//:pulsar",
         "@crate_index//:rustls",
         "@crate_index//:rustls-pemfile",
+        "@crate_index//:serde_json",
+        "@crate_index//:tokio",
     ],
-    visibility = ["//visibility:public"],
 )
-
 
 # Container image for the Rust telemetry service
 oci_image(

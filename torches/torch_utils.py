@@ -9,14 +9,14 @@ import numpy as np
 
 class SimpleNet(nn.Module):
     """A simple neural network for demonstration."""
-    
+
     def __init__(self, input_size=784, hidden_size=128, num_classes=10):
         super(SimpleNet, self).__init__()
         self.fc1 = nn.Linear(input_size, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
         self.fc3 = nn.Linear(hidden_size, num_classes)
         self.dropout = nn.Dropout(0.2)
-        
+
     def forward(self, x):
         x = torch.flatten(x, 1)
         x = F.relu(self.fc1(x))
@@ -40,25 +40,25 @@ def demonstrate_pytorch():
     """Demonstrate basic PyTorch functionality."""
     print("PyTorch version:", torch.__version__)
     print("CUDA available:", torch.cuda.is_available())
-    
+
     # Create model
     model = SimpleNet()
     print(f"Model created with {sum(p.numel() for p in model.parameters())} parameters")
-    
+
     # Create sample data
     inputs, labels = create_sample_data()
     print(f"Sample data shape: {inputs.shape}")
-    
+
     # Forward pass
     with torch.no_grad():
         outputs = model(inputs)
         print(f"Output shape: {outputs.shape}")
-        
+
     # Compute loss
     criterion = nn.CrossEntropyLoss()
     loss = criterion(outputs, labels)
     print(f"Sample loss: {loss.item():.4f}")
-    
+
     return model, inputs, labels
 
 
