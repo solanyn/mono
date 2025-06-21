@@ -21,6 +21,7 @@ bazel_dep(name = "aspect_rules_py", version = "1.6.0")
 bazel_dep(name = "buildifier_prebuilt", version = "6.3.3")
 bazel_dep(name = "gazelle", version = "0.44.0")
 bazel_dep(name = "hermetic_cc_toolchain", version = "3.1.0")
+bazel_dep(name = "platforms", version = "0.0.10")
 
 # Python configuration
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
