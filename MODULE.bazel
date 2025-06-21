@@ -31,6 +31,23 @@ pip.parse(
     hub_name = "pip",
     python_version = "3.11",
     requirements_lock = "//:requirements_lock.txt",
+    whl_modifications = {
+        "nvidia-cublas-cu12": "//tools/whl_modifications:nvidia_cublas_cu12.BUILD",
+        "nvidia-cuda-cupti-cu12": "//tools/whl_modifications:nvidia_cuda_cupti_cu12.BUILD",
+        "nvidia-cuda-nvrtc-cu12": "//tools/whl_modifications:nvidia_cuda_nvrtc_cu12.BUILD",
+        "nvidia-cuda-runtime-cu12": "//tools/whl_modifications:nvidia_cuda_runtime_cu12.BUILD",
+        "nvidia-cudnn-cu12": "//tools/whl_modifications:nvidia_cudnn_cu12.BUILD",
+        "nvidia-cufft-cu12": "//tools/whl_modifications:nvidia_cufft_cu12.BUILD",
+        "nvidia-cufile-cu12": "//tools/whl_modifications:nvidia_cufile_cu12.BUILD",
+        "nvidia-curand-cu12": "//tools/whl_modifications:nvidia_curand_cu12.BUILD",
+        "nvidia-cusolver-cu12": "//tools/whl_modifications:nvidia_cusolver_cu12.BUILD",
+        "nvidia-cusparse-cu12": "//tools/whl_modifications:nvidia_cusparse_cu12.BUILD",
+        "nvidia-cusparselt-cu12": "//tools/whl_modifications:nvidia_cusparselt_cu12.BUILD",
+        "nvidia-nccl-cu12": "//tools/whl_modifications:nvidia_nccl_cu12.BUILD",
+        "nvidia-nvjitlink-cu12": "//tools/whl_modifications:nvidia_nvjitlink_cu12.BUILD",
+        "nvidia-nvtx-cu12": "//tools/whl_modifications:nvidia_nvtx_cu12.BUILD",
+        "triton": "//tools/whl_modifications:triton.BUILD",
+    },
 )
 use_repo(pip, "pip")
 
