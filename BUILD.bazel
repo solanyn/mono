@@ -1,5 +1,6 @@
 load("@npm//:defs.bzl", "npm_link_all_packages")
 load("@rules_uv//uv:pip.bzl", "pip_compile")
+load("@aspect_rules_lint//format:defs.bzl", "format_multirun")
 
 # gazelle:map_kind py_library py_library @aspect_rules_py//py:defs.bzl
 # gazelle:map_kind py_binary py_binary @aspect_rules_py//py:defs.bzl
@@ -28,4 +29,12 @@ pip_compile(
     name = "requirements_gpu",
     requirements_in = "requirements_gpu.txt", 
     requirements_txt = "requirements_gpu_lock.txt",
+)
+
+# Format all files in the repository
+format_multirun(
+    name = "format",
+    javascript = "@multitool//tools/prettier",
+    python = "@multitool//tools/ruff",
+    yaml = "@multitool//tools/yamlfmt",
 )

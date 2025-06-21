@@ -1,28 +1,38 @@
-# Build configuration
-build --symlink_prefix=dist/
-build --show_timestamps
-build --announce_rc
-build --experimental_ui_max_stdouterr_bytes=1048576
+# Import Aspect bazelrc presets
+import %workspace%/.aspect/bazelrc/bazel7.bazelrc
+import %workspace%/.aspect/bazelrc/convenience.bazelrc
+import %workspace%/.aspect/bazelrc/correctness.bazelrc
+import %workspace%/.aspect/bazelrc/debug.bazelrc
+import %workspace%/.aspect/bazelrc/javascript.bazelrc
+import %workspace%/.aspect/bazelrc/performance.bazelrc
 
-# Test configuration
-test --test_output=errors
+### YOUR PROJECT SPECIFIC OPTIONS GO HERE ###
+common --enable_platform_specific_config
 
-# Common flags for all commands
-common --enable_bzlmod=true
-common --enable_workspace=false
+common:release -c opt --stamp --workspace_status_command="node tools/workspace_status.js"
 
-# Remote cache (uncomment when ready)
-# build --remote_cache=https://storage.googleapis.com/your-cache-bucket
+# --incompatible_disallow_empty_glob setting from .aspect/bazelrc/correctness.bazelrc causes issues with LLVM toolchain
+common --noincompatible_disallow_empty_glob
 
-# Performance optimizations  
-build --local_resources=memory=HOST_RAM*.75
-build --local_resources=cpu=HOST_CPUS*.75
+# Don't try and auto detect the cc toolchain, as we use our own gcc toolchains.
+common:linux --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+common --incompatible_enable_proto_toolchain_resolution
 
-# Development settings
-build:dev --compilation_mode=fastbuild
-build:dev --strip=never
+build:windows --sandbox_add_mount_pair=C:\Temp
 
-# Production settings
-build:prod --compilation_mode=opt
-build:prod --strip=always
+# Tell Bazel to pass the right flags for llvm-ar, not libtool, only needed on linux.
+# See https://github.com/bazelbuild/bazel/blob/5c75d0acec21459bbb13520817e3806e1507e907/tools/cpp/unix_cc_toolchain_config.bzl#L1000-L1024
+build:linux --features=-libtool
 
+# Load any settings & overrides specific to the external remote cache from `.aspect/bazelrc/remote-cache.bazelrc`.
+# This file should appear in `.gitignore` so that settings are not shared with team members. This
+# should be last statement in this config so the user configuration is able to overwrite flags from
+# this file. See https://bazel.build/configure/best-practices#bazelrc-file.
+# Setup of this file is automated by running the setup_remote_cache.sh Bash script.
+try-import %workspace%/.aspect/bazelrc/remote-cache.bazelrc
+
+# Load any settings & overrides specific to the current user from `.aspect/bazelrc/user.bazelrc`.
+# This file should appear in `.gitignore` so that settings are not shared with team members. This
+# should be last statement in this config so the user configuration is able to overwrite flags from
+# this file. See https://bazel.build/configure/best-practices#bazelrc-file.
+try-import %workspace%/.aspect/bazelrc/user.bazelrc
