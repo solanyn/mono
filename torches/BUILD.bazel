@@ -27,7 +27,7 @@ py_library(
     name = "torch_deps",
     visibility = ["//visibility:public"],
     deps = select({
-        "//platforms:linux_x86_64_cuda": [
+        "//constraints:cuda": [
             "@pip_by_platform//numpy",
             "@pip_by_platform//torch", 
             "@pip_by_platform//torchvision",
