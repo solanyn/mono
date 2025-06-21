@@ -18,6 +18,13 @@ exports_files([
     "requirements_gpu.txt",
     "requirements_lock.txt",
     "requirements_gpu_lock.txt",
+    # Platform-specific requirements
+    "requirements_linux_x86_64.txt",
+    "requirements_linux_x86_64_cuda.txt", 
+    "requirements_darwin_arm64.txt",
+    "requirements_linux_x86_64_lock.txt",
+    "requirements_linux_x86_64_cuda_lock.txt",
+    "requirements_darwin_arm64_lock.txt",
 ])
 
 # CPU PyTorch dependencies (default)
@@ -32,6 +39,25 @@ pip_compile(
     name = "requirements_gpu",
     requirements_in = "requirements_gpu.txt",
     requirements_txt = "requirements_gpu_lock.txt",
+)
+
+# Platform-specific pip_compile targets
+pip_compile(
+    name = "requirements_linux_x86_64",
+    requirements_in = "requirements_linux_x86_64.txt",
+    requirements_txt = "requirements_linux_x86_64_lock.txt",
+)
+
+pip_compile(
+    name = "requirements_linux_x86_64_cuda",
+    requirements_in = "requirements_linux_x86_64_cuda.txt", 
+    requirements_txt = "requirements_linux_x86_64_cuda_lock.txt",
+)
+
+pip_compile(
+    name = "requirements_darwin_arm64",
+    requirements_in = "requirements_darwin_arm64.txt",
+    requirements_txt = "requirements_darwin_arm64_lock.txt",
 )
 
 

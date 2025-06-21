@@ -26,12 +26,25 @@ bazel_dep(name = "hermetic_cc_toolchain", version = "3.1.0")
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(python_version = "3.11")
 
-# Pip dependencies
+# Platform-specific pip dependencies
 pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+
+# Default CPU-only dependencies for most platforms
 pip.parse(
     hub_name = "pip",
     python_version = "3.11",
     requirements_lock = "//:requirements_lock.txt",
+)
+
+# Platform-specific dependencies using requirements_by_platform
+pip.parse(
+    hub_name = "pip_by_platform",
+    python_version = "3.11",
+    requirements_by_platform = {
+        "//platforms:linux_x86_64": "//:requirements_linux_x86_64_lock.txt",
+        "//platforms:linux_x86_64_cuda": "//:requirements_linux_x86_64_cuda_lock.txt", 
+        "//platforms:darwin_arm64": "//:requirements_darwin_arm64_lock.txt",
+    },
     whl_modifications = {
         "nvidia-cublas-cu12": "//tools/whl_modifications:nvidia_cublas_cu12.BUILD",
         "nvidia-cuda-cupti-cu12": "//tools/whl_modifications:nvidia_cuda_cupti_cu12.BUILD",
@@ -50,7 +63,7 @@ pip.parse(
         "triton": "//tools/whl_modifications:triton.BUILD",
     },
 )
-use_repo(pip, "pip")
+use_repo(pip, "pip", "pip_by_platform")
 
 bazel_dep(name = "rules_oci", version = "2.2.6")
 

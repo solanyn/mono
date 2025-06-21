@@ -22,10 +22,14 @@ jobs:
           bazelisk-cache: true
           disk-cache: ${{ github.workflow }}
           repository-cache: true
-      - name: Run all tests
-        run: bazel test //...
-      - name: Build all targets
-        run: bazel build //...
+      - name: Run all tests (Linux CPU)
+        run: bazel test //... --config=linux
+      - name: Build all targets (Linux CPU)
+        run: bazel build //... --config=linux
+      - name: Test PyTorch targets (Linux CUDA)
+        run: bazel test //torches:... --config=linux-cuda
+      - name: Build PyTorch targets (Linux CUDA)  
+        run: bazel build //torches:... --config=linux-cuda
       - name: Check formatting (Rust)
         run: bazel run @rules_rust//:rustfmt_test
       - name: Run clippy (Rust)

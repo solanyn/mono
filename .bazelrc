@@ -17,6 +17,14 @@ common --host_per_file_copt=external/.*grpc.*@--GRPC_WAS_NOT_SUPPOSED_TO_BE_BUIL
 # Use hermetic CC toolchain
 build --extra_toolchains=@zig_sdk//:toolchain
 
+# Platform configurations
+build:linux --platforms=//platforms:linux_x86_64
+build:linux-cuda --platforms=//platforms:linux_x86_64_cuda
+build:macos --platforms=//platforms:darwin_arm64
+
+# Default to current host platform if no config specified
+# build --platforms=//platforms:darwin_arm64  # Uncomment to set default
+
 # Load any settings & overrides specific to the current user from `.aspect/bazelrc/user.bazelrc`.
 # This file should appear in `.gitignore` so that settings are not shared with team members. This
 # should be last statement in this config so the user configuration is able to overwrite flags from

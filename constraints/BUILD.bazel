@@ -1,0 +1,14 @@
+package(default_visibility = ["//visibility:public"])
+
+# Custom constraint for CUDA support
+constraint_setting(name = "cuda_support")
+
+constraint_value(
+    name = "cuda",
+    constraint_setting = ":cuda_support",
+)
+
+constraint_value(
+    name = "no_cuda",
+    constraint_setting = ":cuda_support",
+)

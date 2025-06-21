@@ -1,0 +1,12 @@
+load("@aspect_rules_py//py:defs.bzl", "py_binary")
+
+# Platform demo binary
+py_binary(
+    name = "platform_demo",
+    srcs = ["platform_demo.py"],
+    main = "platform_demo.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//torches:torch_deps",
+    ],
+)

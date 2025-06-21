@@ -22,13 +22,20 @@ py_binary(
     ],
 )
 
-# Dependencies target for PyTorch
+# Dependencies target for PyTorch (platform-specific)
 py_library(
     name = "torch_deps",
     visibility = ["//visibility:public"],
-    deps = [
-        "@pip//numpy",
-        "@pip//torch",
-        "@pip//torchvision",
-    ],
+    deps = select({
+        "//platforms:linux_x86_64_cuda": [
+            "@pip_by_platform//numpy",
+            "@pip_by_platform//torch", 
+            "@pip_by_platform//torchvision",
+        ],
+        "//conditions:default": [
+            "@pip_by_platform//numpy",
+            "@pip_by_platform//torch",
+            "@pip_by_platform//torchvision",
+        ],
+    }),
 )
