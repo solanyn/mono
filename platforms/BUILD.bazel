@@ -1,6 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-# Linux x86_64 (CPU-only)
 platform(
     name = "linux_x86_64",
     constraint_values = [
@@ -9,7 +8,6 @@ platform(
     ],
 )
 
-# Linux x86_64 with CUDA support
 platform(
     name = "linux_x86_64_cuda",
     constraint_values = [
@@ -19,7 +17,6 @@ platform(
     ],
 )
 
-# macOS ARM64 (Apple Silicon)
 platform(
     name = "darwin_arm64",
     constraint_values = [

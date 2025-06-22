@@ -5,42 +5,40 @@ module(
 
 bazel_dep(name = "bazel_skylib", version = "1.7.1")
 bazel_dep(name = "aspect_bazel_lib", version = "2.19.4")
+bazel_dep(name = "toolchains_protoc", version = "0.4.3")
+bazel_dep(name = "protobuf", version = "31.1")
 bazel_dep(name = "rules_rust", version = "0.61.0")
 bazel_dep(name = "rules_go", version = "0.55.1")
-bazel_dep(name = "rules_java", version = "8.13.0")
-bazel_dep(name = "rules_jvm_external", version = "6.5")
-bazel_dep(name = "toolchains_protoc", version = "0.4.3")
-bazel_dep(name = "rules_buf", version = "0.3.0")
-bazel_dep(name = "protobuf", version = "31.1")
 bazel_dep(name = "aspect_rules_js", version = "2.3.8")
 bazel_dep(name = "rules_shell", version = "0.5.0")
 bazel_dep(name = "rules_python", version = "1.4.1")
 bazel_dep(name = "rules_uv", version = "0.77.0")
 bazel_dep(name = "aspect_rules_py", version = "1.6.0")
-
-bazel_dep(name = "buildifier_prebuilt", version = "6.3.3")
-bazel_dep(name = "gazelle", version = "0.44.0")
+bazel_dep(name = "rules_distroless", version = "0.5.1")
 bazel_dep(name = "hermetic_cc_toolchain", version = "3.1.0")
 bazel_dep(name = "platforms", version = "0.0.10")
+bazel_dep(name = "rules_pkg", version = "1.1.0")
+bazel_dep(name = "buildifier_prebuilt", version = "6.3.3")
+bazel_dep(name = "gazelle", version = "0.44.0")
+bazel_dep(name = "rules_oci", version = "2.2.6")
 
-# Python configuration
+# python
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
-python.toolchain(python_version = "3.11")
+python.toolchain(python_version = "3.12")
 
-# Platform-specific pip dependencies
 pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
 
-# Default CPU-only dependencies for most platforms
+# cpu
 pip.parse(
     hub_name = "pip",
-    python_version = "3.11",
+    python_version = "3.12",
     requirements_lock = "//:requirements_lock.txt",
 )
 
-# Platform-specific dependencies using requirements_by_platform
+# platform-specific dependencies using requirements_by_platform
 pip.parse(
     hub_name = "pip_by_platform",
-    python_version = "3.11",
+    python_version = "3.12",
     requirements_by_platform = {
         "//platforms:linux_x86_64": "//:requirements_linux_x86_64_lock.txt",
         "//platforms:linux_x86_64_cuda": "//:requirements_linux_x86_64_cuda_lock.txt", 
@@ -66,16 +64,13 @@ pip.parse(
 )
 use_repo(pip, "pip", "pip_by_platform")
 
-bazel_dep(name = "rules_oci", version = "2.2.6")
-
-# Rust configuration
+# rust
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 rust.toolchain(edition = "2021")
 
-# Crate universe for Rust dependencies
 crate = use_extension("@rules_rust//crate_universe:extension.bzl", "crate")
 crate.from_cargo(
-    name = "crate_index",
+    name = "crates",
     cargo_lockfile = "//:Cargo.lock",
     manifests = [
         "//:Cargo.toml",
@@ -83,13 +78,9 @@ crate.from_cargo(
         "//tldr/backend:Cargo.toml",
     ],
 )
-use_repo(crate, "crate_index")
+use_repo(crate, "crates")
 
-# Go configuration
-go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
-go_sdk.download(version = "1.24.2")
-
-# NPM configuration for JavaScript projects
+# js
 npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm", dev_dependency = True)
 npm.npm_translate_lock(
     name = "npm",
@@ -105,39 +96,23 @@ use_repo(npm, "npm")
 pnpm = use_extension("@aspect_rules_js//npm:extensions.bzl", "pnpm")
 use_repo(pnpm, "pnpm")
 
-# OCI configuration
+# containers
 oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 oci.pull(
-    name = "distroless_base",
-    digest = "sha256:ccaef5ee2f1850270d453fdf700a5392534f8d1a8ca2acda391fbb6a06b81c86",
-    image = "gcr.io/distroless/base",
+    name = "distroless_cc",
+    image = "gcr.io/distroless/cc-debian12",
+    digest = "sha256:eccec5274132c1be0ce5d2c8e6fe41033e64af5e987ccee9007826e4c012069d",
     platforms = [
         "linux/amd64",
         "linux/arm64",
     ],
 )
-oci.pull(
-    name = "distroless_java",
-    digest = "sha256:161a1d97d592b3f1919801578c3a47c8e932071168a96267698f4b669c24c76d",
-    image = "gcr.io/distroless/java17",
-    platforms = [
-        "linux/amd64",
-        "linux/arm64",
-    ],
-)
-use_repo(oci, "distroless_base", "distroless_base_linux_amd64", "distroless_base_linux_arm64", "distroless_java", "distroless_java_linux_amd64", "distroless_java_linux_arm64")
+use_repo(oci, "distroless_cc", "distroless_cc_linux_amd64", "distroless_cc_linux_arm64")
 
-
-
+# proto
 protoc = use_extension("@toolchains_protoc//protoc:extensions.bzl", "protoc")
 protoc.toolchain()
 
-
-
-buf = use_extension("@rules_buf//buf:extensions.bzl", "buf")
-buf.toolchains(version = "v1.34.0")
-use_repo(buf, "rules_buf_toolchains")
-
-# Hermetic CC toolchain configuration
+# cc toolchain
 cc_toolchain = use_extension("@hermetic_cc_toolchain//toolchain:extension.bzl", "toolchain")
 cc_toolchain.toolchain()

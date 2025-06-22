@@ -9,10 +9,8 @@ package(default_visibility = ["//visibility:public"])
 # gazelle:map_kind py_binary py_binary @aspect_rules_py//py:defs.bzl
 # gazelle:map_kind py_test py_test @aspect_rules_py//py:defs.bzl
 
-# Link npm packages at workspace root
 npm_link_all_packages(name = "node_modules")
 
-# Export requirements files for Python projects
 exports_files([
     "requirements.txt",
     "requirements_gpu.txt",
@@ -27,21 +25,18 @@ exports_files([
     "requirements_darwin_arm64_lock.txt",
 ])
 
-# CPU PyTorch dependencies (default)
 pip_compile(
     name = "requirements_cpu",
     requirements_in = "requirements.txt",
     requirements_txt = "requirements_lock.txt",
 )
 
-# GPU PyTorch dependencies
 pip_compile(
     name = "requirements_gpu",
     requirements_in = "requirements_gpu.txt",
     requirements_txt = "requirements_gpu_lock.txt",
 )
 
-# Platform-specific pip_compile targets
 pip_compile(
     name = "requirements_linux_x86_64",
     requirements_in = "requirements_linux_x86_64.txt",

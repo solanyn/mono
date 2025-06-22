@@ -1,5 +1,6 @@
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
+load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 
 rust_library(
     name = "gt7_telemetry_core",
@@ -14,15 +15,14 @@ rust_library(
         "src/packet.rs",
     ],
     edition = "2021",
-    visibility = ["//visibility:public"],
     deps = [
-        "@crate_index//:bitflags",
-        "@crate_index//:byteorder",
-        "@crate_index//:log",
-        "@crate_index//:salsa20",
-        "@crate_index//:serde",
-        "@crate_index//:serde_json",
-        "@crate_index//:thiserror",
+        "@crates//:bitflags",
+        "@crates//:byteorder",
+        "@crates//:log",
+        "@crates//:salsa20",
+        "@crates//:serde",
+        "@crates//:serde_json",
+        "@crates//:thiserror",
     ],
 )
 
@@ -34,38 +34,38 @@ rust_binary(
         "src/pulsar_handler.rs",
         "src/telemetry_loop.rs",
     ],
+    rustc_flags = [
+        "-Copt-level=0",
+    ],
     edition = "2021",
     toolchains = ["@toolchains_protoc//:protoc_toolchain"],
     visibility = ["//visibility:public"],
     deps = [
         ":gt7_telemetry_core",
-        "@crate_index//:axum",
-        "@crate_index//:axum-extra",
-        "@crate_index//:env_logger",
-        "@crate_index//:futures-util",
-        "@crate_index//:log",
-        "@crate_index//:pulsar",
-        "@crate_index//:rustls",
-        "@crate_index//:rustls-pemfile",
-        "@crate_index//:serde_json",
-        "@crate_index//:tokio",
+        "@crates//:axum",
+        "@crates//:axum-extra",
+        "@crates//:env_logger",
+        "@crates//:futures-util",
+        "@crates//:log",
+        "@crates//:pulsar",
+        "@crates//:rustls",
+        "@crates//:rustls-pemfile",
+        "@crates//:serde_json",
+        "@crates//:tokio",
     ],
+)
+
+pkg_tar(
+    name = "telemetry_server_layer",
+    srcs = [":telemetry_server"],
 )
 
 oci_image(
     name = "telemetry_image",
-    base = "@distroless_base",
+    base = "@distroless_cc",
     entrypoint = ["/telemetry_server"],
-    tars = [":telemetry_server_tar"],
+    tars = [":telemetry_server_layer"],
     visibility = ["//visibility:public"],
-)
-
-genrule(
-    name = "telemetry_server_tar",
-    srcs = [":telemetry_server"],
-    outs = ["telemetry_server.tar"],
-    cmd = "tar -cf $@ -C $$(dirname $(location :telemetry_server)) $$(basename $(location :telemetry_server))",
-    visibility = ["//visibility:private"],
 )
 
 oci_load(

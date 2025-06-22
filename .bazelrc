@@ -14,8 +14,6 @@ common --host_per_file_copt=external/.*protobuf.*@--PROTOBUF_WAS_NOT_SUPPOSED_TO
 common --per_file_copt=external/.*grpc.*@--GRPC_WAS_NOT_SUPPOSED_TO_BE_BUILT
 common --host_per_file_copt=external/.*grpc.*@--GRPC_WAS_NOT_SUPPOSED_TO_BE_BUILT
 
-build --extra_toolchains=@toolchains_protoc//:protoc_toolchain
-
 build:linux --platforms=//platforms:linux_x86_64
 build:linux-cuda --platforms=//platforms:linux_x86_64_cuda
 build:macos --platforms=//platforms:darwin_arm64
