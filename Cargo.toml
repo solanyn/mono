@@ -23,7 +23,7 @@ rustls = "0.23"
 rustls-pemfile = "2.0"
 
 # GT7 specific dependencies
-pulsar = "6.0"
+pulsar = { version = "6.0", default-features = false, features = ["tokio-rustls-runtime"] }
 
 # Backend specific dependencies  
 sqlx = { version = "0.8", features = [
