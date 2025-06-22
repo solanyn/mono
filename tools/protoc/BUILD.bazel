@@ -1,0 +1,15 @@
+# Wrapper to provide hermetic protoc for build scripts
+
+load("@bazel_skylib//rules:native_binary.bzl", "native_binary")
+
+# Create a wrapper script that resolves protoc from the hermetic toolchain
+sh_binary(
+    name = "protoc_wrapper",
+    srcs = ["protoc_wrapper.sh"],
+    data = select({
+        "@platforms//os:macos": ["@@toolchains_protoc++protoc+toolchains_protoc_hub.osx_aarch_64//:bin/protoc"],
+        "@platforms//os:linux": ["@@toolchains_protoc++protoc+toolchains_protoc_hub.linux_x86_64//:bin/protoc"],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
+)

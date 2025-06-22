@@ -23,3 +23,14 @@ platform(
         "@platforms//cpu:arm64",
     ],
 )
+
+# Hermetic platform for CI builds with specific glibc version
+# Matches the hermetic CC toolchain's constraints
+platform(
+    name = "linux_x86_64_hermetic",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+        "@hermetic_cc_toolchain//libc:gnu.2.28",
+    ],
+)

@@ -10,12 +10,9 @@ import %workspace%/.aspect/bazelrc/performance.bazelrc
 ## Ensure that we don't accidentally build protobuf or gRPC
 common --incompatible_enable_proto_toolchain_resolution
 
-# Pass hermetic protoc to build scripts
-# Use platform-specific hermetic protoc from toolchains_protoc 
-build:macos --action_env=PROTOC=external/toolchains_protoc++protoc+toolchains_protoc_hub.osx_aarch_64/bin/protoc
-build:linux --action_env=PROTOC=external/toolchains_protoc++protoc+toolchains_protoc_hub.linux_x86_64/bin/protoc
-# Default fallback to system protoc if platform not matched
-build --action_env=PROTOC=/opt/homebrew/bin/protoc
+# Set PROTOC for Rust build scripts (temporarily use system protoc)
+# TODO: Replace with hermetic protoc once we solve the path resolution
+common --action_env=PROTOC=/opt/homebrew/bin/protoc
 common --per_file_copt=external/.*protobuf.*@--PROTOBUF_WAS_NOT_SUPPOSED_TO_BE_BUILT
 common --host_per_file_copt=external/.*protobuf.*@--PROTOBUF_WAS_NOT_SUPPOSED_TO_BE_BUILT
 common --per_file_copt=external/.*grpc.*@--GRPC_WAS_NOT_SUPPOSED_TO_BE_BUILT
@@ -26,9 +23,7 @@ build:macos --platforms=//platforms:darwin_arm64
 
 # CI configuration 
 build:ci --incompatible_enable_proto_toolchain_resolution
-# Set protoc path for CI builds
-build:ci --action_env=PROTOC=protoc
-# TODO: Re-enable hermetic CC toolchain once target compatibility is resolved
-# build:ci --extra_toolchains=@hermetic_cc_toolchain//toolchain:all
+# Use specific hermetic CC toolchain for Linux x86_64 with glibc 2.28
+build:ci --extra_toolchains=@hermetic_cc_toolchain//toolchain/libc_aware/toolchain:x86_64-linux-gnu.2.28
 
 try-import %workspace%/.aspect/bazelrc/user.bazelrc
