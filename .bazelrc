@@ -24,4 +24,7 @@ common --host_per_file_copt=external/.*grpc.*@--GRPC_WAS_NOT_SUPPOSED_TO_BE_BUIL
 build:linux --platforms=//platforms:linux_x86_64
 build:macos --platforms=//platforms:darwin_arm64
 
+# CI configuration
+build:ci --action_env=PROTOC=external/toolchains_protoc_hub/bin/protoc
+
 try-import %workspace%/.aspect/bazelrc/user.bazelrc
