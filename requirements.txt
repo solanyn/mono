@@ -1,4 +1,6 @@
-# PyTorch and ML dependencies (includes CUDA deps for compatibility)
-torch==2.7.1
-torchvision==0.22.1
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.7.1; platform_machine == "x86_64"
+torch==2.7.1; platform_machine != "x86_64"
+torchvision==0.22.1; platform_machine == "x86_64"
+torchvision==0.22.1; platform_machine != "x86_64"
 numpy==2.2.1

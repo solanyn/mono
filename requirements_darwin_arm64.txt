@@ -1,4 +1,0 @@
-# PyTorch and ML dependencies for macOS ARM64 (Apple Silicon)
-torch==2.7.1
-torchvision==0.22.1
-numpy==2.2.1

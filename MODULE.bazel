@@ -7,19 +7,18 @@ bazel_dep(name = "bazel_skylib", version = "1.7.1")
 bazel_dep(name = "aspect_bazel_lib", version = "2.19.4")
 bazel_dep(name = "toolchains_protoc", version = "0.4.3")
 bazel_dep(name = "protobuf", version = "31.1")
-bazel_dep(name = "rules_rust", version = "0.61.0")
-bazel_dep(name = "rules_go", version = "0.55.1")
-bazel_dep(name = "aspect_rules_js", version = "2.3.8")
-bazel_dep(name = "rules_shell", version = "0.5.0")
-bazel_dep(name = "rules_python", version = "1.4.1")
-bazel_dep(name = "rules_uv", version = "0.77.0")
-bazel_dep(name = "aspect_rules_py", version = "1.6.0")
-bazel_dep(name = "rules_distroless", version = "0.5.1")
+bazel_dep(name = "rules_proto", version = "6.0.2")
 bazel_dep(name = "hermetic_cc_toolchain", version = "3.1.0")
 bazel_dep(name = "platforms", version = "0.0.10")
-bazel_dep(name = "rules_pkg", version = "1.1.0")
 bazel_dep(name = "buildifier_prebuilt", version = "6.3.3")
-bazel_dep(name = "gazelle", version = "0.44.0")
+
+bazel_dep(name = "rules_rust", version = "0.61.0")
+bazel_dep(name = "rules_rust_prost", version = "0.61.0")
+bazel_dep(name = "rules_uv", version = "0.77.0")
+bazel_dep(name = "rules_shell", version = "0.5.0")
+bazel_dep(name = "rules_python", version = "1.4.1")
+bazel_dep(name = "aspect_rules_py", version = "1.6.0")
+bazel_dep(name = "aspect_rules_js", version = "2.3.8")
 bazel_dep(name = "rules_oci", version = "2.2.6")
 
 # python
@@ -27,42 +26,14 @@ python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(python_version = "3.12")
 
 pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
-
-# cpu
 pip.parse(
+    experimental_extra_index_urls = ["https://download.pytorch.org/whl/cpu"],
+    experimental_index_url = "https://pypi.org/simple",
     hub_name = "pip",
     python_version = "3.12",
-    requirements_lock = "//:requirements_lock.txt",
+    requirements_lock = "requirements_lock.txt",
 )
-
-# platform-specific dependencies using requirements_by_platform
-pip.parse(
-    hub_name = "pip_by_platform",
-    python_version = "3.12",
-    requirements_by_platform = {
-        "//platforms:linux_x86_64": "//:requirements_linux_x86_64_lock.txt",
-        "//platforms:linux_x86_64_cuda": "//:requirements_linux_x86_64_cuda_lock.txt", 
-        "//platforms:darwin_arm64": "//:requirements_darwin_arm64_lock.txt",
-    },
-    whl_modifications = {
-        "nvidia-cublas-cu12": "//tools/whl_modifications:nvidia_cublas_cu12.BUILD",
-        "nvidia-cuda-cupti-cu12": "//tools/whl_modifications:nvidia_cuda_cupti_cu12.BUILD",
-        "nvidia-cuda-nvrtc-cu12": "//tools/whl_modifications:nvidia_cuda_nvrtc_cu12.BUILD",
-        "nvidia-cuda-runtime-cu12": "//tools/whl_modifications:nvidia_cuda_runtime_cu12.BUILD",
-        "nvidia-cudnn-cu12": "//tools/whl_modifications:nvidia_cudnn_cu12.BUILD",
-        "nvidia-cufft-cu12": "//tools/whl_modifications:nvidia_cufft_cu12.BUILD",
-        "nvidia-cufile-cu12": "//tools/whl_modifications:nvidia_cufile_cu12.BUILD",
-        "nvidia-curand-cu12": "//tools/whl_modifications:nvidia_curand_cu12.BUILD",
-        "nvidia-cusolver-cu12": "//tools/whl_modifications:nvidia_cusolver_cu12.BUILD",
-        "nvidia-cusparse-cu12": "//tools/whl_modifications:nvidia_cusparse_cu12.BUILD",
-        "nvidia-cusparselt-cu12": "//tools/whl_modifications:nvidia_cusparselt_cu12.BUILD",
-        "nvidia-nccl-cu12": "//tools/whl_modifications:nvidia_nccl_cu12.BUILD",
-        "nvidia-nvjitlink-cu12": "//tools/whl_modifications:nvidia_nvjitlink_cu12.BUILD",
-        "nvidia-nvtx-cu12": "//tools/whl_modifications:nvidia_nvtx_cu12.BUILD",
-        "triton": "//tools/whl_modifications:triton.BUILD",
-    },
-)
-use_repo(pip, "pip", "pip_by_platform")
+use_repo(pip, "pip")
 
 # rust
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
@@ -100,18 +71,24 @@ use_repo(pnpm, "pnpm")
 oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 oci.pull(
     name = "distroless_cc",
-    image = "gcr.io/distroless/cc-debian12",
     digest = "sha256:eccec5274132c1be0ce5d2c8e6fe41033e64af5e987ccee9007826e4c012069d",
+    image = "gcr.io/distroless/cc-debian12",
     platforms = [
         "linux/amd64",
-        "linux/arm64",
+        "linux/arm64/v8",
     ],
 )
-use_repo(oci, "distroless_cc", "distroless_cc_linux_amd64", "distroless_cc_linux_arm64")
+use_repo(oci, "distroless_cc", "distroless_cc_linux_amd64", "distroless_cc_linux_arm64_v8")
 
 # proto
 protoc = use_extension("@toolchains_protoc//protoc:extensions.bzl", "protoc")
-protoc.toolchain()
+protoc.toolchain(
+    google_protobuf = "v27.3",
+    version = "v27.3",
+)
+use_repo(protoc, "toolchains_protoc_hub")
+
+register_toolchains("@toolchains_protoc_hub//:all")
 
 # cc toolchain
 cc_toolchain = use_extension("@hermetic_cc_toolchain//toolchain:extension.bzl", "toolchain")

@@ -1,5 +1,8 @@
-sh_binary(
-    name = "get-version",
-    srcs = ["get-version.sh"],
-    visibility = ["//visibility:public"],
-)
+load("@platforms//host:constraints.bzl", "HOST_CONSTRAINTS")
+load("@rules_rust//rust:defs.bzl", "rust_library_group")
+load("@rules_uv//uv:pip.bzl", "pip_compile")
+
+package(default_visibility = ["//tools/toolchains:__pkg__"])
+
+# Protobuf runtime targets would go here if needed
+# Currently using global PROTOC environment variable approach

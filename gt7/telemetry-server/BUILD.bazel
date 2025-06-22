@@ -1,6 +1,6 @@
+load("@aspect_bazel_lib//lib:tar.bzl", "tar")
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
-load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 
 rust_library(
     name = "gt7_telemetry_core",
@@ -38,7 +38,6 @@ rust_binary(
         "-Copt-level=0",
     ],
     edition = "2021",
-    toolchains = ["@toolchains_protoc//:protoc_toolchain"],
     visibility = ["//visibility:public"],
     deps = [
         ":gt7_telemetry_core",
@@ -55,7 +54,7 @@ rust_binary(
     ],
 )
 
-pkg_tar(
+tar(
     name = "telemetry_server_layer",
     srcs = [":telemetry_server"],
 )

@@ -1,8 +1,5 @@
 [workspace]
-members = [
-    "gt7/telemetry-server",
-    "tldr/backend"
-]
+members = ["gt7/telemetry-server", "tldr/backend"]
 resolver = "2"
 
 [workspace.dependencies]
@@ -17,7 +14,9 @@ log = "0.4"
 env_logger = "0.10"
 tokio = { version = "1", features = ["full"] }
 axum = { version = "0.7", features = ["ws"] }
-axum-extra = { version = "0.9", features = ["typed-header"], default-features = false }
+axum-extra = { version = "0.9", features = [
+  "typed-header",
+], default-features = false }
 axum-server = { version = "0.7", features = ["tls-rustls"] }
 futures-util = "0.3"
 rustls = "0.23"
@@ -27,7 +26,12 @@ rustls-pemfile = "2.0"
 pulsar = "6.0"
 
 # Backend specific dependencies  
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid"] }
+sqlx = { version = "0.8", features = [
+  "runtime-tokio-rustls",
+  "postgres",
+  "chrono",
+  "uuid",
+] }
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }
 clap = { version = "4.0", features = ["derive"] }
@@ -38,3 +42,4 @@ anyhow = "1.0"
 http-body-util = "0.1.3"
 tower = "0.5.2"
 tokio-tungstenite = "0.27"
+

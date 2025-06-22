@@ -1,5 +1,0 @@
-# PyTorch and ML dependencies for Linux x86_64 with CUDA support
-torch==2.7.1
-torchvision==0.22.1
-numpy==2.2.1
---extra-index-url https://download.pytorch.org/whl/cu121

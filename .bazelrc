@@ -9,12 +9,19 @@ import %workspace%/.aspect/bazelrc/performance.bazelrc
 ### YOUR PROJECT SPECIFIC OPTIONS GO HERE ###
 ## Ensure that we don't accidentally build protobuf or gRPC
 common --incompatible_enable_proto_toolchain_resolution
+
+# Pass hermetic protoc to build scripts
+# Use platform-specific hermetic protoc from toolchains_protoc 
+build:macos --action_env=PROTOC=external/toolchains_protoc++protoc+toolchains_protoc_hub.osx_aarch_64/bin/protoc
+build:linux --action_env=PROTOC=external/toolchains_protoc++protoc+toolchains_protoc_hub.linux_x86_64/bin/protoc
+# Default fallback to system protoc if platform not matched
+build --action_env=PROTOC=/opt/homebrew/bin/protoc
 common --per_file_copt=external/.*protobuf.*@--PROTOBUF_WAS_NOT_SUPPOSED_TO_BE_BUILT
 common --host_per_file_copt=external/.*protobuf.*@--PROTOBUF_WAS_NOT_SUPPOSED_TO_BE_BUILT
 common --per_file_copt=external/.*grpc.*@--GRPC_WAS_NOT_SUPPOSED_TO_BE_BUILT
 common --host_per_file_copt=external/.*grpc.*@--GRPC_WAS_NOT_SUPPOSED_TO_BE_BUILT
 
 build:linux --platforms=//platforms:linux_x86_64
-build:linux-cuda --platforms=//platforms:linux_x86_64_cuda
 build:macos --platforms=//platforms:darwin_arm64
+
 try-import %workspace%/.aspect/bazelrc/user.bazelrc

@@ -1,0 +1,2 @@
+# Prost toolchain configuration would go here if needed
+# Currently using global PROTOC environment variable approach
