@@ -26,9 +26,9 @@ build:macos --platforms=//platforms:darwin_arm64
 
 # CI configuration 
 build:ci --incompatible_enable_proto_toolchain_resolution
-# Use hermetic CC toolchain in CI (Linux) - provides Zig-based cross-compilation
-build:ci --extra_toolchains=@hermetic_cc_toolchain//toolchain:all
-# On Linux, use hermetic CC for cross-compilation  
-build:linux --extra_toolchains=@hermetic_cc_toolchain//toolchain:all
+# Set protoc path for CI builds
+build:ci --action_env=PROTOC=protoc
+# TODO: Re-enable hermetic CC toolchain once target compatibility is resolved
+# build:ci --extra_toolchains=@hermetic_cc_toolchain//toolchain:all
 
 try-import %workspace%/.aspect/bazelrc/user.bazelrc
