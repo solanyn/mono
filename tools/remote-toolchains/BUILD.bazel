@@ -1,0 +1,10 @@
+platform(
+    name = "ubuntu-act-22-04-platform",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+    exec_properties = {
+        "container-image": "docker://ghcr.io/catthehacker/ubuntu:act-22.04",
+    },
+)

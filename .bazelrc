@@ -16,7 +16,49 @@ common --host_per_file_copt=external/.*grpc.*@--GRPC_WAS_NOT_SUPPOSED_TO_BE_BUIL
 build:linux --platforms=//platforms:linux_x86_64
 build:macos --platforms=//platforms:darwin_arm64
 
-build:ci --incompatible_enable_proto_toolchain_resolution
-build:ci --extra_toolchains=@llvm_toolchain//:all
+# proto
+build --incompatible_enable_proto_toolchain_resolution
+build --extra_toolchains=@llvm_toolchain//:all
+
+# remote execution
+# Required for @com_google_absl and remoteapis that use it.
+build --cxxopt=-std=c++17
+build --host_cxxopt=-std=c++17
+
+# Don't inherit the user environment as that trashes the cache.
+build --incompatible_strict_action_env
+# Use the new way of defining toolchains.
+build --incompatible_enable_cc_toolchain_resolution=true
+build --incompatible_use_cc_configure_from_rules_cc=true
+
+# Print the errors in the terminal, not just log files.
+test --test_output=errors
+
+# Only download the final result, the intermediate files can stay on the
+# server side.
+build --remote_download_toplevel
+
+# TODO: Don't know why, but dynamic linking just doesn't work.
+build:remote --dynamic_mode=off
+
+# Remote cache and execution configuration
+# build:remote --remote_cache=grpc://frontend.buildbarn.goyangi.io:8980
+# build:remote --remote_executor=grpc://frontend.buildbarn.goyangi.io:8980
+# The Buildbarn worker can configure instance_name_prefix to create separate
+# execution bins within the cluster. Optional, but useful when trying new
+# worker configurations.
+# build:remote --remote_instance_name=fuse
+# Make sure to load Buildbarn with more requests than the number of CPUs on
+# your host machine.
+# build:remote --jobs=16
+# Make sure that the remote execution platform and the matching toolchains
+# take precedence over the other definitions in the WORKSPACE file.
+# build:remote --extra_toolchains=@hermetic_cc_toolchain//:all
+
+# When running Ubuntu 22.04 executors.
+# build:remote --extra_execution_platforms=//tools/remote-toolchains:ubuntu-act-22-04-platform
+
+# CI configuration
+build:ci --config=remote
 
 try-import %workspace%/.aspect/bazelrc/user.bazelrc
