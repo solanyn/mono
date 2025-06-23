@@ -23,10 +23,7 @@ build:macos --platforms=//platforms:darwin_arm64
 
 # CI configuration 
 build:ci --incompatible_enable_proto_toolchain_resolution
-# Use specific hermetic CC toolchain for Linux x86_64 with glibc 2.28
-build:ci --extra_toolchains=@hermetic_cc_toolchain//toolchain/libc_aware/toolchain:x86_64-linux-gnu.2.28
-# Configure Rust to use compatible target triple for hermetic CC toolchain
-build:ci --action_env=CC_TARGET=x86_64-linux-gnu
-build:ci --action_env=CXX_TARGET=x86_64-linux-gnu
+# Use LLVM toolchain for better Rust compatibility
+build:ci --extra_toolchains=@llvm_toolchain//:all
 
 try-import %workspace%/.aspect/bazelrc/user.bazelrc
