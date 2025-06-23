@@ -5,4 +5,4 @@ load("@rules_uv//uv:pip.bzl", "pip_compile")
 package(default_visibility = ["//tools/toolchains:__pkg__"])
 
 # Protobuf runtime targets would go here if needed
-# Currently using global PROTOC environment variable approach
+# Currently using $(location @protobuf//:protoc) in .bazelrc

@@ -10,9 +10,9 @@ import %workspace%/.aspect/bazelrc/performance.bazelrc
 ## Ensure that we don't accidentally build protobuf or gRPC
 common --incompatible_enable_proto_toolchain_resolution
 
-# Set PROTOC for Rust build scripts using hermetic toolchain
-# The protoc toolchain is registered globally, so $(PROTOC) should resolve to the hermetic binary
-common --action_env=PROTOC
+# Set PROTOC for Rust build scripts using hermetic rules_proto toolchain
+# Use $(location) to get the path to the hermetic protoc binary
+common --action_env=PROTOC=$(location @protobuf//:protoc)
 common --per_file_copt=external/.*protobuf.*@--PROTOBUF_WAS_NOT_SUPPOSED_TO_BE_BUILT
 common --host_per_file_copt=external/.*protobuf.*@--PROTOBUF_WAS_NOT_SUPPOSED_TO_BE_BUILT
 common --per_file_copt=external/.*grpc.*@--GRPC_WAS_NOT_SUPPOSED_TO_BE_BUILT
