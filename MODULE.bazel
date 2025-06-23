@@ -54,10 +54,10 @@ crate.annotation(
     crate = "pulsar",
     repositories = ["crates"],
     build_script_env = {
-        "PROTOC": "$(execpath @@toolchains_protoc_hub//:protoc)",
+        "PROTOC": "$(execpath @protobuf//:protoc)",
     },
     build_script_data = [
-        "@@toolchains_protoc_hub//:protoc",
+        "@protobuf//:protoc",
     ],
 )
 use_repo(crate, "crates")
