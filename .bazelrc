@@ -7,7 +7,7 @@ import %workspace%/.aspect/bazelrc/javascript.bazelrc
 import %workspace%/.aspect/bazelrc/performance.bazelrc
 
 common --incompatible_enable_proto_toolchain_resolution
-common --action_env=PROTOC=$(location @protobuf//:protoc)
+common --action_env=PROTOC=external/protobuf+/protoc
 common --per_file_copt=external/.*protobuf.*@--PROTOBUF_WAS_NOT_SUPPOSED_TO_BE_BUILT
 common --host_per_file_copt=external/.*protobuf.*@--PROTOBUF_WAS_NOT_SUPPOSED_TO_BE_BUILT
 common --per_file_copt=external/.*grpc.*@--GRPC_WAS_NOT_SUPPOSED_TO_BE_BUILT
