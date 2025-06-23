@@ -6,12 +6,7 @@ import %workspace%/.aspect/bazelrc/debug.bazelrc
 import %workspace%/.aspect/bazelrc/javascript.bazelrc
 import %workspace%/.aspect/bazelrc/performance.bazelrc
 
-### YOUR PROJECT SPECIFIC OPTIONS GO HERE ###
-## Ensure that we don't accidentally build protobuf or gRPC
 common --incompatible_enable_proto_toolchain_resolution
-
-# Set PROTOC for Rust build scripts using hermetic rules_proto toolchain
-# Use $(location) to get the path to the hermetic protoc binary
 common --action_env=PROTOC=$(location @protobuf//:protoc)
 common --per_file_copt=external/.*protobuf.*@--PROTOBUF_WAS_NOT_SUPPOSED_TO_BE_BUILT
 common --host_per_file_copt=external/.*protobuf.*@--PROTOBUF_WAS_NOT_SUPPOSED_TO_BE_BUILT
@@ -21,9 +16,7 @@ common --host_per_file_copt=external/.*grpc.*@--GRPC_WAS_NOT_SUPPOSED_TO_BE_BUIL
 build:linux --platforms=//platforms:linux_x86_64
 build:macos --platforms=//platforms:darwin_arm64
 
-# CI configuration 
 build:ci --incompatible_enable_proto_toolchain_resolution
-# Use LLVM toolchain for better Rust compatibility
 build:ci --extra_toolchains=@llvm_toolchain//:all
 
 try-import %workspace%/.aspect/bazelrc/user.bazelrc
