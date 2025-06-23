@@ -50,16 +50,6 @@ crate.from_cargo(
         "//tldr/backend:Cargo.toml",
     ],
 )
-crate.annotation(
-    crate = "pulsar",
-    repositories = ["crates"],
-    build_script_env = {
-        "PROTOC": "$(execpath @protobuf//:protoc)",
-    },
-    build_script_data = [
-        "@protobuf//:protoc",
-    ],
-)
 use_repo(crate, "crates")
 
 # js
