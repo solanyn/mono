@@ -10,9 +10,10 @@ import %workspace%/.aspect/bazelrc/performance.bazelrc
 ## Ensure that we don't accidentally build protobuf or gRPC
 common --incompatible_enable_proto_toolchain_resolution
 
-# Set PROTOC for Rust build scripts (temporarily use system protoc)
-# TODO: Replace with hermetic protoc once we solve the path resolution
-common --action_env=PROTOC=/opt/homebrew/bin/protoc
+# Set PROTOC for Rust build scripts - use system protoc installed by CI
+build:ci --action_env=PROTOC=protoc
+build:macos --action_env=PROTOC=/opt/homebrew/bin/protoc
+build:linux --action_env=PROTOC=protoc
 common --per_file_copt=external/.*protobuf.*@--PROTOBUF_WAS_NOT_SUPPOSED_TO_BE_BUILT
 common --host_per_file_copt=external/.*protobuf.*@--PROTOBUF_WAS_NOT_SUPPOSED_TO_BE_BUILT
 common --per_file_copt=external/.*grpc.*@--GRPC_WAS_NOT_SUPPOSED_TO_BE_BUILT
