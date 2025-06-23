@@ -49,17 +49,16 @@ crate.from_cargo(
         "//gt7/telemetry-server:Cargo.toml",
         "//tldr/backend:Cargo.toml",
     ],
-    annotations = {
-        "pulsar": [crate.annotation(
-            crate = "pulsar",
-            build_script_env = {
-                "PROTOC": "$(execpath @toolchains_protoc_hub//:protoc)",
-            },
-            build_script_data = [
-                "@toolchains_protoc_hub//:protoc",
-            ],
-        )],
+)
+crate.annotation(
+    crate = "pulsar",
+    repositories = ["crates"],
+    build_script_env = {
+        "PROTOC": "$(execpath @@toolchains_protoc_hub//:protoc)",
     },
+    build_script_data = [
+        "@@toolchains_protoc_hub//:protoc",
+    ],
 )
 use_repo(crate, "crates")
 
