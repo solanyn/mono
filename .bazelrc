@@ -7,7 +7,8 @@ import %workspace%/.aspect/bazelrc/javascript.bazelrc
 import %workspace%/.aspect/bazelrc/performance.bazelrc
 
 common --incompatible_enable_proto_toolchain_resolution
-# Hermetic protoc provided via crate annotations
+# Make hermetic protoc available via PATH
+common --action_env=PATH=/bin:/usr/bin
 # Removed protobuf/grpc build flags that were breaking hermetic protoc build
 
 build:linux --platforms=//platforms:linux_x86_64

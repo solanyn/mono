@@ -1,0 +1,21 @@
+# Hermetic protoc wrapper that can be used by Rust build scripts
+sh_binary(
+    name = "protoc_wrapper",
+    srcs = ["protoc_wrapper.sh"],
+    data = ["@protobuf//:protoc"],
+    visibility = ["//visibility:public"],
+)
+
+# Create a directory with protoc symlink for PATH manipulation
+genrule(
+    name = "protoc_bin_dir",
+    srcs = ["@protobuf//:protoc"],
+    outs = ["bin/protoc"],
+    cmd = """
+        mkdir -p $$(dirname $@)
+        cp $(location @protobuf//:protoc) $@
+        chmod +x $@
+    """,
+    executable = True,
+    visibility = ["//visibility:public"],
+)
