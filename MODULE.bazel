@@ -51,6 +51,7 @@ crate.from_cargo(
     ],
     annotations = {
         "pulsar": [crate.annotation(
+            crate = "pulsar",
             build_script_env = {
                 "PROTOC": "$(execpath @toolchains_protoc_hub//:protoc)",
             },
