@@ -22,8 +22,7 @@ futures-util = "0.3"
 rustls = "0.23"
 rustls-pemfile = "2.0"
 
-# GT7 specific dependencies
-pulsar = { version = "6.0", default-features = false, features = ["tokio-rustls-runtime"] }
+kafka = { version = "0.10", default-features = false }
 
 # Backend specific dependencies  
 sqlx = { version = "0.8", features = [

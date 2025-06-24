@@ -1,4 +1,4 @@
-use crate::pulsar_handler::PulsarHandler;
+use crate::kafka_handler::KafkaHandler;
 use gt7_telemetry_core::{
     config::Config,
     constants::{PACKET_HEARTBEAT_DATA, PACKET_SIZE},
@@ -16,7 +16,7 @@ use tokio::sync::broadcast;
 pub fn run_telemetry_loop(
     config: Config,
     ws_tx: broadcast::Sender<String>,
-    pulsar_handler: PulsarHandler,
+    kafka_handler: KafkaHandler,
 ) {
     let mut last_periodic_log_time = if let Some(interval) = config.log_packet_interval_duration {
         Instant::now()
@@ -47,7 +47,7 @@ pub fn run_telemetry_loop(
                             handle_packet(
                                 packet,
                                 &ws_tx,
-                                &pulsar_handler,
+                                &kafka_handler,
                                 &config.log_packet_interval_duration,
                                 &mut last_periodic_log_time,
                             );
@@ -145,7 +145,7 @@ fn send_initial_heartbeat(socket: &UdpSocket, destination: SocketAddr) {
 fn handle_packet(
     packet: Packet,
     ws_tx: &broadcast::Sender<String>,
-    pulsar_handler: &PulsarHandler,
+    kafka_handler: &KafkaHandler,
     log_interval: &Option<Duration>,
     last_periodic_log_time: &mut Instant,
 ) {
@@ -160,7 +160,7 @@ fn handle_packet(
             .unwrap_or(false)
     );
 
-    pulsar_handler.try_send_packet(&packet);
+    kafka_handler.try_send_packet(&packet);
 
     let packet_json = serde_json::to_string(&packet).unwrap_or_else(|_| "{}".to_string());
     let _ = ws_tx.send(packet_json);
@@ -207,7 +207,7 @@ fn check_packet_conditions(packet: Packet, flags: PacketFlags) {
         }
         if !reasons.is_empty() {
             info!(
-                "Packet {} conditions not met for Pulsar send ({}). Flags: {:?}, Laps: {}",
+                "Packet {} conditions not met for Kafka send ({}). Flags: {:?}, Laps: {}",
                 packet.packet_id,
                 reasons.join(", "),
                 flags,

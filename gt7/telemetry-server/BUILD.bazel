@@ -37,8 +37,8 @@ rust_binary(
     name = "telemetry_server",
     srcs = [
         "src/http_server.rs",
+        "src/kafka_handler.rs",
         "src/main.rs",
-        "src/pulsar_handler.rs",
         "src/telemetry_loop.rs",
     ],
     rustc_flags = [
@@ -53,7 +53,7 @@ rust_binary(
         "@crates//:env_logger",
         "@crates//:futures-util",
         "@crates//:log",
-        "@crates//:pulsar",
+        "@crates//:kafka",
         "@crates//:rustls",
         "@crates//:rustls-pemfile",
         "@crates//:serde_json",

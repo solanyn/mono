@@ -7,11 +7,11 @@ use tokio::runtime::Runtime;
 use tokio::sync::broadcast;
 
 mod http_server;
-mod pulsar_handler;
+mod kafka_handler;
 mod telemetry_loop;
 
 use http_server::run_http_server;
-use pulsar_handler::PulsarHandler;
+use kafka_handler::KafkaHandler;
 use telemetry_loop::run_telemetry_loop;
 
 fn main() {
@@ -28,14 +28,14 @@ fn main() {
     let runtime = Arc::new(Runtime::new().expect("Failed to create Tokio runtime"));
     let (ws_tx, _ws_rx) = broadcast::channel::<String>(1000);
 
-    let pulsar_handler = match PulsarHandler::new(
-        config.pulsar_service_url.clone(),
-        config.pulsar_topic.clone(),
+    let kafka_handler = match KafkaHandler::new(
+        config.kafka_bootstrap_servers.clone(),
+        config.kafka_topic.clone(),
         Arc::clone(&runtime),
     ) {
         Ok(handler) => handler,
         Err(e) => {
-            error!("Failed to initialize PulsarHandler: {}", e);
+            error!("Failed to initialize KafkaHandler: {}", e);
             process::exit(1);
         }
     };
@@ -44,5 +44,5 @@ fn main() {
     let ws_tx_clone = ws_tx.clone();
     runtime.spawn(run_http_server(http_bind_address, ws_tx_clone));
 
-    run_telemetry_loop(config, ws_tx, pulsar_handler);
+    run_telemetry_loop(config, ws_tx, kafka_handler);
 }

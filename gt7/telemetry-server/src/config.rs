@@ -11,8 +11,8 @@ const BIND_ADDRESS: &str = "0.0.0.0:33740";
 #[derive(Debug, Clone)]
 pub struct Config {
     pub ps5_ip_address: String,
-    pub pulsar_service_url: String,
-    pub pulsar_topic: String,
+    pub kafka_bootstrap_servers: String,
+    pub kafka_topic: String,
     pub http_port: String,
     pub udp_bind_address: String,
     pub telemetry_server_port: u16,
@@ -25,11 +25,11 @@ impl Config {
         let ps5_ip_address = env::var("PS5_IP_ADDRESS")
             .map_err(|_| "PS5_IP_ADDRESS environment variable must be set".to_string())?;
 
-        let pulsar_service_url = env::var("PULSAR_SERVICE_URL")
-            .map_err(|_| "PULSAR_SERVICE_URL environment variable must be set".to_string())?;
+        let kafka_bootstrap_servers = env::var("KAFKA_BOOTSTRAP_SERVERS")
+            .map_err(|_| "KAFKA_BOOTSTRAP_SERVERS environment variable must be set".to_string())?;
 
-        let pulsar_topic = env::var("PULSAR_TOPIC")
-            .map_err(|_| "PULSAR_TOPIC environment variable must be set".to_string())?;
+        let kafka_topic = env::var("KAFKA_TOPIC")
+            .map_err(|_| "KAFKA_TOPIC environment variable must be set".to_string())?;
 
         let http_port = env::var("HTTP_PORT").unwrap_or_else(|_| DEFAULT_HTTP_PORT.to_string());
 
@@ -66,8 +66,8 @@ impl Config {
 
         let config = Config {
             ps5_ip_address,
-            pulsar_service_url,
-            pulsar_topic,
+            kafka_bootstrap_servers,
+            kafka_topic,
             http_port,
             udp_bind_address: BIND_ADDRESS.to_string(),
             telemetry_server_port: TELEMETRY_SERVER_PORT,
@@ -82,8 +82,8 @@ impl Config {
     pub fn log_configuration(&self) {
         info!("=== GT7 Telemetry Server Configuration ===");
         info!("PS5_IP_ADDRESS: {}", self.ps5_ip_address);
-        info!("PULSAR_SERVICE_URL: {}", self.pulsar_service_url);
-        info!("PULSAR_TOPIC: {}", self.pulsar_topic);
+        info!("KAFKA_BOOTSTRAP_SERVERS: {}", self.kafka_bootstrap_servers);
+        info!("KAFKA_TOPIC: {}", self.kafka_topic);
         info!("HTTP_PORT: {}", self.http_port);
         info!(
             "HEARTBEAT_INTERVAL_SECONDS: {}",
@@ -120,8 +120,8 @@ mod tests {
     fn test_config_creation() {
         let config = Config {
             ps5_ip_address: "192.168.1.1".to_string(),
-            pulsar_service_url: "pulsar://localhost:6650".to_string(),
-            pulsar_topic: "test-topic".to_string(),
+            kafka_bootstrap_servers: "localhost:9092".to_string(),
+            kafka_topic: "test-topic".to_string(),
             http_port: "8080".to_string(),
             udp_bind_address: "0.0.0.0:33740".to_string(),
             telemetry_server_port: 33739,

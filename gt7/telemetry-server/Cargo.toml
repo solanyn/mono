@@ -10,7 +10,7 @@ salsa20 = { workspace = true }
 thiserror = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-pulsar = { workspace = true }
+kafka = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }
 tokio = { workspace = true }
