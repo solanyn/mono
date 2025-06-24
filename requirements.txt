@@ -1,6 +1,9 @@
+--extra-index-url https://download.pytorch.org/whl/cu118
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.7.1; platform_machine == "x86_64"
+torch==2.7.1+cu118; platform_machine == "x86_64" and platform_system == "Linux"
+torch==2.7.1; platform_machine == "x86_64" and platform_system == "Darwin"
 torch==2.7.1; platform_machine != "x86_64"
-torchvision==0.22.1; platform_machine == "x86_64"
+torchvision==0.22.1+cu118; platform_machine == "x86_64" and platform_system == "Linux"
+torchvision==0.22.1; platform_machine == "x86_64" and platform_system == "Darwin"
 torchvision==0.22.1; platform_machine != "x86_64"
 numpy==2.2.1

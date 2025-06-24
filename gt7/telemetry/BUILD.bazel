@@ -1,6 +1,7 @@
 load("@aspect_bazel_lib//lib:tar.bzl", "tar")
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
-load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_image_index", "oci_load")
+load(":transition.bzl", "multi_arch")
 
 rust_library(
     name = "gt7_telemetry_core",
@@ -69,7 +70,7 @@ tar(
 oci_image(
     name = "telemetry_image",
     base = "@distroless_cc",
-    entrypoint = ["/telemetry_server"],
+    entrypoint = ["/gt7/telemetry/telemetry_server"],
     tars = [":telemetry_server_layer"],
     visibility = ["//visibility:public"],
 )

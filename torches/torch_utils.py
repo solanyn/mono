@@ -100,15 +100,22 @@ def demonstrate_pytorch():
         print("CUDA devices:", torch.cuda.device_count())
         print("Current CUDA device:", torch.cuda.current_device())
         print("CUDA device name:", torch.cuda.get_device_name())
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    else:
+        device = torch.device("cpu")
     
-    # Create a simple model
-    model = SimpleNet()
+    print(f"Using device: {device}")
+    
+    # Create a simple model and move to device
+    model = SimpleNet().to(device)
     print("Model created successfully")
     print("Model architecture:")
     print(model)
     
-    # Create sample data
+    # Create sample data and move to device
     sample_inputs, sample_labels = create_sample_data(batch_size=4)
+    sample_inputs = sample_inputs.to(device)
+    sample_labels = sample_labels.to(device)
     print(f"Sample input shape: {sample_inputs.shape}")
     print(f"Sample labels shape: {sample_labels.shape}")
     

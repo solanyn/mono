@@ -8,8 +8,7 @@ bazel_dep(name = "aspect_bazel_lib", version = "2.19.4")
 bazel_dep(name = "toolchains_protoc", version = "0.4.3")
 bazel_dep(name = "protobuf", version = "31.1")
 bazel_dep(name = "rules_proto", version = "6.0.2")
-bazel_dep(name = "hermetic_cc_toolchain", version = "3.1.0")
-bazel_dep(name = "toolchains_llvm", version = "1.1.2")
+bazel_dep(name = "rules_nixpkgs_core", version = "0.13.0")
 bazel_dep(name = "platforms", version = "0.0.10")
 bazel_dep(name = "buildifier_prebuilt", version = "6.3.3")
 
@@ -27,7 +26,10 @@ python.toolchain(python_version = "3.12")
 
 pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
 pip.parse(
-    experimental_extra_index_urls = ["https://download.pytorch.org/whl/cpu"],
+    experimental_extra_index_urls = [
+        "https://download.pytorch.org/whl/cu118",
+        "https://download.pytorch.org/whl/cpu"
+    ],
     experimental_index_url = "https://pypi.org/simple",
     hub_name = "pip",
     python_version = "3.12",
@@ -37,7 +39,13 @@ use_repo(pip, "pip")
 
 # rust
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
-rust.toolchain(edition = "2021")
+rust.toolchain(
+    edition = "2021",
+    extra_target_triples = [
+        "x86_64-unknown-linux-gnu",
+        "aarch64-unknown-linux-gnu",
+    ],
+)
 
 crate = use_extension("@rules_rust//crate_universe:extension.bzl", "crate")
 crate.from_cargo(
@@ -90,11 +98,11 @@ use_repo(protoc, "toolchains_protoc_hub")
 
 register_toolchains("@toolchains_protoc_hub//:all")
 
-# LLVM toolchain for better Rust compatibility
-llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm")
-llvm.toolchain(
-    llvm_version = "17.0.6",
+# Nixpkgs for hermetic cross-compilation
+nixpkgs = use_extension("@rules_nixpkgs_core//:extensions.bzl", "nixpkgs")
+nixpkgs.repository(
+    name = "nixpkgs", 
+    repository = "//:flake.nix",
 )
-use_repo(llvm, "llvm_toolchain")
+use_repo(nixpkgs, "nixpkgs")
 
-register_toolchains("@llvm_toolchain//:all")

@@ -13,7 +13,7 @@ build:macos --platforms=//platforms:darwin_arm64
 
 # proto
 build --incompatible_enable_proto_toolchain_resolution
-build --extra_toolchains=@llvm_toolchain//:all
+# build --extra_toolchains=@llvm_toolchain//:all
 
 # remote execution
 # Required for @com_google_absl and remoteapis that use it.

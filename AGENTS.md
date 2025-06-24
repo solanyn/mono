@@ -118,9 +118,6 @@ bazelisk run //tldr/frontend:dev
 
 # Production build
 bazelisk run //tldr/frontend:build
-
-# Type checking
-cd tldr/frontend && npm run check
 ```
 
 ### Rust
@@ -155,7 +152,7 @@ bazelisk run @rules_rust//:clippy_test
 bazelisk build //torches:main
 
 # Update Python dependencies
-bazelisk run //:requirements_cpu.update
+bazelisk run //:requirements.update
 ```
 
 ### Go
