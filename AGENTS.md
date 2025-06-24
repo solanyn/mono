@@ -133,7 +133,7 @@ cd tldr/frontend && npm run check
 ```bash
 # Build Rust targets
 bazelisk build //tldr/backend:tldr-backend
-bazelisk build //gt7/telemetry-server:telemetry_server
+bazelisk build //gt7/telemetry:telemetry_server
 
 # Run Rust formatting
 bazelisk run @rules_rust//:rustfmt_test

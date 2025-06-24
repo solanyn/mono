@@ -45,7 +45,7 @@ crate.from_cargo(
     cargo_lockfile = "//:Cargo.lock",
     manifests = [
         "//:Cargo.toml",
-        "//gt7/telemetry-server:Cargo.toml",
+        "//gt7/telemetry:Cargo.toml",
         "//tldr/backend:Cargo.toml",
     ],
 )

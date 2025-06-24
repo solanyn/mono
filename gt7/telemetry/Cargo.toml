@@ -1,5 +1,5 @@
 [package]
-name = "gt7-telemetry-server"
+name = "gt7-telemetry"
 version = "0.1.0"
 edition = "2021"
 

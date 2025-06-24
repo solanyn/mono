@@ -1,5 +1,5 @@
 [workspace]
-members = ["gt7/telemetry-server", "tldr/backend"]
+members = ["gt7/telemetry", "tldr/backend"]
 resolver = "2"
 
 [workspace.dependencies]
