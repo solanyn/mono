@@ -36,7 +36,8 @@ pip.parse(
     requirements_lock = "requirements_lock.txt",
     experimental_index_url_overrides = {
         "torch": "https://download.pytorch.org/whl/cu118",
-        "torchvision": "https://download.pytorch.org/whl/cu118", 
+        "torchvision": "https://download.pytorch.org/whl/cu118",
+        "triton": "https://download.pytorch.org/whl/cu118",
     },
 )
 use_repo(pip, "pip")
