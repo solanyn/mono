@@ -4,14 +4,24 @@ This document provides essential information for AI agents working on the Goyang
 
 ## Project Overview
 
-Goyangi is a polyglot monorepo using Bazel with Bzlmod for build management. The project includes:
+Goyangi is a polyglot monorepo using Bazel with Bzlmod for build management and hybrid Nix toolchains for hermetic cross-compilation. The project includes:
 
 - **Frontend**: SvelteKit application (TypeScript)
 - **Backend**: Rust services
-- **Python**: ML/data processing components
+- **Python**: ML/data processing components with PyTorch GPU support
 - **Go**: Various utilities and services
+- **GT7 Telemetry**: Real-time racing telemetry streaming via Kafka
 
 ## Build System
+
+### Prerequisites
+
+**Nix Installation Required**: This project uses hybrid Nix+Bazel toolchains for hermetic cross-compilation. Install Nix before development:
+
+```bash
+# macOS/Linux
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
+```
 
 ### Bazel with Aspect CLI
 
@@ -144,12 +154,16 @@ bazelisk run @rules_rust//:clippy_test
 - **Build System**: Bazel with aspect_rules_py
 - **Dependency Management**: requirements.txt with rules_uv
 - **Formatting**: Ruff (via rules_lint)
+- **ML Framework**: PyTorch with CUDA 11.8 support (Linux) and CPU fallback (macOS)
 
 **Key Commands:**
 
 ```bash
 # Build Python targets
 bazelisk build //torches:main
+
+# Run PyTorch demo with GPU detection
+bazelisk run //torches:main
 
 # Update Python dependencies
 bazelisk run //:requirements.update
@@ -190,7 +204,11 @@ bazelisk build //...
 
 ### 3. CI/CD Integration
 
-The project uses GitHub Actions with bazelisk. All commands in CI use `bazel` but this actually runs through bazelisk → Aspect CLI.
+The project uses GitHub Actions with Nix and bazelisk:
+
+- **Nix**: Installed via `cachix/install-nix-action@v25` for hermetic toolchains
+- **Bazel**: All commands use `bazel` but this runs through bazelisk → Aspect CLI
+- **Cross-compilation**: Linux x86_64 and ARM64 targets supported via Nix
 
 ## Configuration Files
 
@@ -264,12 +282,14 @@ bazelisk info
 
 ## External Dependencies
 
+- **Nix**: Hermetic cross-compilation toolchains for system dependencies
 - **Aspect CLI**: Enhanced Bazel experience with additional commands
 - **rules_lint**: Unified linting and formatting across languages
 - **Bzlmod**: Modern Bazel dependency management (preferred over WORKSPACE)
 - **rules_js**: JavaScript/TypeScript support
-- **rules_rust**: Rust language support
+- **rules_rust**: Rust language support with cross-compilation targets
 - **aspect_rules_py**: Python support with modern tooling
+- **rules_nixpkgs_core**: Nix integration for hermetic builds
 
 ## Support
 
