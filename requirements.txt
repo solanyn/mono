@@ -1,6 +1,0 @@
-numpy
-jax[cuda12]>=0.4.34; platform_machine == "x86_64" and platform_system == "Linux"
-jax>=0.4.35; platform_machine == "arm64" and platform_system == "Darwin"
-jax-metal>=0.1.0; platform_machine == "arm64" and platform_system == "Darwin"
-torch
-torchvision

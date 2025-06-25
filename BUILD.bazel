@@ -1,4 +1,5 @@
 load("@npm//:defs.bzl", "npm_link_all_packages")
+load("@rules_multirun//:defs.bzl", "multirun")
 load("@rules_uv//uv:pip.bzl", "pip_compile")
 load("@rules_uv//uv:venv.bzl", "create_venv", "sync_venv")
 
@@ -12,12 +13,36 @@ package(default_visibility = ["//visibility:public"])
 npm_link_all_packages(name = "node_modules")
 
 pip_compile(
+    name = "requirements_linux",
+    python_platform = "x86_64-unknown-linux-gnu",
+    requirements_in = "requirements_linux.txt",
+    requirements_txt = "requirements_linux_lock.txt",
+)
+
+pip_compile(
+    name = "requirements_macos",
+    python_platform = "aarch64-apple-darwin",
+    requirements_in = "requirements_darwin.txt",
+    requirements_txt = "requirements_darwin_lock.txt",
+)
+
+multirun(
     name = "requirements",
-    requirements_in = "requirements.txt",
-    requirements_txt = "requirements_lock.txt",
+    commands = [
+        ":requirements_linux",
+        ":requirements_macos",
+    ],
+    # Running in a single threaded mode allows consecutive `uv` invocations to benefit
+    # from the `uv` cache from the first run.
+    jobs = 1,
 )
 
 create_venv(
     name = "venv",
     destination_folder = ".venv",
+    requirements_txt = select({
+        "@platforms//os:linux": ":requirements_linux_lock.txt",
+        "@platforms//os:osx": ":requirements_darwin_lock.txt",
+    }),
 )
+
