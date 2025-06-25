@@ -13,8 +13,8 @@ serde_json = "1.0"
 log = "0.4"
 env_logger = "0.10"
 tokio = { version = "1", features = ["full"] }
-axum = { version = "0.7", features = ["ws"] }
-axum-extra = { version = "0.9", features = [
+axum = { version = "0.8", features = ["ws"] }
+axum-extra = { version = "0.10", features = [
   "typed-header",
 ], default-features = false }
 axum-server = { version = "0.7", features = ["tls-rustls"] }
