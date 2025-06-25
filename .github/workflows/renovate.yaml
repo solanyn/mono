@@ -1,7 +1,5 @@
----
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 name: "Renovate"
-
 on:
   workflow_dispatch:
     inputs:
@@ -23,11 +21,9 @@ on:
     branches: ["main"]
     paths:
       - .renovaterc.json5
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.number || github.ref }}
   cancel-in-progress: true
-
 env:
   LOG_LEVEL: "${{ inputs.logLevel || 'debug' }}"
   RENOVATE_AUTODISCOVER: true
@@ -36,7 +32,6 @@ env:
   RENOVATE_PLATFORM: github
   RENOVATE_PLATFORM_COMMIT: true
   WORKFLOW_RENOVATE_VERSION: "${{ inputs.version || 'latest' }}"
-
 jobs:
   renovate:
     name: Renovate
@@ -48,12 +43,10 @@ jobs:
         with:
           app-id: "${{ secrets.BOT_APP_ID }}"
           private-key: "${{ secrets.BOT_APP_PRIVATE_KEY }}"
-
       - name: Checkout
         uses: actions/checkout@v4
         with:
           token: "${{ steps.app-token.outputs.token }}"
-
       - name: Renovate
         uses: renovatebot/github-action@v43.0.1
         with:

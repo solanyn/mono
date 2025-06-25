@@ -1,0 +1,57 @@
+load("@aspect_rules_js//js:defs.bzl", "js_library", "js_run_binary")
+load("@npm//:defs.bzl", "npm_link_all_packages")
+load("@npm//tldr/frontend:vite/package_json.bzl", vite_bin = "bin")
+
+npm_link_all_packages(name = "node_modules")
+
+# Core Svelte application library
+js_library(
+    name = "svelte_app",
+    srcs = glob(
+        [
+            "src/**/*.svelte",
+            "src/**/*.ts",
+            "src/**/*.css",
+            "src/app.html",
+            "svelte.config.js",
+            "vite.config.js",
+            "package.json",
+        ],
+        allow_empty = True,
+    ),
+    visibility = ["//visibility:public"],
+    deps = [
+        "//:node_modules",
+    ],
+)
+
+# Development server
+vite_bin.vite_binary(
+    name = "dev",
+    args = ["dev"],
+    chdir = package_name(),
+    data = [":svelte_app"],
+    visibility = ["//visibility:public"],
+)
+
+# Production build
+vite_bin.vite_binary(
+    name = "build",
+    args = ["build"],
+    chdir = package_name(),
+    data = [
+        ":node_modules",
+        ":svelte_app",
+        "//:node_modules",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# Preview production build
+vite_bin.vite_binary(
+    name = "preview",
+    args = ["preview"],
+    chdir = package_name(),
+    data = [":svelte_app"],
+    visibility = ["//visibility:public"],
+)

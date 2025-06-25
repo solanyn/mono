@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 import httpx
 import os
 import s3fs
+from urllib.request import urlopen
 
 NSW_PROPERTY_SALES_INFORMATION_URL = (
     "https://valuation.property.nsw.gov.au/embed/propertySalesInformation"
@@ -20,7 +21,7 @@ NSW_PROPERTY_SALES_INFORMATION_URL = (
 @retry(retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)))
 def fetch_zip_file_links() -> List[str]:
     """Fetch all ZIP file links from the NSW property sales information page.
-    
+
     Returns:
         List[str]: List of URLs to ZIP files
     """
@@ -31,26 +32,26 @@ def fetch_zip_file_links() -> List[str]:
             "Chrome/120.0.0.0 Safari/537.36"
         ),
     }
-    
+
     try:
         response = httpx.get(
             NSW_PROPERTY_SALES_INFORMATION_URL,
             headers=headers,
             timeout=30.0,
-            follow_redirects=True
+            follow_redirects=True,
         )
         response.raise_for_status()
-        
+
         soup = BeautifulSoup(response.text, "html.parser")
         links = [
             link["href"]
             for link in soup.find_all(href=True)
             if re.search(r"\.zip$", link["href"], re.IGNORECASE)
         ]
-        
+
         if not links:
             raise ValueError("No ZIP files found on the page")
-            
+
         return links
     except httpx.HTTPStatusError as e:
         raise Exception(f"HTTP error occurred: {e.response.status_code}")
@@ -62,10 +63,10 @@ def fetch_zip_file_links() -> List[str]:
 @retry(retry=retry_if_exception_type((IOError)))
 def download_link_to_s3(url: str) -> str:
     """Download a file from URL and upload to S3.
-    
+
     Args:
         url (str): Source URL of the file
-        
+
     Returns:
         str: Status message
     """
@@ -74,13 +75,13 @@ def download_link_to_s3(url: str) -> str:
         secret=os.getenv("AWS_SECRET_ACCESS_KEY"),
         client_kwargs={
             "endpoint_url": os.getenv("S3_ENDPOINT_URL"),
-            "config": s3fs.config.Config(retries=dict(max_attempts=3))
+            "config": s3fs.config.Config(retries=dict(max_attempts=3)),
         },
     )
-    
+
     path = urlparse(url).path.lstrip("/")
     uri = f"s3://bps/{path}"
-    
+
     if s3.exists(uri):
         return f"Skipped {uri}"
 
@@ -109,7 +110,7 @@ def nsw_property_sales_dag():
         urls = fetch_zip_file_links()
         if not urls:
             raise ValueError("No ZIP files found to download")
-        
+
         download_link_to_s3.expand(url=urls)  # task mapping
     except Exception as e:
         logging.error(f"DAG execution failed: {str(e)}")

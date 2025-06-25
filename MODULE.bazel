@@ -1,0 +1,81 @@
+module(
+    name = "goyangi",
+    version = "0.1.0",
+)
+
+bazel_dep(name = "bazel_skylib", version = "1.7.1")
+bazel_dep(name = "aspect_bazel_lib", version = "2.19.4")
+bazel_dep(name = "rules_nixpkgs_core", version = "0.13.0")
+bazel_dep(name = "platforms", version = "0.0.10")
+bazel_dep(name = "buildifier_prebuilt", version = "6.3.3")
+bazel_dep(name = "rules_multirun", version = "0.12.0")
+bazel_dep(name = "rules_rust", version = "0.61.0")
+bazel_dep(name = "rules_uv", version = "0.77.0")
+bazel_dep(name = "rules_shell", version = "0.5.0")
+bazel_dep(name = "rules_python", version = "1.4.1")
+bazel_dep(name = "aspect_rules_py", version = "1.6.0")
+bazel_dep(name = "aspect_rules_js", version = "2.3.8")
+bazel_dep(name = "rules_oci", version = "2.2.6")
+
+# python
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(python_version = "3.12")
+
+# rust
+rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
+rust.toolchain(
+    edition = "2021",
+    extra_target_triples = [
+        "x86_64-unknown-linux-gnu",
+        "aarch64-unknown-linux-gnu",
+    ],
+)
+
+crate = use_extension("@rules_rust//crate_universe:extension.bzl", "crate")
+crate.from_cargo(
+    name = "crates",
+    cargo_lockfile = "//:Cargo.lock",
+    manifests = [
+        "//:Cargo.toml",
+        "//gt7/telemetry:Cargo.toml",
+        "//tldr/backend:Cargo.toml",
+    ],
+)
+use_repo(crate, "crates")
+
+# js
+npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm", dev_dependency = True)
+npm.npm_translate_lock(
+    name = "npm",
+    npmrc = "//:.npmrc",
+    pnpm_lock = "//:pnpm-lock.yaml",
+    public_hoist_packages = {
+        "typescript-eslint": [""],
+    },
+)
+use_repo(npm, "npm")
+
+# bazel run -- @pnpm//:pnpm --dir $PWD install --lockfile-only
+pnpm = use_extension("@aspect_rules_js//npm:extensions.bzl", "pnpm")
+use_repo(pnpm, "pnpm")
+
+# containers
+oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
+oci.pull(
+    name = "distroless_cc",
+    digest = "sha256:eccec5274132c1be0ce5d2c8e6fe41033e64af5e987ccee9007826e4c012069d",
+    image = "gcr.io/distroless/cc-debian12",
+    platforms = [
+        "linux/amd64",
+        "linux/arm64/v8",
+    ],
+)
+use_repo(oci, "distroless_cc", "distroless_cc_linux_amd64", "distroless_cc_linux_arm64_v8")
+
+# Nixpkgs for hermetic cross-compilation
+nixpkgs = use_extension("@rules_nixpkgs_core//:extensions.bzl", "nixpkgs")
+nixpkgs.repository(
+    name = "nixpkgs",
+    repository = "//:flake.nix",
+)
+use_repo(nixpkgs, "nixpkgs")

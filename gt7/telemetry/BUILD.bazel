@@ -1,0 +1,82 @@
+load("@aspect_bazel_lib//lib:tar.bzl", "tar")
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
+
+rust_library(
+    name = "gt7_telemetry_core",
+    srcs = [
+        "src/config.rs",
+        "src/constants.rs",
+        "src/cypher.rs",
+        "src/errors.rs",
+        "src/flags.rs",
+        "src/heartbeat.rs",
+        "src/lib.rs",
+        "src/packet.rs",
+    ],
+    edition = "2021",
+    deps = [
+        "@crates//:bitflags",
+        "@crates//:byteorder",
+        "@crates//:log",
+        "@crates//:salsa20",
+        "@crates//:serde",
+        "@crates//:serde_json",
+        "@crates//:thiserror",
+    ],
+)
+
+rust_test(
+    name = "gt7_telemetry_core_test",
+    crate = ":gt7_telemetry_core",
+    edition = "2021",
+    size = "small",
+)
+
+rust_binary(
+    name = "telemetry_server",
+    srcs = [
+        "src/http_server.rs",
+        "src/kafka_handler.rs",
+        "src/main.rs",
+        "src/telemetry_loop.rs",
+    ],
+    rustc_flags = [
+        "-Copt-level=0",
+    ],
+    edition = "2021",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":gt7_telemetry_core",
+        "@crates//:axum",
+        "@crates//:axum-extra",
+        "@crates//:env_logger",
+        "@crates//:futures-util",
+        "@crates//:log",
+        "@crates//:kafka",
+        "@crates//:rustls",
+        "@crates//:rustls-pemfile",
+        "@crates//:serde_json",
+        "@crates//:tokio",
+    ],
+)
+
+tar(
+    name = "telemetry_server_layer",
+    srcs = [":telemetry_server"],
+)
+
+oci_image(
+    name = "telemetry_image",
+    base = "@distroless_cc",
+    entrypoint = ["/telemetry"],
+    tars = [":telemetry_server_layer"],
+    visibility = ["//visibility:public"],
+)
+
+oci_load(
+    name = "telemetry_tarball",
+    image = ":telemetry_image",
+    repo_tags = ["gt7-telemetry:latest"],
+    visibility = ["//visibility:public"],
+)

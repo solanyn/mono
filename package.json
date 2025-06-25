@@ -1,0 +1,15 @@
+{
+  "name": "goyangi",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "workspaces": [
+    "tldr/frontend"
+  ],
+  "scripts": {},
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^18",
+    "typescript": "4.9.5"
+  }
+}

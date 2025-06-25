@@ -1,0 +1,8 @@
+configure:
+  languages:
+    javascript: true
+    go: true
+    python: true
+    protobuf: true
+    bzl: true
+    rust: true

@@ -1,5 +1,12 @@
 # tl;dr
 
+**Note**: This project requires Nix for hermetic cross-compilation toolchains. Install Nix before development:
+
+```bash
+# macOS/Linux
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
+```
+
 # Backend
 
 ```bash
