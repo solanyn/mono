@@ -12,7 +12,7 @@ permissions:
   packages: write
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: goyangi-runner
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,7 +31,7 @@ jobs:
       - name: Test all targets
         run: bazel test //... --config=ci
   build-images:
-    runs-on: ubuntu-latest
+    runs-on: goyangi-runner
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
@@ -103,7 +103,7 @@ jobs:
             echo "Loading $tarball"
             docker load -i "$tarball"
           done
-          
+
           # For now, only push the GT7 telemetry server
           # TODO: Make this more generic when we have multiple services
           if docker images --format "table {{.Repository}}:{{.Tag}}" | grep -q "gt7-telemetry-server:latest"; then
@@ -114,7 +114,7 @@ jobs:
           fi
   results:
     if: ${{ always() }}
-    runs-on: ubuntu-latest
+    runs-on: goyangi-runner
     name: Build results
     needs: [test, build-images]
     steps:
