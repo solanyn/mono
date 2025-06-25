@@ -14,7 +14,7 @@ npm_link_all_packages(name = "node_modules")
 pip_compile(
     name = "requirements",
     extra_args = [
-        "--index-strategy=unsafe-best-match",  # NOTE: required because torch's index contains requests and that is preferred over pypi
+        "--index-strategy=unsafe-best-match",
         "--universal",
     ],
     requirements_in = "requirements.txt",

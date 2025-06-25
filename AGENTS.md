@@ -8,7 +8,7 @@ Goyangi is a polyglot monorepo using Bazel with Bzlmod for build management and 
 
 - **Frontend**: SvelteKit application (TypeScript)
 - **Backend**: Rust services
-- **Python**: ML/data processing components with PyTorch GPU support
+- **Python**: ML/data processing components with JAX support
 - **Go**: Various utilities and services
 - **GT7 Telemetry**: Real-time racing telemetry streaming via Kafka
 
@@ -107,7 +107,7 @@ goyangi/
 │       ├── Cargo.toml
 │       └── src/
 ├── gt7/                      # GT7 telemetry server
-├── torches/                  # PyTorch utilities
+├── jaxes/                    # JAX examples and utilities
 └── tools/                    # Build tools and utilities
 ```
 
@@ -154,16 +154,18 @@ bazelisk run @rules_rust//:clippy_test
 - **Build System**: Bazel with aspect_rules_py
 - **Dependency Management**: requirements.txt with rules_uv
 - **Formatting**: Ruff (via rules_lint)
-- **ML Framework**: PyTorch with CUDA 11.8 support (Linux) and CPU fallback (macOS)
+- **ML Framework**: JAX with CUDA 12 support (Linux) and CPU/Metal fallback (macOS)
 
 **Key Commands:**
 
 ```bash
 # Build Python targets
-bazelisk build //torches:main
+bazelisk build //jaxes:simple_jax
 
-# Run PyTorch demo with GPU detection
-bazelisk run //torches:main
+# Run JAX examples
+bazelisk run //jaxes:simple_jax
+bazelisk run //jaxes:neural_network
+bazelisk run //jaxes:check_gpu
 
 # Update Python dependencies
 bazelisk run //:requirements.update
