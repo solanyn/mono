@@ -13,7 +13,7 @@ permissions:
   packages: write
 jobs:
   configure:
-    runs-on: ubuntu-latest
+    runs-on: goyangi-runner
     outputs:
       matrix: ${{ steps.get-versions.outputs.result }}
     steps:
@@ -25,7 +25,7 @@ jobs:
         with:
           cmd: yq eval -o=json -I=0 airflow/versions.yaml
   build_and_push:
-    runs-on: ubuntu-latest
+    runs-on: goyangi-runner
     needs: configure
     strategy:
       # Prevent a failure in one image from stopping the other builds

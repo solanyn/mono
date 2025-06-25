@@ -16,7 +16,7 @@ permissions:
   packages: write
 jobs:
   configure:
-    runs-on: ubuntu-latest
+    runs-on: goyangi-runner
     outputs:
       matrix: ${{ steps.get-versions.outputs.result }}
     steps:
@@ -28,7 +28,7 @@ jobs:
         with:
           cmd: yq eval -o=json -I=0 cnpg/versions.yaml
   build_and_push:
-    runs-on: ubuntu-latest
+    runs-on: goyangi-runner
     needs: configure
     strategy:
       # Prevent a failure in one image from stopping the other builds
@@ -107,7 +107,7 @@ jobs:
             TIMESCALEDB_TAG=${{ matrix.timescaledb }}
   results:
     if: ${{ always() }}
-    runs-on: ubuntu-latest
+    runs-on: goyangi-runner
     name: Build results
     needs: [build_and_push]
     steps:
