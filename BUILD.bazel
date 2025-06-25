@@ -1,6 +1,6 @@
 load("@npm//:defs.bzl", "npm_link_all_packages")
-load("@aspect_rules_js//js:defs.bzl", "js_library")
 load("@rules_uv//uv:pip.bzl", "pip_compile")
+load("@rules_uv//uv:venv.bzl", "create_venv", "sync_venv")
 
 
 package(default_visibility = ["//visibility:public"])
@@ -13,10 +13,11 @@ npm_link_all_packages(name = "node_modules")
 
 pip_compile(
     name = "requirements",
-    extra_args = [
-        "--index-strategy=unsafe-best-match",
-        "--universal",
-    ],
     requirements_in = "requirements.txt",
     requirements_txt = "requirements_lock.txt",
+)
+
+create_venv(
+    name = "venv",
+    destination_folder = ".venv",
 )
