@@ -12,7 +12,7 @@ permissions:
   packages: write
 jobs:
   test:
-    runs-on: goyangi-runner
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,7 +31,7 @@ jobs:
       - name: Test all targets
         run: bazel test //... --config=ci
   build-images:
-    runs-on: goyangi-runner
+    runs-on: ubuntu-latest
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
@@ -114,7 +114,7 @@ jobs:
           fi
   results:
     if: ${{ always() }}
-    runs-on: goyangi-runner
+    runs-on: ubuntu-latest
     name: Build results
     needs: [test, build-images]
     steps:

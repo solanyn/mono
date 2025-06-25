@@ -8,7 +8,7 @@ permissions:
   pull-requests: write
 jobs:
   sync_and_pr_subdir:
-    runs-on: goyangi-runner
+    runs-on: ubuntu-latest
     outputs:
       new_tag_found: ${{ steps.find_latest_tag.outputs.new_tag_found }}
       new_tag: ${{ steps.find_latest_tag.outputs.new_tag }}
