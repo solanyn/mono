@@ -6,16 +6,18 @@ on:
       container:
         description: 'Container to build (or "all" for all containers)'
         required: true
-        default: 'all'
+        default: "all"
         type: string
   push:
     branches: [main]
     paths:
       - "containers/**"
+      - ".github/workflows/containers.yaml"
   pull_request:
     branches: [main]
     paths:
       - "containers/**"
+      - ".github/workflows/containers.yaml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -37,7 +39,7 @@ jobs:
         run: |
           # Discover all container directories
           ALL_CONTAINERS=($(find containers -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort))
-          
+
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             if [[ "${{ inputs.container }}" == "all" ]]; then
               # Build all discovered containers
@@ -137,3 +139,4 @@ jobs:
           else
             exit 1
           fi
+
