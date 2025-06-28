@@ -11,7 +11,6 @@ RUN wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
   chmod +x /usr/bin/yq
 
 COPY cupsd.conf /etc/cups/cupsd.conf
-COPY printers.yaml /etc/cups/printers.yaml
 COPY entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh
