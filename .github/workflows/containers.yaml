@@ -1,4 +1,4 @@
-name: Build and Push Containers
+name: Containers
 
 on:
   workflow_dispatch:
@@ -164,4 +164,3 @@ jobs:
           else
             exit 1
           fi
-

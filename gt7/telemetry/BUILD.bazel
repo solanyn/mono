@@ -1,6 +1,6 @@
 load("@aspect_bazel_lib//lib:tar.bzl", "tar")
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
-load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
 
 rust_library(
     name = "gt7_telemetry_core",
@@ -78,5 +78,13 @@ oci_load(
     name = "telemetry_tarball",
     image = ":telemetry_image",
     repo_tags = ["telemetry:latest"],
+    visibility = ["//visibility:public"],
+)
+
+oci_push(
+    name = "telemetry_push",
+    image = ":telemetry_image",
+    repository = "ghcr.io/solanyn/telemetry",
+    remote_tags = ["latest"],
     visibility = ["//visibility:public"],
 )

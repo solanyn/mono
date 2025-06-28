@@ -52,8 +52,8 @@ jobs:
       - name: Discover OCI targets
         id: discover
         run: |
-          # Find all oci_load targets
-          OCI_TARGETS=$(bazel query 'kind("oci_load", //...)' 2>/dev/null || echo "")
+          # Find all oci_push targets
+          OCI_TARGETS=$(bazel query 'kind("oci_push", //...)' 2>/dev/null || echo "")
           
           # Generate monorepo version
           MONOREPO_VERSION=$(bazel run //tools:get-version -- .)
@@ -63,7 +63,7 @@ jobs:
           for target in $OCI_TARGETS; do
             # Extract package path and target name
             package=$(echo $target | sed 's|//||; s|:.*||')
-            target_name=$(echo $target | sed 's|.*:||; s|_tarball$||; s|_load$||')
+            target_name=$(echo $target | sed 's|.*:||; s|_push$||')
             
             # Use monorepo version for all containers
             VERSION="$MONOREPO_VERSION"
@@ -99,10 +99,6 @@ jobs:
         uses: cachix/install-nix-action@v31
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3.6.0
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3.11.1
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3.4.0
         with:
@@ -115,58 +111,23 @@ jobs:
           bazelisk-cache: true
           disk-cache: ${{ github.workflow }}
           repository-cache: true
-      - name: Build and load container image
+      - name: Build and push container image
         run: |
-          echo "Building ${{ matrix.target }}"
-          bazel run ${{ matrix.target }} --config=ci
+          echo "Building and pushing ${{ matrix.target }}"
           
-          # Load the generated tarball
-          tarball=$(find bazel-bin -path "*${{ matrix.package }}*" -name "tarball.tar" -type f | head -1)
-          if [ -n "$tarball" ]; then
-            echo "Loading $tarball"
-            docker load -i "$tarball"
+          # For main branch, push to registry
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+            # Push with latest tag (defined in BUILD.bazel)
+            bazel run ${{ matrix.target }} --config=ci
+            
+            # Push with version tag
+            bazel run ${{ matrix.target }} --config=ci -- --tag ${{ matrix.monorepo_version }}
           else
-            echo "Error: Could not find tarball for ${{ matrix.target }}"
-            exit 1
-          fi
-      - name: Tag and push image
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-        run: |
-          cd "${{ matrix.package }}"
-          
-          # Check if docker-bake.hcl exists
-          if [ -f "docker-bake.hcl" ]; then
-            echo "Using docker-bake.hcl for ${{ matrix.target_name }}"
-            
-            # Set environment variables for docker-bake
-            export VERSION="${{ matrix.monorepo_version }}"
-            export GITHUB_ACTOR="${{ github.actor }}"
-            export GITHUB_REPOSITORY="${{ github.repository }}"
-            export TARGET="${{ matrix.target_name }}"
-            export REPOSITORY_SUBPATH="${{ matrix.package }}"
-            
-            # Use docker buildx bake to tag and push
-            docker buildx bake --push \
-              --set "*.platform=" \
-              --set "*.output=type=registry"
-          else
-            echo "No docker-bake.hcl found, using standard tagging"
-            
-            # Find the loaded image
-            local_tag="${{ matrix.target_name }}:latest"
-            if docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "$local_tag"; then
-              # Generate and push standard tags
-              registry_base="ghcr.io/${{ github.actor }}/${{ matrix.target_name }}"
-              
-              docker tag "$local_tag" "${registry_base}:latest"
-              docker tag "$local_tag" "${registry_base}:${{ matrix.monorepo_version }}"
-              
-              docker push "${registry_base}:latest"
-              docker push "${registry_base}:${{ matrix.monorepo_version }}"
-            else
-              echo "Error: Could not find loaded image $local_tag"
-              exit 1
-            fi
+            # For PRs, just test build without pushing
+            echo "PR build - testing build without push"
+            # Build the underlying image to verify it works
+            IMAGE_TARGET=$(echo "${{ matrix.target }}" | sed 's|_push$|_image|')
+            bazel build $IMAGE_TARGET --config=ci
           fi
   results:
     if: ${{ always() }}
