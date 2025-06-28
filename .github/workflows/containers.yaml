@@ -154,11 +154,13 @@ jobs:
         run: |
           # Get the image name/tag from the build script
           if [[ -f "containers/${{ matrix.container }}/container-structure-test.yaml" ]]; then
-            # Extract image name from docker-bake.hcl or use default naming
-            if [[ -f "containers/${{ matrix.container }}/docker-bake.hcl" ]]; then
-              IMAGE_NAME=$(grep -E '^\s*"ghcr.io/' containers/${{ matrix.container }}/docker-bake.hcl | head -1 | sed 's/.*"ghcr.io\/\([^"]*\)".*/ghcr.io\/\1/' || echo "ghcr.io/${{ github.actor }}/${{ matrix.container }}")
+            # For PR builds, use local image names; for push builds, use registry names
+            if [[ "${{ steps.should-push.outputs.push }}" == "true" ]]; then
+              # Production builds push to registry
+              IMAGE_NAME="ghcr.io/${{ github.actor }}/${{ matrix.container }}:latest"
             else
-              IMAGE_NAME="ghcr.io/${{ github.actor }}/${{ matrix.container }}"
+              # PR builds use local tags
+              IMAGE_NAME="${{ matrix.container }}:latest"
             fi
             
             # Run structure tests
