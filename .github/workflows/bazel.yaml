@@ -30,6 +30,16 @@ jobs:
         run: bazel build //... --config=ci
       - name: Test all targets
         run: bazel test //... --config=ci
+      - name: Run container structure tests
+        run: |
+          # Find and run all container structure tests
+          STRUCTURE_TESTS=$(bazel query 'kind("container_structure_test", //...)' 2>/dev/null || echo "")
+          if [ -n "$STRUCTURE_TESTS" ]; then
+            echo "Running container structure tests: $STRUCTURE_TESTS"
+            bazel test $STRUCTURE_TESTS --config=ci
+          else
+            echo "No container structure tests found"
+          fi
   
   discover-images:
     runs-on: ubuntu-latest

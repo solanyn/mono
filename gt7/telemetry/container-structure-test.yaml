@@ -1,0 +1,26 @@
+schemaVersion: 2.0.0
+
+fileExistenceTests:
+  - name: "telemetry binary"
+    path: "/telemetry"
+    shouldExist: true
+
+commandTests:
+  - name: "telemetry binary is executable"
+    command: "test"
+    args: ["-x", "/telemetry"]
+    exitCode: 0
+
+  - name: "telemetry help"
+    command: "/telemetry"
+    args: ["--help"]
+    exitCode: 0
+    expectedOutput: ["GT7"]
+
+metadataTest:
+  workdir: "/workspace"
+  entrypoint: ["/telemetry"]
+  labels:
+    - key: "org.opencontainers.image.title"
+      value: "telemetry"
+
