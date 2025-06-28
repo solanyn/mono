@@ -45,7 +45,15 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             if [[ "${{ inputs.container }}" == "all" ]]; then
               # Build all discovered containers
-              CONTAINERS_JSON=$(printf '%s\n' "${ALL_CONTAINERS[@]}" | jq -R . | jq -s .)
+              # Build JSON array manually to avoid formatting issues
+              CONTAINERS_JSON="["
+              for i in "${!ALL_CONTAINERS[@]}"; do
+                if [[ $i -gt 0 ]]; then
+                  CONTAINERS_JSON+=","
+                fi
+                CONTAINERS_JSON+="\"${ALL_CONTAINERS[$i]}\""
+              done
+              CONTAINERS_JSON+="]"
               echo "containers=$CONTAINERS_JSON" >> $GITHUB_OUTPUT
             else
               # Validate the specified container exists
@@ -72,7 +80,15 @@ jobs:
             if [[ ${#CONTAINERS[@]} -eq 0 ]]; then
               echo 'containers=[]' >> $GITHUB_OUTPUT
             else
-              CONTAINERS_JSON=$(printf '%s\n' "${CONTAINERS[@]}" | jq -R . | jq -s .)
+              # Build JSON array manually to avoid formatting issues
+              CONTAINERS_JSON="["
+              for i in "${!CONTAINERS[@]}"; do
+                if [[ $i -gt 0 ]]; then
+                  CONTAINERS_JSON+=","
+                fi
+                CONTAINERS_JSON+="\"${CONTAINERS[$i]}\""
+              done
+              CONTAINERS_JSON+="]"
               echo "containers=$CONTAINERS_JSON" >> $GITHUB_OUTPUT
             fi
           fi
