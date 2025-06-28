@@ -1,0 +1,139 @@
+name: Build and Push Containers
+
+on:
+  workflow_dispatch:
+    inputs:
+      container:
+        description: 'Container to build (or "all" for all containers)'
+        required: true
+        default: 'all'
+        type: string
+  push:
+    branches: [main]
+    paths:
+      - "containers/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "containers/**"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  packages: write
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      containers: ${{ steps.changes.outputs.containers }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Check for changes
+        id: changes
+        run: |
+          # Discover all container directories
+          ALL_CONTAINERS=($(find containers -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort))
+          
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            if [[ "${{ inputs.container }}" == "all" ]]; then
+              # Build all discovered containers
+              CONTAINERS_JSON=$(printf '%s\n' "${ALL_CONTAINERS[@]}" | jq -R . | jq -s .)
+              echo "containers=$CONTAINERS_JSON" >> $GITHUB_OUTPUT
+            else
+              # Validate the specified container exists
+              if [[ " ${ALL_CONTAINERS[*]} " =~ " ${{ inputs.container }} " ]]; then
+                echo 'containers=["${{ inputs.container }}"]' >> $GITHUB_OUTPUT
+              else
+                echo "Error: Container '${{ inputs.container }}' not found in containers/ directory"
+                echo "Available containers: ${ALL_CONTAINERS[*]}"
+                exit 1
+              fi
+            fi
+          else
+            # Auto-detect changed containers
+            BASE=${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || 'HEAD~1' }}
+            CHANGED_FILES=$(git diff --name-only $BASE...HEAD)
+            CONTAINERS=()
+            
+            for container in "${ALL_CONTAINERS[@]}"; do
+              if echo "$CHANGED_FILES" | grep -q "^containers/$container/"; then
+                CONTAINERS+=("$container")
+              fi
+            done
+            
+            if [[ ${#CONTAINERS[@]} -eq 0 ]]; then
+              echo 'containers=[]' >> $GITHUB_OUTPUT
+            else
+              CONTAINERS_JSON=$(printf '%s\n' "${CONTAINERS[@]}" | jq -R . | jq -s .)
+              echo "containers=$CONTAINERS_JSON" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+  build:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.containers != '[]' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        container: ${{ fromJson(needs.changes.outputs.containers) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3.6.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.11.1
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Determine if push should happen
+        id: should-push
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "push=false" >> $GITHUB_OUTPUT
+          else
+            echo "push=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build container using unified script
+        env:
+          PUSH: ${{ steps.should-push.outputs.push }}
+          REGISTRY: ghcr.io/${{ github.actor }}
+        run: |
+          # Use the unified build script for consistency
+          if [[ "$PUSH" == "true" ]]; then
+            # For production builds, use image-all target with CI options
+            ./tools/containers/build.sh ${{ matrix.container }} image-all \
+              "--set *.cache-from=type=gha --set *.cache-to=type=gha,mode=max --set *.platform=linux/amd64,linux/arm64"
+          else
+            # For PR/test builds, use default local build
+            ./tools/containers/build.sh ${{ matrix.container }}
+          fi
+
+  results:
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    name: Build results
+    needs: [build]
+    steps:
+      - run: |
+          result="${{ needs.build.result }}"
+          if [[ $result == "success" || $result == "skipped" ]]; then
+            exit 0
+          else
+            exit 1
+          fi

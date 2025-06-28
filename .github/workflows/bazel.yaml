@@ -55,9 +55,10 @@ jobs:
       - name: Generate version
         id: version
         run: |
-          chmod +x ./tools/get-version.sh
-          VERSION=$(./tools/get-version.sh gt7/telemetry)
+          VERSION=$(bazel run //tools:get-version -- gt7/telemetry)
+          MONOREPO_VERSION=$(bazel run //tools:get-version -- .)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "monorepo_version=$MONOREPO_VERSION" >> $GITHUB_OUTPUT
       - name: Generate docker image tags
         id: metadata
         uses: docker/metadata-action@v5
@@ -73,6 +74,7 @@ jobs:
             name=ghcr.io/${{ github.actor }}/gt7-telemetry-server
           tags: |
             type=raw,value=${{ steps.version.outputs.version }}
+            type=raw,value=${{ steps.version.outputs.monorepo_version }}
             type=ref,event=branch
             type=ref,event=pr,prefix=pr,suffix=,pattern={{.number}}
             type=sha
