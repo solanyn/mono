@@ -30,9 +30,66 @@ jobs:
         run: bazel build //... --config=ci
       - name: Test all targets
         run: bazel test //... --config=ci
-  build-images:
+  
+  discover-images:
     runs-on: ubuntu-latest
     needs: test
+    outputs:
+      matrix: ${{ steps.discover.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@0.15.0
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}
+          repository-cache: true
+      - name: Discover OCI targets
+        id: discover
+        run: |
+          # Find all oci_load targets
+          OCI_TARGETS=$(bazel query 'kind("oci_load", //...)' 2>/dev/null || echo "")
+          
+          # Generate monorepo version
+          MONOREPO_VERSION=$(bazel run //tools:get-version -- .)
+          
+          # Build matrix JSON
+          MATRIX_ITEMS='[]'
+          for target in $OCI_TARGETS; do
+            # Extract package path and target name
+            package=$(echo $target | sed 's|//||; s|:.*||')
+            target_name=$(echo $target | sed 's|.*:||; s|_tarball$||; s|_load$||')
+            
+            # Use monorepo version for all containers
+            VERSION="$MONOREPO_VERSION"
+            
+            # Add to matrix
+            ITEM=$(jq -n \
+              --arg target "$target" \
+              --arg package "$package" \
+              --arg target_name "$target_name" \
+              --arg version "$VERSION" \
+              --arg monorepo_version "$MONOREPO_VERSION" \
+              '{target: $target, package: $package, target_name: $target_name, version: $version, monorepo_version: $monorepo_version}')
+            MATRIX_ITEMS=$(echo "$MATRIX_ITEMS" | jq ". + [$ITEM]")
+          done
+          
+          MATRIX=$(echo "$MATRIX_ITEMS" | jq '{include: .}')
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          echo "Generated matrix: $MATRIX"
+
+  build-images:
+    runs-on: ubuntu-latest
+    needs: discover-images
+    if: ${{ needs.discover-images.outputs.matrix != '' && fromJson(needs.discover-images.outputs.matrix).include[0] }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.discover-images.outputs.matrix) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -52,66 +109,64 @@ jobs:
           registry: ghcr.io
           username: "${{ github.actor }}"
           password: "${{ github.token }}"
-      - name: Generate version
-        id: version
-        run: |
-          VERSION=$(bazel run //tools:get-version -- gt7/telemetry)
-          MONOREPO_VERSION=$(bazel run //tools:get-version -- .)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "monorepo_version=$MONOREPO_VERSION" >> $GITHUB_OUTPUT
-      - name: Generate docker image tags
-        id: metadata
-        uses: docker/metadata-action@v5
-        with:
-          flavor: |
-            latest=${{ github.ref == 'refs/heads/main' }}
-          labels: |-
-            org.opencontainers.image.title=gt7-telemetry-server
-            org.opencontainers.image.url=https://ghcr.io/${{ github.repository_owner }}/gt7-telemetry-server
-            org.opencontainers.image.description=GT7 telemetry server with WebSocket and Kafka support
-            org.opencontainers.image.version=${{ steps.version.outputs.version }}
-          images: |
-            name=ghcr.io/${{ github.actor }}/gt7-telemetry-server
-          tags: |
-            type=raw,value=${{ steps.version.outputs.version }}
-            type=raw,value=${{ steps.version.outputs.monorepo_version }}
-            type=ref,event=branch
-            type=ref,event=pr,prefix=pr,suffix=,pattern={{.number}}
-            type=sha
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@0.15.0
         with:
           bazelisk-cache: true
           disk-cache: ${{ github.workflow }}
           repository-cache: true
-      - name: Build container images
+      - name: Build and load container image
         run: |
-          # Find all oci_load targets (tarball builders) and build them
-          targets=$(bazel query 'kind("oci_load", //...)')
-          if [ -n "$targets" ]; then
-            echo "Building container images: $targets"
-            for target in $targets; do
-              bazel run $target --config=ci
-            done
-          else
-            echo "No container image targets found"
-          fi
-      - name: Load and push images
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-        run: |
-          # Find all generated tarballs and load them
-          find bazel-bin -name "tarball.tar" -type f | while read tarball; do
+          echo "Building ${{ matrix.target }}"
+          bazel run ${{ matrix.target }} --config=ci
+          
+          # Load the generated tarball
+          tarball=$(find bazel-bin -path "*${{ matrix.package }}*" -name "tarball.tar" -type f | head -1)
+          if [ -n "$tarball" ]; then
             echo "Loading $tarball"
             docker load -i "$tarball"
-          done
-
-          # For now, only push the GT7 telemetry server
-          # TODO: Make this more generic when we have multiple services
-          if docker images --format "table {{.Repository}}:{{.Tag}}" | grep -q "gt7-telemetry-server:latest"; then
-            for tag in $(echo '${{ steps.metadata.outputs.tags }}' | tr '\n' ' '); do
-              docker tag gt7-telemetry-server:latest $tag
-              docker push $tag
-            done
+          else
+            echo "Error: Could not find tarball for ${{ matrix.target }}"
+            exit 1
+          fi
+      - name: Tag and push image
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        run: |
+          cd "${{ matrix.package }}"
+          
+          # Check if docker-bake.hcl exists
+          if [ -f "docker-bake.hcl" ]; then
+            echo "Using docker-bake.hcl for ${{ matrix.target_name }}"
+            
+            # Set environment variables for docker-bake
+            export VERSION="${{ matrix.monorepo_version }}"
+            export GITHUB_ACTOR="${{ github.actor }}"
+            export GITHUB_REPOSITORY="${{ github.repository }}"
+            export TARGET="${{ matrix.target_name }}"
+            export REPOSITORY_SUBPATH="${{ matrix.package }}"
+            
+            # Use docker buildx bake to tag and push
+            docker buildx bake --push \
+              --set "*.platform=" \
+              --set "*.output=type=registry"
+          else
+            echo "No docker-bake.hcl found, using standard tagging"
+            
+            # Find the loaded image
+            local_tag="${{ matrix.target_name }}:latest"
+            if docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "$local_tag"; then
+              # Generate and push standard tags
+              registry_base="ghcr.io/${{ github.actor }}/${{ matrix.target_name }}"
+              
+              docker tag "$local_tag" "${registry_base}:latest"
+              docker tag "$local_tag" "${registry_base}:${{ matrix.monorepo_version }}"
+              
+              docker push "${registry_base}:latest"
+              docker push "${registry_base}:${{ matrix.monorepo_version }}"
+            else
+              echo "Error: Could not find loaded image $local_tag"
+              exit 1
+            fi
           fi
   results:
     if: ${{ always() }}

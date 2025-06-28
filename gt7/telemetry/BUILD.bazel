@@ -77,6 +77,6 @@ oci_image(
 oci_load(
     name = "telemetry_tarball",
     image = ":telemetry_image",
-    repo_tags = ["gt7-telemetry:latest"],
+    repo_tags = ["telemetry:latest"],
     visibility = ["//visibility:public"],
 )
