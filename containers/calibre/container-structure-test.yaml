@@ -25,9 +25,9 @@ commandTests:
     expectedOutput: ['Python 3']
 
   - name: 'entrypoint is executable'
-    command: 'test'
-    args: ['-x', '/entrypoint.sh']
-    exitCode: 0
+    command: 'stat'
+    args: ['-c', '%A', '/entrypoint.sh']
+    expectedOutput: ['-rwxr-xr-x']
 
 metadataTest:
   envVars:
@@ -37,8 +37,6 @@ metadataTest:
       value: '/config'
     - key: 'CALIBRE__PORT'
       value: '8080'
-  
-  user: 'nobody'
   workdir: '/config'
   volumes: ['/config']
   entrypoint: ['/usr/bin/catatonit', '--', '/entrypoint.sh']

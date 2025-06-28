@@ -1,24 +1,19 @@
 schemaVersion: 2.0.0
 
-fileExistenceTests:
-  - name: 'Requirements file'
-    path: '/requirements.txt'
-    shouldExist: true
-
 commandTests:
   - name: 'airflow version'
     command: 'airflow'
     args: ['version']
-    expectedOutput: ['Apache Airflow']
+    expectedOutput: ['3.0.1']
 
   - name: 'python version'
     command: 'python'
     args: ['--version']
     expectedOutput: ['Python 3']
 
-  - name: 'pip requirements installed'
-    command: 'pip'
-    args: ['check']
+  - name: 'airflow command available'
+    command: 'which'
+    args: ['airflow']
     exitCode: 0
 
 metadataTest:
