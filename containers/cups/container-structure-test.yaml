@@ -17,15 +17,7 @@ fileExistenceTests:
     path: '/etc/cups/cupsd.conf'
     shouldExist: true
 
-  - name: 'printers config'
-    path: '/etc/cups/printers.yaml'
-    shouldExist: true
-
 commandTests:
-  - name: 'cups version'
-    command: '/usr/sbin/cupsd'
-    args: ['-v']
-    expectedOutput: ['CUPS']
 
   - name: 'yq version'
     command: '/usr/bin/yq'

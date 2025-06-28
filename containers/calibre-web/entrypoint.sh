@@ -7,7 +7,7 @@ fi
 
 #shellcheck disable=SC2086
 exec \
-  /app/calibre-web \
+  /app/calibre-server \
   --port=${CALIBRE__PORT} \
   ${CALIBRE__LIBRARY} \
   "$@"

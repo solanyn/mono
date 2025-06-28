@@ -30,7 +30,7 @@ commandTests:
     exitCode: 0
 
 metadataTest:
-  env:
+  envVars:
     - key: 'CALIBRE__CREATE_LIBRARY'
       value: 'true'
     - key: 'CALIBRE__LIBRARY'
