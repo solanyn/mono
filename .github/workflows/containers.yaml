@@ -179,6 +179,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3.11.1
 
+      - name: Download bake metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: bake-${{ matrix.container }}
+          path: ${{ runner.temp }}
+
       - name: Install container-structure-test
         if: ${{ needs.plan.outputs.is_release == 'false' }}
         run: |
@@ -193,17 +199,29 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
-      - name: Generate bake metadata
+      - name: Build container metadata
         id: meta
         uses: docker/metadata-action@v5
+        env:
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
         with:
+          flavor: latest=false
           images: ghcr.io/${{ github.actor }}/${{ matrix.container }}
+          labels: |
+            org.opencontainers.image.title=${{ matrix.container }}
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}},value=${{ steps.options.outputs.version }}
+            type=raw,value=${{ steps.options.outputs.version }}
+            type=raw,value=rolling
           bake-target: image
+
+      - name: Upload bake metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: bake-${{ matrix.container }}
+          path: ${{ runner.temp }}/docker-metadata-action-bake.json
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Build container
         id: build
@@ -212,14 +230,13 @@ jobs:
           workdir: containers/${{ matrix.container }}
           targets: image
           files: |
-            ${{ steps.meta.outputs.bake-file }}
+            ${{ runner.temp }}/docker-metadata-action-bake.json
           set: |
             *.cache-from=type=registry,ref=ghcr.io/${{ github.actor }}/build_cache:${{ matrix.container }}-${{ matrix.platform }}
             *.cache-to=type=registry,ref=ghcr.io/${{ github.actor }}/build_cache:${{ matrix.container }}-${{ matrix.platform }},mode=max,compression=zstd,compression-force=true
             *.platform=${{ matrix.platform }}
             *.labels.org.opencontainers.image.url=https://ghcr.io/${{ github.repository_owner }}
             *.labels.org.opencontainers.image.vendor=${{ github.repository_owner }}
-            *.labels.org.opencontainers.image.title=${{ matrix.container }}
             *.labels.org.opencontainers.image.version=${{ needs.plan.outputs.version }}
             *.labels.org.opencontainers.image.source=${{ needs.plan.outputs.source }}
             ${{ needs.plan.outputs.is_release == 'true' && format('*.output=type=image,name=ghcr.io/{0}/{1},push-by-digest=true,name-canonical=true,push=true', github.actor, matrix.container) || '*.output=type=docker' }}
@@ -316,4 +333,3 @@ jobs:
           else
             exit 1
           fi
-
