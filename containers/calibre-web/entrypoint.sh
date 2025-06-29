@@ -11,3 +11,4 @@ exec \
   --port=${CALIBRE__PORT} \
   ${CALIBRE__LIBRARY} \
   "$@"
+

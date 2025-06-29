@@ -153,7 +153,7 @@ jobs:
       - name: Run container structure tests
         run: |
           # Get the image name/tag from the build script
-          if [[ -f "containers/${{ matrix.container }}/container-structure-test.yaml" ]]; then
+          if [[ -f "containers/${{ matrix.container }}/test.yaml" ]]; then
             # For PR builds, use local image names; for push builds, use registry names
             if [[ "${{ steps.should-push.outputs.push }}" == "true" ]]; then
               # Production builds push to registry
@@ -166,7 +166,7 @@ jobs:
             # Run structure tests
             container-structure-test test \
               --image "${IMAGE_NAME}" \
-              --config containers/${{ matrix.container }}/container-structure-test.yaml
+              --config containers/${{ matrix.container }}/test.yaml
           else
             echo "No structure test config found for ${{ matrix.container }}, skipping tests"
           fi
