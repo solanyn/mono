@@ -25,7 +25,7 @@ runs:
     - name: Application Options
       id: options
       shell: bash
-      working-directory: ./apps/${{ inputs.app }}
+      working-directory: ./containers/${{ inputs.app }}
       run: |
         PLATFORMS=$(\
             docker buildx bake image-all --print --progress=quiet \

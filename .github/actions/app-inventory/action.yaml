@@ -32,6 +32,6 @@ runs:
               }
           }
 
-          const appsDirectory = path.resolve(process.cwd(), 'apps');
+          const appsDirectory = path.resolve(process.cwd(), 'containers');
           const apps = scanDirectory(appsDirectory).sort();
           core.setOutput('apps', JSON.stringify(apps));
