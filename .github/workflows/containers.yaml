@@ -46,7 +46,7 @@ jobs:
         id: changed-files
         uses: bjw-s-labs/action-changed-files@930cef8463348e168cab7235c47fe95a7a235f65 # v0.3.3
         with:
-          path: apps
+          path: containers
           include_only_directories: true
           max_depth: 1
 
@@ -215,17 +215,6 @@ jobs:
           source: .
           targets: image
           workdir: ./apps/${{ inputs.app }}
-
-      - name: Run container structure tests
-        if: ${{ needs.plan.outputs.is_release == 'false' }}
-        run: |
-          if [[ -f "containers/${{ matrix.container }}/test.yaml" ]]; then
-            container-structure-test test \
-              --image "${{ steps.build.outputs.imageid }}" \
-              --config containers/${{ matrix.container }}/test.yaml
-          else
-            echo "No structure test config found for ${{ matrix.container }}, skipping tests"
-          fi
 
       - if: ${{ ! inputs.release }}
         name: Run Application Tests
