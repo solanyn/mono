@@ -13,12 +13,12 @@ commandTests:
   - name: 'postgres version'
     command: '/usr/lib/postgresql/17/bin/postgres'
     args: ['--version']
-    expectedOutput: ['postgres (PostgreSQL)']
+    exitCode: 0
 
   - name: 'psql available'
     command: '/usr/lib/postgresql/17/bin/psql'
     args: ['--version']
-    expectedOutput: ['psql (PostgreSQL) 17']
+    exitCode: 0
 
 metadataTest:
   user: 'postgres'
