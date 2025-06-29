@@ -33,7 +33,7 @@ target "image" {
 target "image-local" {
   inherits = ["image"]
   output = ["type=docker"]
-  tags = ["${APP}:${AIRFLOW_TAG}"]
+  tags = ["${APP}:${VERSION}"]
 }
 
 target "image-all" {

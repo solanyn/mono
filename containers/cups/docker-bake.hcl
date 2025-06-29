@@ -37,7 +37,7 @@ target "image" {
 target "image-local" {
   inherits = ["image"]
   output = ["type=docker"]
-  tags = ["${APP}:${DEBIAN_VERSION}"]
+  tags = ["${APP}:${VERSION}"]
 }
 
 target "image-all" {

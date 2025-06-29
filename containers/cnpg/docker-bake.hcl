@@ -49,7 +49,7 @@ target "image" {
 target "image-local" {
   inherits = ["image"]
   output = ["type=docker"]
-  tags = ["${APP}:${CNPG_VERSION}"]
+  tags = ["${APP}:${VERSION}"]
 }
 
 target "image-all" {

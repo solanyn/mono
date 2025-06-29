@@ -39,7 +39,7 @@ target "image" {
 target "image-local" {
   inherits = ["image"]
   output = ["type=docker"]
-  tags = ["${APP}:${CALIBRE_VERSION}"]
+  tags = ["${APP}:${VERSION}"]
 }
 
 target "image-all" {
