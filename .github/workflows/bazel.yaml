@@ -89,7 +89,7 @@ jobs:
             MATRIX_ITEMS=$(echo "$MATRIX_ITEMS" | jq ". + [$ITEM]")
           done
           
-          MATRIX=$(echo "$MATRIX_ITEMS" | jq '{include: .}')
+          MATRIX=$(echo "$MATRIX_ITEMS" | jq -c '{include: .}')
           echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
           echo "Generated matrix: $MATRIX"
 
