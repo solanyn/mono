@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       container:
-        description: 'Container to build (or "all" for all containers)'
+        description: "Container to build (or \"all\" for all containers)"
         required: true
         default: "all"
         type: string
@@ -37,77 +37,26 @@ permissions:
 
 jobs:
   prepare:
+    name: Prepare
     runs-on: ubuntu-latest
     outputs:
-      containers: ${{ steps.changes.outputs.containers }}
+      changed-files: ${{ steps.changed-files.outputs.changed_files }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Get Changed Files
+        id: changed-files
+        uses: bjw-s-labs/action-changed-files@930cef8463348e168cab7235c47fe95a7a235f65 # v0.3.3
         with:
-          fetch-depth: 0
-
-      - name: Check for changes
-        id: changes
-        run: |
-          # Discover all container directories
-          ALL_CONTAINERS=($(find containers -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort))
-
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            if [[ "${{ inputs.container }}" == "all" ]]; then
-              # Build all discovered containers
-              # Build JSON array manually to avoid formatting issues
-              CONTAINERS_JSON="["
-              for i in "${!ALL_CONTAINERS[@]}"; do
-                if [[ $i -gt 0 ]]; then
-                  CONTAINERS_JSON+=","
-                fi
-                CONTAINERS_JSON+="\"${ALL_CONTAINERS[$i]}\""
-              done
-              CONTAINERS_JSON+="]"
-              echo "containers=$CONTAINERS_JSON" >> $GITHUB_OUTPUT
-            else
-              # Validate the specified container exists
-              if [[ " ${ALL_CONTAINERS[*]} " =~ " ${{ inputs.container }} " ]]; then
-                echo 'containers=["${{ inputs.container }}"]' >> $GITHUB_OUTPUT
-              else
-                echo "Error: Container '${{ inputs.container }}' not found in containers/ directory"
-                echo "Available containers: ${ALL_CONTAINERS[*]}"
-                exit 1
-              fi
-            fi
-          else
-            # Auto-detect changed containers
-            BASE=${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || 'HEAD~1' }}
-            CHANGED_FILES=$(git diff --name-only $BASE...HEAD)
-            CONTAINERS=()
-            
-            for container in "${ALL_CONTAINERS[@]}"; do
-              if echo "$CHANGED_FILES" | grep -q "^containers/$container/"; then
-                CONTAINERS+=("$container")
-              fi
-            done
-            
-            if [[ ${#CONTAINERS[@]} -eq 0 ]]; then
-              echo 'containers=[]' >> $GITHUB_OUTPUT
-            else
-              # Build JSON array manually to avoid formatting issues
-              CONTAINERS_JSON="["
-              for i in "${!CONTAINERS[@]}"; do
-                if [[ $i -gt 0 ]]; then
-                  CONTAINERS_JSON+=","
-                fi
-                CONTAINERS_JSON+="\"${CONTAINERS[$i]}\""
-              done
-              CONTAINERS_JSON+="]"
-              echo "containers=$CONTAINERS_JSON" >> $GITHUB_OUTPUT
-            fi
-          fi
+          path: containers
+          include_only_directories: true
+          max_depth: 1
 
   changed:
+    if: ${{ needs.prepare.outputs.changed-files != '[]' || github.event_name == 'workflow_dispatch' }}
+    name: Get Changed Containers
+    needs: ["prepare"]
     runs-on: ubuntu-latest
-    needs: [prepare]
-    if: ${{ needs.prepare.outputs.containers != '[]' }}
     outputs:
+      containers: ${{ steps.containers.outputs.containers }}
       matrix: ${{ steps.matrix.outputs.matrix }}
       is_release: ${{ steps.release.outputs.is_release }}
     steps:
@@ -128,13 +77,26 @@ jobs:
             echo "is_release=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Get Containers
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        id: containers
+        env:
+          CONTAINERS: ${{ github.event_name == 'workflow_dispatch' && (inputs.container == 'all' && join(fromJSON('["airflow","calibre","calibre-web","cnpg","cups","mysql-init"]'), ' ') || inputs.container) || join(fromJSON(needs.prepare.outputs.changed-files), ' ') }}
+        with:
+          script: |
+            const { CONTAINERS } = process.env;
+            const containersToBuild = CONTAINERS.split(' ').filter(Boolean);
+            core.setOutput('containers', JSON.stringify(containersToBuild));
+            console.log('containers:', JSON.stringify(containersToBuild, null, 2));
+            core.summary.addHeading('Containers to build:').addList(containersToBuild).write();
+
       - name: Generate build matrix
         id: matrix
         run: |
-          CONTAINERS=($(echo '${{ needs.prepare.outputs.containers }}' | jq -r '.[]'))
+          CONTAINERS='${{ steps.containers.outputs.containers }}'
           MATRIX_JSON="[]"
-
-          for container in "${CONTAINERS[@]}"; do
+          
+          for container in $(echo "$CONTAINERS" | jq -r '.[]'); do
             if [[ -f "containers/$container/docker-bake.hcl" ]]; then
               cd "containers/$container"
               
@@ -173,7 +135,7 @@ jobs:
               exit 1
             fi
           done
-
+          
           echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
 
   build:
@@ -334,4 +296,3 @@ jobs:
           else
             exit 1
           fi
-
