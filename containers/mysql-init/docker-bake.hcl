@@ -12,8 +12,9 @@ variable "MYSQL_CLIENT_VERSION" {
   default = "11.4.5-r2"
 }
 
-variable "REGISTRY" {
-  default = "ghcr.io/solanyn"
+variable "VERSION" {
+  // renovate: datasource=docker depName=mysql versioning=semver updateType=major
+  default = "8"
 }
 
 variable "SOURCE" {

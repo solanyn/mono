@@ -17,6 +17,10 @@ variable "SOURCE" {
   default = "https://github.com/OpenPrinting/cups"
 }
 
+variable "VERSION" {
+  default = "${DEBIAN_VERSION}"
+}
+
 group "default" {
   targets = ["image-local"]
 }
@@ -27,8 +31,6 @@ target "image" {
   }
   labels = {
     "org.opencontainers.image.source" = "${SOURCE}"
-    "org.opencontainers.image.title" = "${APP}"
-    "org.opencontainers.image.version" = "${DEBIAN_VERSION}"
   }
 }
 

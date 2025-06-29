@@ -8,6 +8,11 @@ on:
         required: true
         default: "all"
         type: string
+      release:
+        description: "Create release artifacts"
+        required: false
+        default: false
+        type: boolean
   push:
     branches: [main]
     paths:
@@ -24,10 +29,14 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
+  actions: read
+  attestations: write
+  contents: read
+  id-token: write
   packages: write
 
 jobs:
-  changes:
+  prepare:
     runs-on: ubuntu-latest
     outputs:
       containers: ${{ steps.changes.outputs.containers }}
@@ -36,6 +45,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: Check for changes
         id: changes
         run: |
@@ -93,19 +103,93 @@ jobs:
             fi
           fi
 
-  build:
+  changed:
     runs-on: ubuntu-latest
-    needs: changes
-    if: ${{ needs.changes.outputs.containers != '[]' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        container: ${{ fromJson(needs.changes.outputs.containers) }}
+    needs: [prepare]
+    if: ${{ needs.prepare.outputs.containers != '[]' }}
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      is_release: ${{ steps.release.outputs.is_release }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.11.1
+
+      - name: Determine if release
+        id: release
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.release }}" == "true" ]]; then
+            echo "is_release=true" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "is_release=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_release=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate build matrix
+        id: matrix
+        run: |
+          CONTAINERS=($(echo '${{ needs.prepare.outputs.containers }}' | jq -r '.[]'))
+          MATRIX_JSON="[]"
+
+          for container in "${CONTAINERS[@]}"; do
+            if [[ -f "containers/$container/docker-bake.hcl" ]]; then
+              cd "containers/$container"
+              
+              # Extract platforms
+              PLATFORMS=$(docker buildx bake image-all --print --progress=quiet | jq -r '.target."image-all".platforms[]?' 2>/dev/null || echo "")
+              
+              # Extract source and version
+              SOURCE=$(docker buildx bake --list type=variables,format=json --progress=quiet | jq -r '.[] | select(.name == "SOURCE") | .value' 2>/dev/null || echo "")
+              VERSION=$(docker buildx bake --list type=variables,format=json --progress=quiet | jq -r '.[] | select(.name == "VERSION") | .value' 2>/dev/null || echo "")
+              
+              cd - > /dev/null
+              
+              if [[ -z "$PLATFORMS" ]]; then
+                echo "Error: No platforms found for $container"
+                exit 1
+              fi
+              
+              if [[ -z "$SOURCE" ]]; then
+                echo "Error: SOURCE not found for $container"
+                exit 1
+              fi
+              
+              if [[ -z "$VERSION" ]]; then
+                echo "Error: VERSION not found for $container"
+                exit 1
+              fi
+              
+              # Add each platform as a matrix entry
+              for platform in $PLATFORMS; do
+                MATRIX_ENTRY=$(jq -n --arg container "$container" --arg platform "$platform" --arg source "$SOURCE" --arg version "$VERSION" \
+                  '{container: $container, platform: $platform, source: $source, version: $version}')
+                MATRIX_JSON=$(echo "$MATRIX_JSON" | jq ". + [$MATRIX_ENTRY]")
+              done
+            else
+              echo "Error: docker-bake.hcl not found for $container"
+              exit 1
+            fi
+          done
+
+          echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [changed]
+    if: ${{ needs.changed.outputs.matrix != '[]' }}
+    strategy:
+      max-parallel: 4
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.changed.outputs.matrix) }}
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3.6.0
@@ -114,6 +198,7 @@ jobs:
         uses: docker/setup-buildx-action@v3.11.1
 
       - name: Install container-structure-test
+        if: ${{ needs.changed.outputs.is_release == 'false' }}
         run: |
           curl -LO https://storage.googleapis.com/container-structure-test/latest/container-structure-test-linux-amd64 && \
           chmod +x container-structure-test-linux-amd64 && \
@@ -126,56 +211,121 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
-      - name: Determine if push should happen
-        id: should-push
-        run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "push=false" >> $GITHUB_OUTPUT
-          else
-            echo "push=true" >> $GITHUB_OUTPUT
-          fi
+      - name: Generate bake metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.actor }}/${{ matrix.container }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+          bake-target: image
 
-      - name: Build container using unified script
-        env:
-          PUSH: ${{ steps.should-push.outputs.push }}
-          REGISTRY: ghcr.io/${{ github.actor }}
+      - name: Build container
+        id: build
+        uses: docker/bake-action@v4
+        with:
+          workdir: containers/${{ matrix.container }}
+          targets: image
+          files: |
+            ${{ steps.meta.outputs.bake-file }}
+          set: |
+            *.cache-from=type=registry,ref=ghcr.io/${{ github.actor }}/build_cache:${{ matrix.container }}-${{ matrix.platform }}
+            *.cache-to=type=registry,ref=ghcr.io/${{ github.actor }}/build_cache:${{ matrix.container }}-${{ matrix.platform }},mode=max,compression=zstd,compression-force=true
+            *.platform=${{ matrix.platform }}
+            *.labels.org.opencontainers.image.url=https://ghcr.io/${{ github.repository_owner }}
+            *.labels.org.opencontainers.image.vendor=${{ github.repository_owner }}
+            *.labels.org.opencontainers.image.title=${{ matrix.container }}
+            *.labels.org.opencontainers.image.version=${{ matrix.version }}
+            *.labels.org.opencontainers.image.source=${{ matrix.source }}
+            ${{ needs.changed.outputs.is_release == 'true' && format('*.output=type=image,name=ghcr.io/{0}/{1},push-by-digest=true,name-canonical=true,push=true', github.actor, matrix.container) || '*.output=type=docker' }}
+
+      - name: Export digest
+        if: ${{ needs.changed.outputs.is_release == 'true' }}
         run: |
-          # Use the unified build script for consistency
-          if [[ "$PUSH" == "true" ]]; then
-            # For production builds, use image-all target with CI options
-            ./tools/containers/build.sh ${{ matrix.container }} image-all \
-              "--set *.cache-from=type=gha --set *.cache-to=type=gha,mode=max --set *.platform=linux/amd64,linux/arm64"
-          else
-            # For PR/test builds, use default local build
-            ./tools/containers/build.sh ${{ matrix.container }}
-          fi
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        if: ${{ needs.changed.outputs.is_release == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.container }}-${{ strategy.job-index }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Run container structure tests
+        if: ${{ needs.changed.outputs.is_release == 'false' }}
         run: |
-          # Get the image name/tag from the build script
           if [[ -f "containers/${{ matrix.container }}/test.yaml" ]]; then
-            # For PR builds, use local image names; for push builds, use registry names
-            if [[ "${{ steps.should-push.outputs.push }}" == "true" ]]; then
-              # Production builds push to registry
-              IMAGE_NAME="ghcr.io/${{ github.actor }}/${{ matrix.container }}:latest"
-            else
-              # PR builds use local tags
-              IMAGE_NAME="${{ matrix.container }}:latest"
-            fi
-            
-            # Run structure tests
             container-structure-test test \
-              --image "${IMAGE_NAME}" \
+              --image "${{ steps.build.outputs.imageid }}" \
               --config containers/${{ matrix.container }}/test.yaml
           else
             echo "No structure test config found for ${{ matrix.container }}, skipping tests"
           fi
 
-  results:
+  release:
+    runs-on: ubuntu-latest
+    needs: [changed, build]
+    if: ${{ needs.changed.outputs.is_release == 'true' }}
+    strategy:
+      matrix:
+        container: ${{ fromJson(needs.changed.outputs.containers) }}
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          pattern: digests-${{ matrix.container }}-*
+          path: /tmp/digests
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.11.1
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf 'ghcr.io/${{ github.actor }}/${{ matrix.container }}@sha256:%s ' *)
+
+      - name: Inspect image
+        run: |
+          docker buildx imagetools inspect ghcr.io/${{ github.actor }}/${{ matrix.container }}:latest
+
+  attest:
+    runs-on: ubuntu-latest
+    needs: [changed, release]
+    if: ${{ needs.changed.outputs.is_release == 'true' }}
+    strategy:
+      matrix:
+        container: ${{ fromJson(needs.changed.outputs.containers) }}
+    permissions:
+      attestations: write
+      id-token: write
+    steps:
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: ghcr.io/${{ github.actor }}/${{ matrix.container }}
+          subject-digest: ${{ needs.build.outputs.image-digest }}
+
+  status:
     if: ${{ always() }}
     runs-on: ubuntu-latest
-    name: Build results
-    needs: [build]
+    name: Build status
+    needs: [build, release, attest]
     steps:
       - run: |
           result="${{ needs.build.result }}"
@@ -184,3 +334,4 @@ jobs:
           else
             exit 1
           fi
+

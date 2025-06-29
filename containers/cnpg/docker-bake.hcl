@@ -23,12 +23,12 @@ variable "TIMESCALEDB_VERSION" {
   default = "2.20.2"
 }
 
-variable "REGISTRY" {
-  default = "ghcr.io/solanyn"
-}
-
 variable "SOURCE" {
   default = "https://github.com/cloudnative-pg/cloudnative-pg"
+}
+
+variable "VERSION" {
+  default = "${CNPG_VERSION}"
 }
 
 group "default" {

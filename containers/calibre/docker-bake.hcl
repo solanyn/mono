@@ -14,8 +14,8 @@ variable "UBUNTU_VERSION" {
   default = "24.04"
 }
 
-variable "REGISTRY" {
-  default = "ghcr.io/solanyn"
+variable "VERSION" {
+  default = "${CALIBRE_VERSION}"
 }
 
 variable "SOURCE" {

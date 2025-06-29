@@ -9,8 +9,8 @@ variable "AIRFLOW_VERSION" {
   default = "3.0.2"
 }
 
-variable "REGISTRY" {
-  default = "ghcr.io/solanyn"
+variable "VERSION" {
+  default = "${AIRFLOW_VERSION}"
 }
 
 variable "SOURCE" {
@@ -23,7 +23,7 @@ group "default" {
 
 target "image" {
   args = {
-    AIRFLOW_TAG = "${AIRFLOW_TAG}"
+    AIRFLOW_VERSION = "${AIRFLOW_VERSION}"
   }
   labels = {
     "org.opencontainers.image.source" = "${SOURCE}"

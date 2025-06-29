@@ -24,8 +24,8 @@ variable "UBUNTU_VERSION" {
   default = "24.04"
 }
 
-variable "REGISTRY" {
-  default = "ghcr.io/solanyn"
+variable "VERSION" {
+  default = "${CALIBRE_WEB_VERSION}"
 }
 
 variable "SOURCE" {
@@ -45,8 +45,6 @@ target "image" {
   }
   labels = {
     "org.opencontainers.image.source" = "${SOURCE}"
-    "org.opencontainers.image.title" = "${APP}"
-    "org.opencontainers.image.version" = "${CALIBRE_WEB_VERSION}"
   }
 }
 
