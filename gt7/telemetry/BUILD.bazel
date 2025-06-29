@@ -70,7 +70,7 @@ tar(
 oci_image(
     name = "telemetry_image",
     base = "@distroless_cc",
-    entrypoint = ["/telemetry"],
+    entrypoint = ["/gt7/telemetry/telemetry_server"],
     tars = [":telemetry_server_layer"],
     visibility = ["//visibility:public"],
 )

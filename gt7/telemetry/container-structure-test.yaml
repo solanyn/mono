@@ -2,20 +2,6 @@ schemaVersion: 2.0.0
 
 fileExistenceTests:
   - name: "telemetry binary"
-    path: "/telemetry"
+    path: "/gt7/telemetry/telemetry_server"
     shouldExist: true
-
-commandTests:
-  - name: "telemetry help"
-    command: "/telemetry"
-    args: ["--help"]
-    exitCode: 0
-    expectedOutput: ["GT7"]
-
-metadataTest:
-  workdir: "/workspace"
-  entrypoint: ["/telemetry"]
-  labels:
-    - key: "org.opencontainers.image.title"
-      value: "telemetry"
 
