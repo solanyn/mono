@@ -1,0 +1,25 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/github-action.json
+name: Version
+description: Returns version for a directory or subdirectory
+
+inputs:
+  directory:
+    description: Directory to get version for
+    required: false
+    default: '.'
+
+outputs:
+  version:
+    description: Directory version
+    value: ${{ steps.version.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Get Version
+      id: version
+      shell: bash
+      run: |
+        VERSION=$(./tools/get-version.sh "${{ inputs.directory }}")
+        echo "version=$VERSION" >> $GITHUB_OUTPUT

@@ -39,6 +39,12 @@ jobs:
         with:
           app: ${{ inputs.app }}
 
+      - name: Get Directory Version
+        id: directory-version
+        uses: ./.github/actions/version
+        with:
+          directory: ${{ inputs.app }}
+
       - name: Get Application Versions
         uses: ./.github/actions/app-versions
         id: app-versions
@@ -59,6 +65,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},value=${{ steps.app-versions.outputs.semantic }},enable=${{ steps.app-versions.outputs.is-valid-semver }}
             type=semver,pattern={{major}},value=${{ steps.app-versions.outputs.semantic }},enable=${{ steps.app-versions.outputs.is-valid-semver }}
             type=raw,value=${{ steps.app-versions.outputs.raw }},enable=${{ steps.app-versions.outputs.is-valid-semver }}
+            type=raw,value=${{ steps.directory-version.outputs.version }}
             type=raw,value=rolling
 
       - name: Upload Bake Metadata
