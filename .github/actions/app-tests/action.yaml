@@ -28,4 +28,4 @@ runs:
     - name: Run Tests
       shell: bash
       run: |
-        container-structure-test test --image "${IMAGE}" --config "./containers/${APP}/tests.yaml"
+        container-structure-test test --image "${{ inputs.image }}" --config "./containers/${{ inputs.app }}/tests.yaml"
