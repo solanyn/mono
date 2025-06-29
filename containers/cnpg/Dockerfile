@@ -1,10 +1,11 @@
-ARG CNPG_TAG
+ARG CNPG_VERSION
+ARG TIMESCALEDB_VERSION
 
-FROM ghcr.io/cloudnative-pg/postgresql:$CNPG_TAG-bookworm
+FROM ghcr.io/cloudnative-pg/postgresql:$CNPG_VERSION-bookworm
 
 ARG PG_MAJOR
-ARG CNPG_TAG
-ARG TIMESCALEDB_TAG
+ARG CNPG_VERSION
+ARG TIMESCALEDB_VERSION
 ARG TARGETARCH
 
 # drop to root to install packages
@@ -25,7 +26,7 @@ RUN <<EOT
 
   # Install Timescale
   apt-get update
-  apt-get install -y --no-install-recommends "timescaledb-2-postgresql-${PG_MAJOR}=${TIMESCALEDB_TAG}~debian${VERSION_ID}"
+  apt-get install -y --no-install-recommends "timescaledb-2-postgresql-${PG_MAJOR}=${TIMESCALEDB_VERSION}~debian${VERSION_ID}"
 
   # Cleanup
   apt-get purge -y curl

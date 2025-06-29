@@ -1,0 +1,21 @@
+load("@rules_multirun//:defs.bzl", "multirun")
+load("@rules_uv//uv:pip.bzl", "pip_compile")
+load("@rules_uv//uv:venv.bzl", "create_venv")
+
+
+package(default_visibility = ["//visibility:public"])
+
+
+pip_compile(
+    name = "requirements",
+    requirements_in = ":requirements.txt",
+    requirements_txt = ":requirements_lock.txt",
+)
+
+create_venv(
+    name = "venv",
+    destination_folder = "cronprint/.venv",
+    requirements_txt = "requirements_lock.txt",
+)
+
+

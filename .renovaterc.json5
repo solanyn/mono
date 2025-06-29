@@ -23,6 +23,18 @@
       "matchStrings": [
         "datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n.*?\"(?<currentValue>.*)\"\\n"
       ]
+    },
+    {
+      "customType": "regex",
+      "description": "Process Annotations in Docker Bake",
+      "fileMatch": [
+        "docker-bake\\.hcl$"
+      ],
+      "matchStrings": [
+        "datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)( versioning=(?<versioning>\\S+))?\\n.+ = \"(?<currentValue>[^\"]+)\""
+      ],
+      "datasourceTemplate": "{{#if datasource}}{{{datasource}}}{{else}}github-releases{{/if}}",
+      "versioningTemplate": "{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}"
     }
   ],
   "dependencyDashboardTitle": "Renovate Dashboard 🤖",
@@ -31,6 +43,18 @@
     {
       "matchManagers": ["cargo"],
       "postUpdateOptions": ["cargoUpdateLockfile"]
+    },
+    {
+      "description": "Auto-merge Container Updates",
+      "automerge": true,
+      "automergeType": "pr",
+      "addLabels": ["renovate/container"],
+      "additionalBranchPrefix": "{{parentDir}}-",
+      "commitMessageExtra": "( {{currentVersion}} → {{newVersion}} )",
+      "commitMessageTopic": "{{depName}}",
+      "matchFileNames": ["**/docker-bake.hcl"],
+      "semanticCommitScope": "{{parentDir}}",
+      "semanticCommitType": "release"
     },
     {
       "addLabels": ["renovate/container", "type/major"],

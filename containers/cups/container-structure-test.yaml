@@ -1,0 +1,34 @@
+schemaVersion: 2.0.0
+
+fileExistenceTests:
+  - name: 'CUPS daemon'
+    path: '/usr/sbin/cupsd'
+    shouldExist: true
+
+  - name: 'yq binary'
+    path: '/usr/bin/yq'
+    shouldExist: true
+
+  - name: 'entrypoint script'
+    path: '/entrypoint.sh'
+    shouldExist: true
+
+  - name: 'cups config'
+    path: '/etc/cups/cupsd.conf'
+    shouldExist: true
+
+commandTests:
+
+  - name: 'yq version'
+    command: '/usr/bin/yq'
+    args: ['--version']
+    expectedOutput: ['yq']
+
+  - name: 'entrypoint is executable'
+    command: 'test'
+    args: ['-x', '/entrypoint.sh']
+    exitCode: 0
+
+metadataTest:
+  exposedPorts: ['631']
+  entrypoint: ['/entrypoint.sh']

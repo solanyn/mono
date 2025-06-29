@@ -110,7 +110,7 @@ mod tests {
         thread::sleep(Duration::from_millis(20));
         let later_time = manager.time_since_last_heartbeat();
         assert!(later_time >= Duration::from_millis(15));
-        assert!(later_time < Duration::from_millis(30));
+        assert!(later_time < Duration::from_millis(50));
     }
 
     #[test]

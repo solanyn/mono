@@ -1,6 +1,13 @@
-# Agent Documentation for Goyangi Project
+# Agent Documentation for `goyangi`
 
-This document provides essential information for AI agents working on the Goyangi project.
+## Agent Guidelines
+
+- Do not attribute agents in commit messages
+- Always use `gh` CLI to interact with GitHub
+- PRs must be linked to an issue. Open one if there is no relevant issue.
+- Documentation is always informative and technical in detail
+- Do not add unnecessary information
+- Do not use emojis
 
 ## Project Overview
 
@@ -9,106 +16,77 @@ Goyangi is a polyglot monorepo using Bazel with Bzlmod for build management and 
 - **Frontend**: SvelteKit application (TypeScript)
 - **Backend**: Rust services
 - **Python**: ML/data processing components with JAX support
-- **Go**: Various utilities and services
-- **GT7 Telemetry**: Real-time racing telemetry streaming via Kafka
 
 ## Build System
 
 ### Prerequisites
 
-**Nix Installation Required**: This project uses hybrid Nix+Bazel toolchains for hermetic cross-compilation. Install Nix before development:
+Install Nix before development:
 
 ```bash
-# macOS/Linux
 curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
 ```
 
 ### Bazel with Aspect CLI
 
-The project uses **Aspect CLI** instead of standard Bazel for enhanced developer experience:
+All bazel commands use bazelisk (which uses Aspect CLI):
 
 ```bash
-# All bazel commands should use bazelisk (which uses Aspect CLI)
 bazelisk build //...
 bazelisk test //...
 bazelisk run //target:name
 ```
 
-**Key Configuration Files:**
+**Configuration Files:**
 
 - `.bazeliskrc` - Configures bazelisk to use Aspect CLI
-- `MODULE.bazel` - Bzlmod dependencies (preferred over WORKSPACE)
+- `MODULE.bazel` - Bzlmod dependencies
 - `.bazelrc` - Bazel configuration options
 
-### Essential Commands for Agents
+Use Bazel to build all projects except Python projects. For Python projects, use Bazel to setup a common virtual environment with `bazelisk run //{project}:venv`.
+
+Package using Dockerfiles and GitHub Actions Docker builds. Add dependencies to `requirements.txt` and `requirements_darwin.txt` files. Run `bazelisk run //{project}:requirements` to update lock files.
+
+### Essential Commands
 
 #### Build and Test
 
 ```bash
-# Build all targets
 bazelisk build //...
-
-# Run all tests
 bazelisk test //...
-
-# Build specific target
 bazelisk build //tldr/frontend:svelte_app
-
-# Run development server
 bazelisk run //tldr/frontend:dev
+bazelisk run //torches:venv
+bazelisk run //jaxes:venv
+bazelisk run //cronprint:venv
 ```
 
-#### Code Quality and Formatting
+#### Build containers
 
 ```bash
-# Format all files in the repository
-bazelisk run //:format
-
-# Auto-generate/update BUILD files (like gazelle)
-bazelisk configure
-
-# Show what configure would change without applying
-bazelisk configure --mode=diff
-
-# Print generated BUILD files to stdout
-bazelisk configure --mode=print
-
-# Lint all targets (when aspects are configured)
-bazelisk lint //...
+./tools/containers/build.sh airflow
+./tools/containers/build.sh calibre-web
+./tools/containers/build.sh calibre
+./tools/containers/build.sh cnpg
+./tools/containers/build.sh cups
+for container in containers/*/; do ./tools/containers/build.sh $(basename "$container"); done
 ```
+
+**Container build requirements:**
+
+- Docker Desktop running with buildx support
+- Network access to pull base images
+- For registry push: authentication to ghcr.io
+
+**Container versioning:**
+
+- Containers in `./containers/` use their main dependency version (e.g., Airflow version for airflow container)
+- Applications built with Bazel use monorepo version from `./tools/get-version.sh`
 
 #### Dependency Management
 
 ```bash
-# Update Python dependencies
-bazelisk run //:requirements_cpu.update
-bazelisk run //:requirements_gpu.update
-
-# Update npm dependencies (run in frontend directory)
 cd tldr/frontend && npm update
-```
-
-## Project Structure
-
-```
-goyangi/
-├── .aspect/cli/config.yaml    # Aspect CLI configuration
-├── .bazeliskrc               # Bazelisk configuration (uses Aspect CLI)
-├── MODULE.bazel              # Bzlmod dependencies
-├── BUILD.bazel               # Root build file with format target
-├── tldr/                     # TLDR application
-│   ├── frontend/             # SvelteKit frontend
-│   │   ├── BUILD.bazel
-│   │   ├── package.json
-│   │   ├── eslint.config.js
-│   │   └── src/
-│   └── backend/              # Rust backend
-│       ├── BUILD.bazel
-│       ├── Cargo.toml
-│       └── src/
-├── gt7/                      # GT7 telemetry server
-├── jaxes/                    # JAX examples and utilities
-└── tools/                    # Build tools and utilities
 ```
 
 ## Language-Specific Guidelines
@@ -117,16 +95,9 @@ goyangi/
 
 - **Framework**: SvelteKit with Vite
 - **Package Manager**: npm (with Bazel npm rules)
-- **Linting**: ESLint with TypeScript and Svelte plugins
-- **Formatting**: Prettier (via rules_lint)
-
-**Key Commands:**
 
 ```bash
-# Development server
 bazelisk run //tldr/frontend:dev
-
-# Production build
 bazelisk run //tldr/frontend:build
 ```
 
@@ -135,76 +106,32 @@ bazelisk run //tldr/frontend:build
 - **Build System**: Bazel with rules_rust
 - **Dependency Management**: Cargo.toml with Bazel crate_universe
 
-**Key Commands:**
-
 ```bash
-# Build Rust targets
 bazelisk build //tldr/backend:tldr-backend
 bazelisk build //gt7/telemetry:telemetry_server
-
-# Run Rust formatting
-bazelisk run @rules_rust//:rustfmt_test
-
-# Run Clippy linting
-bazelisk run @rules_rust//:clippy_test
 ```
 
 ### Python
 
-- **Build System**: Bazel with aspect_rules_py
+- **Build System**: Bazel with `rules_uv` to build virtual environments
 - **Dependency Management**: requirements.txt with rules_uv
-- **Formatting**: Ruff (via rules_lint)
-- **ML Framework**: JAX with CUDA 12 support (Linux) and CPU/Metal fallback (macOS)
-
-**Key Commands:**
 
 ```bash
-# Build Python targets
-bazelisk build //jaxes:simple_jax
-
-# Run JAX examples
-bazelisk run //jaxes:simple_jax
-bazelisk run //jaxes:neural_network
-bazelisk run //jaxes:check_gpu
-
-# Update Python dependencies
-bazelisk run //:requirements.update
+bazelisk run //torches:requirements
+bazelisk run //jaxes:requirements
+bazelisk run //cronprint:requirements
 ```
 
-### Go
+## Development Workflow
 
-- **Build System**: Bazel with rules_go
-- **Dependency Management**: go.mod with Gazelle
-
-## Development Workflow for Agents
-
-### 1. Before Making Changes
+### After Making Changes
 
 ```bash
-# Update BUILD files for any new source files
-bazelisk configure
-
-# Check current formatting
-bazelisk run //:format --mode=check
-```
-
-### 2. After Making Changes
-
-```bash
-# Auto-generate BUILD files for new code
-bazelisk configure
-
-# Format all code
-bazelisk run //:format
-
-# Run tests
 bazelisk test //...
-
-# Build everything to ensure no breakage
 bazelisk build //...
 ```
 
-### 3. CI/CD Integration
+### CI/CD Integration
 
 The project uses GitHub Actions with Nix and bazelisk:
 
@@ -212,25 +139,29 @@ The project uses GitHub Actions with Nix and bazelisk:
 - **Bazel**: All commands use `bazel` but this runs through bazelisk → Aspect CLI
 - **Cross-compilation**: Linux x86_64 and ARM64 targets supported via Nix
 
+#### GitHub Workflows
+
+**Bazel Build (`bazel.yaml`)**
+
+- Builds and tests all targets with `//...`
+- Builds container images using Bazel OCI targets
+- Tags containers with both service-specific and monorepo versions
+- Pushes to GHCR on main branch commits
+
+**Container Build (`containers.yaml`)**
+
+- Auto-discovers all containers in `./containers/` directory
+- Builds only changed containers on PRs/pushes
+- Supports manual dispatch for specific containers or all containers
+- Multi-platform builds (linux/amd64, linux/arm64) with Docker Buildx
+- Uses unified build script `./tools/containers/build.sh`
+
+**Other Workflows**
+
+- `renovate.yaml` - Dependency updates via Renovate bot
+- `website.yaml` - Builds and deploys Quartz documentation site
+
 ## Configuration Files
-
-### `.aspect/cli/config.yaml`
-
-```yaml
-lint:
-  aspects:
-    - "@aspect_rules_lint//lint:eslint.bzl%eslint"
-    - "@aspect_rules_lint//lint:ruff.bzl%ruff"
-
-configure:
-  languages:
-    javascript: true
-    go: true
-    python: true
-    protobuf: true
-    bzl: true
-    rust: true
-```
 
 ### `.bazeliskrc`
 
@@ -243,50 +174,37 @@ USE_BAZEL_VERSION=aspect/2025.11.0
 
 ### Common Issues
 
-1. **"No repository visible as '@repo_name'"**
+**"No repository visible as '@repo_name'"**
 
-   - Check MODULE.bazel for missing dependencies
-   - Ensure Bzlmod is enabled in .bazelrc
+- Check MODULE.bazel for missing dependencies
+- Ensure Bzlmod is enabled in .bazelrc
 
-2. **Build failures after adding new files**
+**Build failures after adding new files**
 
-   - Run `bazelisk configure` to update BUILD files
-   - Check that new dependencies are added to MODULE.bazel
+- Check that new dependencies are added to MODULE.bazel
+- Ensure BUILD files include new targets
 
-3. **Formatting not working**
-   - Ensure rules_lint is properly configured in MODULE.bazel
-   - Check that multitool extension is set up correctly
-
-### Useful Debug Commands
+### Debug Commands
 
 ```bash
-# Check what targets are available
 bazelisk query //...
-
-# Check specific package targets
 bazelisk query //tldr/frontend:all
-
-# Analyze dependency graph
 bazelisk query "deps(//target:name)"
-
-# Check Bazel info
 bazelisk info
 ```
 
-## Best Practices for Agents
+## Best Practices
 
-1. **Always use `bazelisk`** instead of `bazel` directly
-2. **Run `bazelisk configure`** after adding new source files
-3. **Use `bazelisk run //:format`** before committing changes
-4. **Test changes with `bazelisk test //...`** before submitting
-5. **Check CI compatibility** - all commands should work in GitHub Actions
-6. **Update this documentation** when adding new tools or workflows
+- Always use `bazelisk` instead of `bazel` directly
+- Test changes with `bazelisk test //...` before submitting
+- Check CI compatibility - all commands should work in GitHub Actions
+- Use `.yaml` extension for all YAML files (not `.yml`)
+- Update this documentation when adding new tools or workflows
 
 ## External Dependencies
 
 - **Nix**: Hermetic cross-compilation toolchains for system dependencies
-- **Aspect CLI**: Enhanced Bazel experience with additional commands
-- **rules_lint**: Unified linting and formatting across languages
+- **Aspect CLI**: Enhanced Bazel experience
 - **Bzlmod**: Modern Bazel dependency management (preferred over WORKSPACE)
 - **rules_js**: JavaScript/TypeScript support
 - **rules_rust**: Rust language support with cross-compilation targets
@@ -298,5 +216,6 @@ bazelisk info
 For questions about this setup:
 
 1. Check the Aspect CLI documentation: <https://docs.aspect.build/cli>
-2. Review rules_lint documentation: <https://github.com/aspect-build/rules_lint>
-3. Consult Bazel Bzlmod guide: <https://bazel.build/external/migration>
+2. Consult Bazel Bzlmod guide: <https://bazel.build/external/migration>
+3. See the specific Bazel ruleset documentation
+

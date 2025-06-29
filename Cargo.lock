@@ -790,6 +790,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8d1add55171497b4705a648c6b583acafb01d58050a51727785f0b2c8e0a2b2"
 
 [[package]]
+name = "gt7-telemetry"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "axum-extra",
+ "bitflags",
+ "byteorder",
+ "env_logger",
+ "futures-util",
+ "http-body-util",
+ "kafka",
+ "log",
+ "rustls",
+ "rustls-pemfile",
+ "salsa20",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.12",
+ "tokio",
+ "tokio-tungstenite 0.27.0",
+ "tower",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.15.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2179,30 +2203,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "telemetry"
-version = "0.1.0"
-dependencies = [
- "axum",
- "axum-extra",
- "bitflags",
- "byteorder",
- "env_logger",
- "futures-util",
- "http-body-util",
- "kafka",
- "log",
- "rustls",
- "rustls-pemfile",
- "salsa20",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tokio-tungstenite 0.27.0",
- "tower",
 ]
 
 [[package]]

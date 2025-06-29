@@ -1,6 +1,0 @@
-numpy
-jax[cuda12]>=0.4.34
-jaxlib>=0.4.35
-torch
-torchvision
-
