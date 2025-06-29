@@ -1,10 +1,12 @@
+target "docker-metadata-action" {}
+
 variable "APP" {
   default = "airflow"
 }
 
-variable "AIRFLOW_TAG" {
+variable "AIRFLOW_VERSION" {
   // renovate: datasource=docker depName=apache/airflow
-  default = "3.0.1"
+  default = "3.0.2"
 }
 
 variable "REGISTRY" {
@@ -25,26 +27,19 @@ target "image" {
   }
   labels = {
     "org.opencontainers.image.source" = "${SOURCE}"
-    "org.opencontainers.image.title" = "${APP}"
-    "org.opencontainers.image.version" = "${AIRFLOW_TAG}"
   }
 }
 
 target "image-local" {
   inherits = ["image"]
   output = ["type=docker"]
-  tags = ["${APP}:${AIRFLOW_TAG}", "${APP}:latest"]
+  tags = ["${APP}:${AIRFLOW_TAG}"]
 }
 
 target "image-all" {
   inherits = ["image"]
-  output = ["type=registry"]
   platforms = [
     "linux/amd64",
     "linux/arm64"
-  ]
-  tags = [
-    "${REGISTRY}/${APP}:${AIRFLOW_TAG}",
-    "${REGISTRY}/${APP}:latest"
   ]
 }

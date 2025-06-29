@@ -1,13 +1,14 @@
-FROM debian:bookworm-slim
+ARG DEBIAN_VERSION
+ARG TARGETARCH
 
-# Install dependencies
+FROM debian:${DEBIAN_VERSION}
+
 RUN apt-get update && apt-get install -y \
   cups \
   wget \
   && rm -rf /var/lib/apt/lists/*
 
-# Install yq
-RUN wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && \
+RUN wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${TARGETARCH} -O /usr/bin/yq && \
   chmod +x /usr/bin/yq
 
 COPY cupsd.conf /etc/cups/cupsd.conf

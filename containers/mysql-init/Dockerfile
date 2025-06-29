@@ -1,8 +1,7 @@
 ARG ALPINE_VERSION
+ARG MYSQL_CLIENT_VERSION
 
 FROM docker.io/library/alpine:${ALPINE_VERSION}
-
-ARG TARGETPLATFORM
 
 USER root
 WORKDIR /app
@@ -12,12 +11,10 @@ RUN \
   bash \
   ca-certificates \
   catatonit \
-  mysql-client
+  mysql-client~"${MYSQL_CLIENT_VERSION}"
 
 COPY entrypoint.sh /entrypoint.sh
 
 USER nobody:nogroup
 
 ENTRYPOINT ["/usr/bin/catatonit", "--", "/entrypoint.sh"]
-
-LABEL org.opencontainers.image.source="https://github.com/alpinelinux/aports"

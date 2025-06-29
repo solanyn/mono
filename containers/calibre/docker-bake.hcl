@@ -1,3 +1,5 @@
+target "docker-metadata-action" {}
+
 variable "APP" {
   default = "calibre"
 }
@@ -31,26 +33,19 @@ target "image" {
   }
   labels = {
     "org.opencontainers.image.source" = "${SOURCE}"
-    "org.opencontainers.image.title" = "${APP}"
-    "org.opencontainers.image.version" = "${CALIBRE_VERSION}"
   }
 }
 
 target "image-local" {
   inherits = ["image"]
   output = ["type=docker"]
-  tags = ["${APP}:${CALIBRE_VERSION}", "${APP}:latest"]
+  tags = ["${APP}:${CALIBRE_VERSION}"]
 }
 
 target "image-all" {
   inherits = ["image"]
-  output = ["type=registry"]
   platforms = [
     "linux/amd64",
     "linux/arm64"
-  ]
-  tags = [
-    "${REGISTRY}/${APP}:${CALIBRE_VERSION}",
-    "${REGISTRY}/${APP}:latest"
   ]
 }

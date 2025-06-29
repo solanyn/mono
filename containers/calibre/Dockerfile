@@ -1,9 +1,9 @@
 ARG UBUNTU_VERSION
-ARG CALIBRE_VERSION
 
 FROM ubuntu:${UBUNTU_VERSION}
 
-ARG TARGETPLATFORM
+ARG TARGETARCH
+ARG TARGETARCH=${TARGETARCH/amd64/x86_64}
 ARG CALIBRE_VERSION
 
 ENV CALIBRE__CREATE_LIBRARY="true" \
@@ -14,15 +14,6 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # hadolint ignore=DL3008,DL3015,SC2086
 RUN \
-  case "${TARGETPLATFORM}" in \
-  'linux/amd64') \
-  export ARCH='x86_64'; \
-  ;; \
-  'linux/arm64') \
-  export ARCH='arm64'; \
-  ;; \
-  esac \
-  && \
   apt-get -qq update \
   && \
   apt-get -qq install -y \
@@ -41,7 +32,7 @@ RUN \
   mkdir -p /opt/calibre \
   && mkdir -p /app \
   && \
-  curl -fsSL "https://download.calibre-ebook.com/${CALIBRE_VERSION}/calibre-${CALIBRE_VERSION}-${ARCH}.txz" \
+  curl -fsSL "https://download.calibre-ebook.com/${CALIBRE_VERSION}/calibre-${CALIBRE_VERSION}-${TARGETARCH}.txz" \
   | tar Jxvf - -C /app \
   && /app/calibre_postinstall \
   && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
@@ -63,5 +54,3 @@ WORKDIR /config
 VOLUME ["/config"]
 
 ENTRYPOINT ["/usr/bin/catatonit", "--", "/entrypoint.sh"]
-
-LABEL org.opencontainers.image.source="https://github.com/kovidgoyal/calibre"

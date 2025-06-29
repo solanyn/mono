@@ -1,10 +1,21 @@
+target "docker-metadata-action" {}
+
 variable "APP" {
   default = "cnpg"
+}
+
+variable "DEBIAN_VERSION" {
+  // renovate: datasource=docker depName=debian
+  default = "bookworm"
 }
 
 variable "CNPG_VERSION" {
   // renovate: datasource=docker depName=ghcr.io/cloudnative-pg/postgresql
   default = "17.5"
+}
+
+variable "PG_MAJOR" {
+  default = split(".", "${CNPG_VERSION}")[0]
 }
 
 variable "TIMESCALEDB_VERSION" {
@@ -28,30 +39,23 @@ target "image" {
   args = {
     CNPG_VERSION = "${CNPG_VERSION}"
     TIMESCALEDB_VERSION = "${TIMESCALEDB_VERSION}"
-    PG_MAJOR = "17"
+    PG_MAJOR = "${PG_MAJOR}"
   }
   labels = {
     "org.opencontainers.image.source" = "${SOURCE}"
-    "org.opencontainers.image.title" = "${APP}"
-    "org.opencontainers.image.version" = "${CNPG_VERSION}"
   }
 }
 
 target "image-local" {
   inherits = ["image"]
   output = ["type=docker"]
-  tags = ["${APP}:${CNPG_VERSION}", "${APP}:latest"]
+  tags = ["${APP}:${CNPG_VERSION}"]
 }
 
 target "image-all" {
   inherits = ["image"]
-  output = ["type=registry"]
   platforms = [
     "linux/amd64",
     "linux/arm64"
-  ]
-  tags = [
-    "${REGISTRY}/${APP}:${CNPG_VERSION}",
-    "${REGISTRY}/${APP}:latest"
   ]
 }
