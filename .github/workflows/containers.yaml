@@ -29,11 +29,11 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  actions: read
   attestations: write
-  contents: read
+  contents: write
   id-token: write
   packages: write
+  security-events: write
 
 jobs:
   prepare:
@@ -46,59 +46,30 @@ jobs:
         id: changed-files
         uses: bjw-s-labs/action-changed-files@930cef8463348e168cab7235c47fe95a7a235f65 # v0.3.3
         with:
-          path: containers
+          path: apps
           include_only_directories: true
           max_depth: 1
 
   changed:
     if: ${{ needs.prepare.outputs.changed-files != '[]' || github.event_name == 'workflow_dispatch' }}
-    name: Get Changed Containers
+    name: Get Changed Apps
     needs: ["prepare"]
     runs-on: ubuntu-latest
     outputs:
-      containers: ${{ steps.containers.outputs.containers }}
+      apps: ${{ steps.apps.outputs.apps }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Get Containers
+      - name: Get Apps
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
-        id: containers
+        id: apps
+        env:
+          APPS: ${{ github.event_name == 'workflow_dispatch' && inputs.app || join(fromJSON(needs.prepare.outputs.changed-files), ' ') }}
         with:
           script: |
-            const fs = require('fs');
-            const path = require('path');
-
-            // Discover all container directories
-            const containerDir = 'containers';
-            const allContainers = fs.readdirSync(containerDir, { withFileTypes: true })
-              .filter(dirent => dirent.isDirectory())
-              .map(dirent => dirent.name)
-              .sort();
-
-            let containersToBuild = [];
-
-            if (context.eventName === 'workflow_dispatch') {
-              const containerInput = '${{ inputs.container }}';
-              if (containerInput === 'all') {
-                containersToBuild = allContainers;
-              } else if (allContainers.includes(containerInput)) {
-                containersToBuild = [containerInput];
-              } else {
-                core.setFailed(`Container '${containerInput}' not found. Available: ${allContainers.join(', ')}`);
-                return;
-              }
-            } else {
-              const changedFiles = '${{ needs.prepare.outputs.changed-files }}';
-              if (changedFiles && changedFiles !== '[]') {
-                const changedContainers = JSON.parse(changedFiles);
-                containersToBuild = changedContainers.filter(container => allContainers.includes(container));
-              }
-            }
-
-            core.setOutput('containers', JSON.stringify(containersToBuild));
-            console.log('containers:', JSON.stringify(containersToBuild, null, 2));
-            core.summary.addHeading('Containers to build:').addList(containersToBuild).write();
+            const { APPS } = process.env;
+            const appsToBuild = APPS.split(' ').filter(Boolean);
+            core.setOutput('apps', JSON.stringify(appsToBuild));
+            console.log('apps:', JSON.stringify(appsToBuild, null, 2));
+            core.summary.addHeading('Apps to build:').addList(appsToBuild).write();
 
   plan:
     runs-on: ubuntu-latest
@@ -108,10 +79,8 @@ jobs:
       matrix:
         container: ${{ fromJson(needs.changed.outputs.containers) }}
     outputs:
-      platforms: ${{ steps.platforms.outputs.platforms }}
-      source: ${{ steps.options.outputs.source }}
-      version: ${{ steps.options.outputs.version }}
-      is_release: ${{ steps.release.outputs.is_release }}
+      app-exists: ${{ steps.app-exists.outputs.exists }}
+      platforms: ${{ steps.app-options.outputs.platforms }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -157,48 +126,6 @@ jobs:
           PLATFORMS=$(docker buildx bake image-all --print --progress=quiet | jq -c '.target."image-all".platforms // []')
           echo "platforms=$PLATFORMS" >> $GITHUB_OUTPUT
 
-  build:
-    runs-on: ubuntu-latest
-    needs: [changed, plan]
-    if: ${{ needs.plan.outputs.platforms != '[]' }}
-    strategy:
-      max-parallel: 4
-      fail-fast: false
-      matrix:
-        container: ${{ fromJson(needs.changed.outputs.containers) }}
-        platform: ${{ fromJson(needs.plan.outputs.platforms) }}
-    outputs:
-      image-digest: ${{ steps.build.outputs.digest }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3.6.0
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3.11.1
-
-      - name: Download bake metadata
-        uses: actions/download-artifact@v4
-        with:
-          name: bake-${{ matrix.container }}
-          path: ${{ runner.temp }}
-
-      - name: Install container-structure-test
-        if: ${{ needs.plan.outputs.is_release == 'false' }}
-        run: |
-          curl -LO https://storage.googleapis.com/container-structure-test/latest/container-structure-test-linux-amd64 && \
-          chmod +x container-structure-test-linux-amd64 && \
-          sudo mv container-structure-test-linux-amd64 /usr/local/bin/container-structure-test
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3.4.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-
       - name: Build container metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -223,39 +150,71 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-      - name: Build container
-        id: build
-        uses: docker/bake-action@v4
+  build:
+    name: Build (${{ matrix.platform }})
+    needs: ["plan"]
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ${{ fromJson(needs.plan.outputs.platforms) }}
+    runs-on: ${{ startsWith(matrix.platform, 'linux/arm') && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          workdir: containers/${{ matrix.container }}
-          targets: image
+          persist-credentials: false
+
+      - name: Get Target Architecture
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        id: target
+        with:
+          script: |
+            core.setOutput('arch', '${{ matrix.platform }}'.split('/').pop());
+
+      - name: Get Application Options
+        id: app-options
+        uses: ./.github/actions/app-options
+        with:
+          app: ${{ inputs.app }}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Download Bake Metadata
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ${{ inputs.app }}-bake-metadata
+          path: ${{ runner.temp }}
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+
+      - name: Build Application
+        uses: docker/bake-action@37816e747588cb137173af99ab33873600c46ea8 # v6.8.0
+        id: bake
+        with:
           files: |
-            ${{ runner.temp }}/docker-metadata-action-bake.json
+            ./docker-bake.hcl
+            cwd://${{ runner.temp }}/docker-metadata-action-bake.json
           set: |
-            *.cache-from=type=registry,ref=ghcr.io/${{ github.actor }}/build_cache:${{ matrix.container }}-${{ matrix.platform }}
-            *.cache-to=type=registry,ref=ghcr.io/${{ github.actor }}/build_cache:${{ matrix.container }}-${{ matrix.platform }},mode=max,compression=zstd,compression-force=true
-            *.platform=${{ matrix.platform }}
-            *.labels.org.opencontainers.image.url=https://ghcr.io/${{ github.repository_owner }}
+            *.args.VENDOR=${{ github.repository_owner }}
+            *.cache-from=${{ format('type=registry,ref=ghcr.io/{0}/build_cache:{1}-{2},mode=max', github.repository_owner, inputs.app, steps.target.outputs.arch) }}
+            *.cache-to=${{ inputs.release && format('type=registry,ref=ghcr.io/{0}/build_cache:{1}-{2},mode=max,compression=zstd,force-compression=true', github.repository_owner, inputs.app, steps.target.outputs.arch) || '' }}
+            *.labels.org.opencontainers.image.title=${{ inputs.app }}
+            *.labels.org.opencontainers.image.url=https://ghcr.io/${{ github.repository_owner }}/${{ inputs.app }}
+            *.labels.org.opencontainers.image.version=${{ steps.app-options.outputs.version }}
+            *.labels.org.opencontainers.image.revision=${{ github.sha }}
             *.labels.org.opencontainers.image.vendor=${{ github.repository_owner }}
-            *.labels.org.opencontainers.image.version=${{ needs.plan.outputs.version }}
-            *.labels.org.opencontainers.image.source=${{ needs.plan.outputs.source }}
-            ${{ needs.plan.outputs.is_release == 'true' && format('*.output=type=image,name=ghcr.io/{0}/{1},push-by-digest=true,name-canonical=true,push=true', github.actor, matrix.container) || '*.output=type=docker' }}
-
-      - name: Export digest
-        if: ${{ needs.plan.outputs.is_release == 'true' }}
-        run: |
-          mkdir -p /tmp/digests
-          digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"
-
-      - name: Upload digest
-        if: ${{ needs.plan.outputs.is_release == 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: digests-${{ matrix.container }}-${{ strategy.job-index }}
-          path: /tmp/digests/*
-          if-no-files-found: error
-          retention-days: 1
+            ${{ inputs.release && format('*.output=type=image,name=ghcr.io/{0}/{1},push-by-digest=true,name-canonical=true,push=true', github.repository_owner, inputs.app) || '*.output=type=docker' }}
+            *.platform=${{ matrix.platform }}
+            *.tags=
+          source: .
+          targets: image
+          workdir: ./apps/${{ inputs.app }}
 
       - name: Run container structure tests
         if: ${{ needs.plan.outputs.is_release == 'false' }}
@@ -268,68 +227,123 @@ jobs:
             echo "No structure test config found for ${{ matrix.container }}, skipping tests"
           fi
 
-  release:
-    runs-on: ubuntu-latest
-    needs: [changed, plan, build]
-    if: ${{ needs.plan.outputs.is_release == 'true' }}
-    strategy:
-      matrix:
-        container: ${{ fromJson(needs.changed.outputs.containers) }}
-    steps:
-      - name: Download digests
-        uses: actions/download-artifact@v4
+      - if: ${{ ! inputs.release }}
+        name: Run Application Tests
+        uses: ./.github/actions/app-tests
         with:
-          pattern: digests-${{ matrix.container }}-*
-          path: /tmp/digests
+          app: ${{ inputs.app }}
+          image: ${{ fromJSON(steps.bake.outputs.metadata).image['containerimage.config.digest'] }}
+          token: ${{ github.token }}
+
+      - if: ${{ inputs.release }}
+        name: Export Digest
+        run: |
+          mkdir -p ${{ runner.temp }}/digests
+          DIGEST="${{ fromJSON(steps.bake.outputs.metadata).image['containerimage.digest'] }}"
+          touch "${{ runner.temp }}/digests/${DIGEST#sha256:}"
+
+      - if: ${{ inputs.release }}
+        name: Upload Digest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ inputs.app }}-digests-${{ steps.target.outputs.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  release:
+    if: ${{ inputs.release }}
+    name: Release
+    runs-on: ubuntu-latest
+    needs: ["build"]
+    outputs:
+      digest: ${{ steps.digest.outputs.digest }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Download Bake Metadata
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ${{ inputs.app }}-bake-metadata
+          path: ${{ runner.temp }}
+
+      - name: Download Digests
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: ${{ inputs.app }}-digests-*
           merge-multiple: true
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3.11.1
-
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3.4.0
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
-      - name: Create manifest list and push
-        working-directory: /tmp/digests
+      - name: Create Manifest List and Push
+        working-directory: ${{ runner.temp }}/digests
         run: |
-          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf 'ghcr.io/${{ github.actor }}/${{ matrix.container }}@sha256:%s ' *)
+          docker buildx imagetools create \
+              $(jq --raw-output --compact-output '.target."docker-metadata-action".tags | map(select(startswith("ghcr.io/${{ github.repository_owner }}/${{ inputs.app }}")) | "-t " + .) | join(" ")' ${{ runner.temp }}/docker-metadata-action-bake.json) \
+              $(printf 'ghcr.io/${{ github.repository_owner }}/${{ inputs.app }}@sha256:%s ' *)
 
-      - name: Inspect image
+      - name: Inspect Image
         run: |
-          docker buildx imagetools inspect ghcr.io/${{ github.actor }}/${{ matrix.container }}:latest
+          docker buildx imagetools inspect ghcr.io/${{ github.repository_owner }}/${{ inputs.app }}:$(jq --raw-output '.target."docker-metadata-action".args.DOCKER_META_VERSION' ${{ runner.temp }}/docker-metadata-action-bake.json)
+
+      - name: Export Digest
+        id: digest
+        run: |
+          TAG=$(jq --raw-output '.target."docker-metadata-action".args.DOCKER_META_VERSION' ${{ runner.temp }}/docker-metadata-action-bake.json)
+          DIGEST=$(docker buildx imagetools inspect ghcr.io/${{ github.repository_owner }}/${{ inputs.app }}:${TAG} --format '{{ json . }}' | jq --raw-output '.manifest.digest')
+          echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
 
   attest:
+    if: ${{ inputs.release }}
+    name: Attest
+    needs: ["release"]
     runs-on: ubuntu-latest
-    needs: [changed, plan, release]
-    if: ${{ needs.plan.outputs.is_release == 'true' }}
-    strategy:
-      matrix:
-        container: ${{ fromJson(needs.changed.outputs.containers) }}
-    permissions:
-      attestations: write
-      id-token: write
     steps:
-      - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v1
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
         with:
-          subject-name: ghcr.io/${{ github.actor }}/${{ matrix.container }}
-          subject-digest: ${{ needs.build.outputs.image-digest }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Upload Dependency Snapshot
+        uses: anchore/sbom-action@9246b90769f852b3a8921f330c59e0b3f439d6e9 # v0.20.1
+        with:
+          dependency-snapshot: true
+          image: ghcr.io/${{ github.repository_owner }}/${{ inputs.app }}@${{ needs.release.outputs.digest }}
+
+      - name: Attestation
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          push-to-registry: true
+          subject-name: ghcr.io/${{ github.repository_owner }}/${{ inputs.app }}
+          subject-digest: ${{ needs.release.outputs.digest }}
+
+      - name: Verify Attestation
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          gh attestation verify --repo ${{ github.repository }} oci://ghcr.io/${{ github.repository_owner }}/${{ inputs.app }}@${{ needs.release.outputs.digest }}
 
   status:
-    if: ${{ always() }}
+    if: ${{ !cancelled() }}
+    name: Build Success
+    needs: ["release"]
     runs-on: ubuntu-latest
-    name: Build status
-    needs: [build, release, attest]
     steps:
-      - run: |
-          result="${{ needs.build.result }}"
-          if [[ $result == "success" || $result == "skipped" ]]; then
-            exit 0
-          else
-            exit 1
-          fi
+      - name: Any jobs failed?
+        if: ${{ contains(needs.*.result, 'failure') }}
+        run: exit 1
+
+      - name: All jobs passed or skipped?
+        if: ${{ !(contains(needs.*.result, 'failure')) }}
+        run: echo "All jobs passed or skipped" && echo "${{ toJSON(needs.*.result) }}"

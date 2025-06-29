@@ -1,0 +1,31 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/github-action.json
+name: Application Tests
+description: Takes an app, container image and token then runs container tests
+
+inputs:
+  app:
+    description: Application Name
+    required: true
+  image:
+    description: Image
+    required: true
+  token:
+    description: GitHub Token
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Actions Script Path
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+      shell: bash
+      run: |
+        gh release download --repo GoogleContainerTools/container-structure-test --pattern "*-linux-$(dpkg --print-architecture)" --output /usr/local/bin/container-structure-test
+        chmod +x /usr/local/bin/container-structure-test
+
+    - name: Run Tests
+      shell: bash
+      run: |
+        container-structure-test test --image "${IMAGE}" --config "./containers/${APP}/tests.yaml"
