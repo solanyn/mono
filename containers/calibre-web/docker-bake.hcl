@@ -1,5 +1,5 @@
 variable "APP" {
-  default = "calibre"
+  default = "calibre-web"
 }
 
 variable "KEPUBIFY_VERSION" {
