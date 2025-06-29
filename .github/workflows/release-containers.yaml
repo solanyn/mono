@@ -58,7 +58,7 @@ jobs:
     if: ${{ needs.changed.outputs.apps != '[]' }}
     name: Build ${{ matrix.app }}
     needs: ["changed"]
-    uses: ./.github/workflows/app-builder.yaml
+    uses: ./.github/workflows/build-containers.yaml
     permissions:
       attestations: write
       contents: write
