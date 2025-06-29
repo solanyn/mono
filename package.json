@@ -7,9 +7,8 @@
     "tldr/frontend"
   ],
   "scripts": {},
-  "dependencies": {},
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^22.15.34",
     "typescript": "5.8.3"
   }
 }
