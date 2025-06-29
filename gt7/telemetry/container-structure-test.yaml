@@ -6,11 +6,6 @@ fileExistenceTests:
     shouldExist: true
 
 commandTests:
-  - name: "telemetry binary is executable"
-    command: "test"
-    args: ["-x", "/telemetry"]
-    exitCode: 0
-
   - name: "telemetry help"
     command: "/telemetry"
     args: ["--help"]

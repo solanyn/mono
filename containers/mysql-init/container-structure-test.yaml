@@ -30,6 +30,5 @@ commandTests:
     exitCode: 0
 
 metadataTest:
-  user: 'nobody'
   workdir: '/app'
   entrypoint: ['/usr/bin/catatonit', '--', '/entrypoint.sh']

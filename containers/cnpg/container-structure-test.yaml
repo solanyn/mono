@@ -18,7 +18,7 @@ commandTests:
   - name: 'psql available'
     command: '/usr/lib/postgresql/17/bin/psql'
     args: ['--version']
-    expectedOutput: ['psql (PostgreSQL)']
+    expectedOutput: ['psql (PostgreSQL) 17']
 
 metadataTest:
   user: 'postgres'
