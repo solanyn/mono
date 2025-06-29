@@ -4,7 +4,7 @@ variable "APP" {
 
 variable "AIRFLOW_TAG" {
   // renovate: datasource=docker depName=apache/airflow
-  default = "3.0.1"
+  default = "3.0.2"
 }
 
 variable "REGISTRY" {
