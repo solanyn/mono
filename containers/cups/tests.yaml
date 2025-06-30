@@ -26,4 +26,3 @@ commandTests:
 metadataTest:
   exposedPorts: ["631"]
   entrypoint: ["/entrypoint.sh"]
-

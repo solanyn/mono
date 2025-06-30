@@ -9,6 +9,11 @@ variable "DEBIAN_VERSION" {
   default = "bookworm-slim"
 }
 
+variable "YQ_VERSION" {
+  // renovate: datasource=github depName=mikefarah/yq
+  default = "4.45.4"
+}
+
 variable "REGISTRY" {
   default = "ghcr.io/solanyn"
 }
@@ -28,6 +33,7 @@ group "default" {
 target "image" {
   args = {
     DEBIAN_VERSION = "${DEBIAN_VERSION}"
+    YQ_VERSION = "${YQ_VERSION}"
   }
   labels = {
     "org.opencontainers.image.source" = "${SOURCE}"
