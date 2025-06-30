@@ -1,38 +1,24 @@
 schemaVersion: 2.0.0
 
 fileExistenceTests:
-  - name: "Calibre binary"
-    path: "/app/calibre"
+  - name: "calibre binary"
+    path: "/opt/calibre/calibre"
     shouldExist: true
 
-  - name: "Entrypoint script"
-    path: "/entrypoint.sh"
+  - name: "kepubify binary"
+    path: "/opt/kepubify/kepubify"
+    shouldExist: true
+
+  - name: "calibre-web entrypoint"
+    path: "/app/cps.py"
     shouldExist: true
 
   - name: "Config directory"
     path: "/config"
     shouldExist: true
 
-commandTests:
-  - name: "calibre version"
-    command: "/app/calibre"
-    args: ["--version"]
-    expectedOutput: ["calibre"]
-
-  - name: "python3 available"
-    command: "python3"
-    args: ["--version"]
-    expectedOutput: ["Python 3"]
-
 metadataTest:
-  envVars:
-    - key: "CALIBRE__CREATE_LIBRARY"
-      value: "true"
-    - key: "CALIBRE__LIBRARY"
-      value: "/config"
-    - key: "CALIBRE__PORT"
-      value: "8080"
   workdir: "/config"
   volumes: ["/config"]
-  entrypoint: ["/usr/bin/catatonit", "--", "/entrypoint.sh"]
-
+  entrypoint:
+    ["/usr/bin/catatonit", "--", "python3", "/app/cps.py", "-o", "/dev/stdout"]

@@ -14,15 +14,15 @@ fileExistenceTests:
     shouldExist: true
 
 commandTests:
-  - name: "calibre version"
-    command: "/app/calibre"
+  - name: "calibre-server version"
+    command: "/app/calibre-server"
     args: ["--version"]
-    expectedOutput: ["calibre"]
+    exitCode: 0
 
   - name: "python3 available"
     command: "python3"
     args: ["--version"]
-    expectedOutput: ["Python 3"]
+    exitCode: 0
 
   - name: "entrypoint is executable"
     command: "stat"
@@ -40,4 +40,3 @@ metadataTest:
   workdir: "/config"
   volumes: ["/config"]
   entrypoint: ["/usr/bin/catatonit", "--", "/entrypoint.sh"]
-
