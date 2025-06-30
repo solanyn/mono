@@ -5,8 +5,8 @@ use std::time::Duration;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 
-use gt7_telemetry_core::flags::PacketFlags;
-use gt7_telemetry_core::packet::Packet;
+use lib::flags::PacketFlags;
+use lib::packet::Packet;
 
 type KafkaMessagePayload = Vec<u8>;
 
@@ -97,8 +97,8 @@ impl KafkaHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gt7_telemetry_core::flags::PacketFlags;
-    use gt7_telemetry_core::packet::Packet;
+    use lib::flags::PacketFlags;
+    use lib::packet::Packet;
     use tokio::sync::mpsc;
 
     impl KafkaHandler {

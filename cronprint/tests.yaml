@@ -2,8 +2,9 @@ schemaVersion: 2.0.0
 
 fileExistenceTests:
   - name: "cronprint executable exists"
-    path: "/cronprint/cronprint_app"
+    path: "/cronprint/app"
     shouldExist: true
 
 metadataTest:
-  entrypoint: ["/cronprint/cronprint_app"]
+  entrypoint: ["/cronprint/app"]
+

@@ -82,5 +82,6 @@ container_structure_test(
     configs = ["tests.yaml"],
     image = ":image",
     visibility = ["//visibility:public"],
+    size="small",
 )
 

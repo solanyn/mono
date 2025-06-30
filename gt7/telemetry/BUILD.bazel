@@ -48,7 +48,7 @@ rust_binary(
     edition = "2021",
     visibility = ["//visibility:public"],
     deps = [
-        ":gt7_telemetry_core",
+        ":lib",
         "@crates//:axum",
         "@crates//:axum-extra",
         "@crates//:env_logger",
@@ -93,6 +93,7 @@ oci_push(
 container_structure_test(
     name = "container_test",
     configs = ["tests.yaml"],
-    image = ":telemetry_image",
+    image = ":image",
     visibility = ["//visibility:public"],
+    size="small",
 )

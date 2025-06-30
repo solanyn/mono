@@ -2,6 +2,5 @@ schemaVersion: 2.0.0
 
 fileExistenceTests:
   - name: "telemetry binary"
-    path: "/gt7/telemetry/telemetry_server"
+    path: "/gt7/telemetry/app"
     shouldExist: true
-

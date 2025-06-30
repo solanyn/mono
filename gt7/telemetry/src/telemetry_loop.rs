@@ -1,5 +1,5 @@
 use crate::kafka_handler::KafkaHandler;
-use gt7_telemetry_core::{
+use lib::{
     config::Config,
     constants::{PACKET_HEARTBEAT_DATA, PACKET_SIZE},
     errors::ParsePacketError,

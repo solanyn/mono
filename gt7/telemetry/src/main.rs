@@ -1,5 +1,5 @@
 use env_logger::Env;
-use gt7_telemetry_core::config::Config;
+use lib::config::Config;
 use log::error;
 use std::process;
 use std::sync::Arc;
