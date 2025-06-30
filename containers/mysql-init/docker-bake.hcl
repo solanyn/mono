@@ -9,7 +9,7 @@ variable "ALPINE_VERSION" {
 
 variable "MYSQL_CLIENT_VERSION" {
   // renovate: datasource=repology depName=alpine_3_22/mysql-client versioning=loose
-  default = "11.4.5-r2"
+  default = "11"
 }
 
 variable "VERSION" {
