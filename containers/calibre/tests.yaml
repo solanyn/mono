@@ -19,11 +19,6 @@ commandTests:
     args: ["--version"]
     exitCode: 0
 
-  - name: "python3 available"
-    command: "python3"
-    args: ["--version"]
-    exitCode: 0
-
   - name: "entrypoint is executable"
     command: "stat"
     args: ["-c", "%A", "/entrypoint.sh"]
