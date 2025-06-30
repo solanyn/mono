@@ -1,8 +1,9 @@
 ARG DEBIAN_VERSION
-ARG YQ_VERSION
-ARG TARGETARCH
 
 FROM debian:${DEBIAN_VERSION}
+
+ARG YQ_VERSION
+ARG TARGETARCH
 
 RUN apt-get update && apt-get install -y \
   cups \
