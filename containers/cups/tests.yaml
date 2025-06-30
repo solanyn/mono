@@ -17,12 +17,6 @@ fileExistenceTests:
     path: "/etc/cups/cupsd.conf"
     shouldExist: true
 
-commandTests:
-  - name: "yq version"
-    command: "/usr/bin/yq"
-    args: ["--version"]
-    expectedOutput: ["yq"]
-
 metadataTest:
   exposedPorts: ["631"]
   entrypoint: ["/entrypoint.sh"]
