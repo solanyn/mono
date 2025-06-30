@@ -10,7 +10,7 @@ RUN \
   bash \
   ca-certificates \
   catatonit \
-  mysql-client=${MYSQL_CLIENT_VERSION}
+  mysql-client~${MYSQL_CLIENT_VERSION}
 
 COPY entrypoint.sh /entrypoint.sh
 
