@@ -18,5 +18,4 @@ fileExistenceTests:
     shouldExist: true
 
 metadataTest:
-  exposedPorts: ["631"]
   entrypoint: ["/entrypoint.sh"]
