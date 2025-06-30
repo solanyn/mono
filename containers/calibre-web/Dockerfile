@@ -1,5 +1,6 @@
 ARG DEBIAN_VERSION=bookworm-slim
 ARG TARGETARCH
+ARG TARGETARCH=${TARGETARCH/amd64/64bit}
 ARG CALIBRE_ARCH=${TARGETARCH/amd64/64bit}
 ARG KEPUBIFY_VERSION
 ARG CALIBRE_VERSION
@@ -52,13 +53,13 @@ RUN \
   mkdir -p /app \
   && curl -fsSL https://github.com/janeczku/calibre-web/archive/${CALIBRE_WEB_VERSION}.tar.gz \
   | tar xzf - -C /app --strip-components=1 \
-  && sed -i '/netifaces-plus/d' /app/requirements.txt \
   && pip install --upgrade --requirement /app/requirements.txt \
+  && pip install --upgrade --requirement /app/optional-requirements.txt \
   # kepubify
   && mkdir -p /opt/kepubify \
   && curl -o \
   /opt/kepubify/kepubify -L \
-  "https://github.com/pgaskin/kepubify/releases/download/v${KEPUBIFY_VERSION}/kepubify-linux-64bit" \
+  "https://github.com/pgaskin/kepubify/releases/download/v${KEPUBIFY_VERSION}/kepubify-linux-${TARGETARCH}" \
   && chmod +x /opt/kepubify/kepubify \
   # calibre
   && mkdir -p /opt/calibre \

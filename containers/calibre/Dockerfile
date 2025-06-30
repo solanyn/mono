@@ -2,9 +2,9 @@ ARG DEBIAN_VERSION=bookworm-slim
 
 FROM debian:${DEBIAN_VERSION}
 
-ARG TARGETARCH
 ARG CALIBRE_VERSION
-ARG CALIBRE_ARCH=${TARGETARCH/amd64/x86_64}
+ARG TARGETARCH
+ARG TARGETARCH=${TARGETARCH/amd64/x86_64}
 
 ENV CALIBRE__CREATE_LIBRARY="true" \
   CALIBRE__LIBRARY="/config" \
@@ -19,7 +19,7 @@ RUN \
   catatonit \
   xz-utils \
   && mkdir -p /app \
-  && curl -fsSL "https://github.com/kovidgoyal/calibre/releases/download/v${CALIBRE_VERSION}/calibre-${CALIBRE_VERSION}-${CALIBRE_ARCH}.txz" \
+  && curl -fsSL "https://github.com/kovidgoyal/calibre/releases/download/v${CALIBRE_VERSION}/calibre-${CALIBRE_VERSION}-${TARGETARCH}}.txz" \
   | tar Jxvf - -C /app \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/* /tmp/* \
