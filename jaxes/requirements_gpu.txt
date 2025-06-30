@@ -1,3 +1,3 @@
 numpy
-jax[cuda12]>=0.4.35
-jaxlib>=0.4.35
+jax[cuda12]
+jaxlib

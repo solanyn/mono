@@ -1,27 +1,9 @@
 load("@aspect_bazel_lib//lib:expand_template.bzl", "expand_template")
 load("@aspect_bazel_lib//lib:tar.bzl", "tar")
 load("@aspect_rules_py//py:defs.bzl", "py_binary", "py_library")
-load("@rules_multirun//:defs.bzl", "multirun")
-load("@rules_uv//uv:pip.bzl", "pip_compile")
-load("@rules_uv//uv:venv.bzl", "create_venv")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
 load("@container_structure_test//:defs.bzl", "container_structure_test")
-
-
-package(default_visibility = ["//visibility:public"])
-
-
-pip_compile(
-    name = "requirements",
-    requirements_in = ":requirements.txt",
-    requirements_txt = ":requirements_lock.txt",
-)
-
-create_venv(
-    name = "venv",
-    destination_folder = "cronprint/.venv",
-    requirements_txt = "requirements_lock.txt",
-)
+load("@rules_uv//uv:pip.bzl", "pip_compile")
 
 py_library(
     name = "lib",
@@ -31,13 +13,23 @@ py_library(
         "printer.py",
         "scheduler.py",
     ],
+    deps = [
+        "@cronprint_deps//fastapi:pkg",
+        "@cronprint_deps//uvicorn:pkg",
+        "@cronprint_deps//apscheduler:pkg",
+        "@cronprint_deps//pycups:pkg",
+        "@cronprint_deps//requests:pkg",
+    ],
 )
 
 py_binary(
     name = "app",
     srcs = ["main.py"],
     main = "main.py",
-    deps = [":lib"],
+    imports = ["."],
+    deps = [
+        ":lib",
+    ],
 )
 
 tar(
@@ -83,5 +75,12 @@ container_structure_test(
     image = ":image",
     visibility = ["//visibility:public"],
     size="small",
+)
+
+pip_compile(
+    name = "requirements",
+    requirements_in = "requirements.txt",
+    requirements_txt = "requirements_lock.txt",
+    visibility = ["//visibility:public"],
 )
 
