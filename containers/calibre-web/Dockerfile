@@ -51,7 +51,7 @@ RUN \
   && \
   # calibre-web
   mkdir -p /app \
-  && curl -fsSL https://github.com/janeczku/calibre-web/archive/${CALIBRE_WEB_VERSION}.tar.gz \
+  && curl -fsSL https://github.com/janeczku/calibre-web/archive/refs/tags/${CALIBRE_WEB_VERSION}.tar.gz \
   | tar xzf - -C /app --strip-components=1 \
   && pip install --upgrade --requirement /app/requirements.txt \
   && pip install --upgrade --requirement /app/optional-requirements.txt \
