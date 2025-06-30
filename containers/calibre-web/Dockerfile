@@ -50,7 +50,7 @@ RUN \
   && \
   # calibre-web
   mkdir -p /app \
-  && curl -fsSL https://github.com/janeczku/calibre-web/archive/0.6.24.tar.gz \
+  && curl -fsSL https://github.com/janeczku/calibre-web/archive/${CALIBRE_WEB_VERSION}.tar.gz \
   | tar xzf - -C /app --strip-components=1 \
   && sed -i '/netifaces-plus/d' /app/requirements.txt \
   && pip install --upgrade --requirement /app/requirements.txt \
@@ -58,11 +58,11 @@ RUN \
   && mkdir -p /opt/kepubify \
   && curl -o \
   /opt/kepubify/kepubify -L \
-  "https://github.com/pgaskin/kepubify/releases/download/v4.0.4/kepubify-linux-64bit" \
+  "https://github.com/pgaskin/kepubify/releases/download/v${KEPUBIFY_VERSION}/kepubify-linux-64bit" \
   && chmod +x /opt/kepubify/kepubify \
   # calibre
   && mkdir -p /opt/calibre \
-  && curl -fsSL "https://github.com/kovidgoyal/calibre/releases/download/v8.5.0/calibre-8.5.0-arm64.txz" \
+  && curl -fsSL "https://github.com/kovidgoyal/calibre/releases/download/v${CALIBRE_VERSION}/calibre-${CALIBRE_VERSION}-${CALIBRE_ARCH}.txz" \
   | tar Jxvf - -C /opt/calibre \
   && apt-get purge -y \
   libldap2-dev \

@@ -19,7 +19,7 @@ RUN \
   catatonit \
   xz-utils \
   && mkdir -p /app \
-  && curl -fsSL "https://github.com/kovidgoyal/calibre/releases/download/v8.5.0/calibre-8.5.0-arm64.txz" \
+  && curl -fsSL "https://github.com/kovidgoyal/calibre/releases/download/v${CALIBRE_VERSION}/calibre-${CALIBRE_VERSION}-${CALIBRE_ARCH}.txz" \
   | tar Jxvf - -C /app \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/* /tmp/* \
