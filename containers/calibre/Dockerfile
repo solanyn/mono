@@ -1,10 +1,10 @@
-ARG UBUNTU_VERSION
+ARG DEBIAN_VERSION=bookworm-slim
 
-FROM ubuntu:${UBUNTU_VERSION}
+FROM debian:${DEBIAN_VERSION}
 
 ARG TARGETARCH
-ARG TARGETARCH=${TARGETARCH/amd64/x86_64}
 ARG CALIBRE_VERSION
+ARG CALIBRE_ARCH=${TARGETARCH/amd64/x86_64}
 
 ENV CALIBRE__CREATE_LIBRARY="true" \
   CALIBRE__LIBRARY="/config" \
@@ -12,40 +12,19 @@ ENV CALIBRE__CREATE_LIBRARY="true" \
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# hadolint ignore=DL3008,DL3015,SC2086
 RUN \
-  apt-get -qq update \
-  && \
-  apt-get -qq install -y \
+  apt-get update && apt-get install -y --no-install-recommends \
   curl \
+  ca-certificates \
   catatonit \
-  libegl1 \
-  libfontconfig1 \
-  libgl1 \
-  libglx-mesa0 \
-  libopengl0 \
-  libxdamage1 \
-  libxkbcommon0 \
-  python3 \
   xz-utils \
-  && \
-  mkdir -p /opt/calibre \
   && mkdir -p /app \
-  && \
-  curl -fsSL "https://download.calibre-ebook.com/${CALIBRE_VERSION}/calibre-${CALIBRE_VERSION}-${TARGETARCH}.txz" \
+  && curl -fsSL "https://github.com/kovidgoyal/calibre/releases/download/v8.5.0/calibre-8.5.0-arm64.txz" \
   | tar Jxvf - -C /app \
-  && /app/calibre_postinstall \
-  && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
-  && apt-get autoremove -y \
   && apt-get clean \
-  && \
-  rm -rf \
-  /tmp/* \
-  /var/lib/apt/lists/* \
-  /var/tmp/ \
+  && rm -rf /var/lib/apt/lists/* /tmp/* \
   && chown -R root:root /app \
-  && chmod -R 755 /app \
-  && printf "umask %d" "${UMASK}" >> /etc/bash.bashrc
+  && chmod -R 755 /app
 
 COPY ./entrypoint.sh /entrypoint.sh
 

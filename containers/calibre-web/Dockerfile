@@ -1,8 +1,11 @@
-ARG UBUNTU_VERSION
+ARG DEBIAN_VERSION=bookworm-slim
 ARG TARGETARCH
-ARG CALIBRE_ARCH=${TARGETARCH/amd64/x86_64}
+ARG CALIBRE_ARCH=${TARGETARCH/amd64/64bit}
+ARG KEPUBIFY_VERSION
+ARG CALIBRE_VERSION
+ARG CALIBRE_WEB_VERSION
 
-FROM ubuntu:${UBUNTU_VERSION}
+FROM debian:${DEBIAN_VERSION}
 
 ENV \
   PYTHONDONTWRITEBYTECODE=1 \
@@ -16,22 +19,15 @@ ENV CALIBRE_DBPATH=/config
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# hadolint ignore=DL3008,DL3015,SC2086
 RUN \
-  apt-get update \
-  && \
-  apt-get install -y \
+  apt-get update && apt-get install -y --no-install-recommends \
   curl \
+  ca-certificates \
   catatonit \
   imagemagick \
-  libegl1 \
-  libfontconfig1 \
-  libgl1 \
-  libglx-mesa0 \
-  libldap2 \
-  libnss3 \
-  libopengl0 \
+  libldap-2.5-0 \
   libsasl2-2 \
+  libx11-6 \
   libxcomposite1 \
   libxdamage1 \
   libxi6 \
@@ -40,44 +36,47 @@ RUN \
   libxslt1.1 \
   python3 \
   python3-pip \
-  python3-pkg-resources \
+  xz-utils \
   && \
-  # Dev
-  apt-get install -y \
+  # Build deps
+  apt-get install -y --no-install-recommends \
   libldap2-dev \
   libsasl2-dev \
   python3-dev \
   gcc \
   g++ \
+  libc6-dev \
+  linux-libc-dev \
   && \
   # calibre-web
   mkdir -p /app \
-  && curl -fsSL https://github.com/janeczku/calibre-web/archive/refs/tags/${CALIBRE_WEB_VERSION}.tar.gz \
+  && curl -fsSL https://github.com/janeczku/calibre-web/archive/0.6.24.tar.gz \
   | tar xzf - -C /app --strip-components=1 \
+  && sed -i '/netifaces-plus/d' /app/requirements.txt \
   && pip install --upgrade --requirement /app/requirements.txt \
-  && pip install --upgrade --requirement /app/optional-requirements.txt \
   # kepubify
   && mkdir -p /opt/kepubify \
   && curl -o \
   /opt/kepubify/kepubify -L \
-  "https://github.com/pgaskin/kepubify/releases/download/v${KEPUBIFY_VERSION}/kepubify-linux-${TARGETARCH}" \
+  "https://github.com/pgaskin/kepubify/releases/download/v4.0.4/kepubify-linux-64bit" \
+  && chmod +x /opt/kepubify/kepubify \
   # calibre
   && mkdir -p /opt/calibre \
-  && curl -fsSL "https://download.calibre-ebook.com/${CALIBRE_VERSION}/calibre-${CALIBRE_VERSION}-${CALIBRE_ARCH}.txz" \
+  && curl -fsSL "https://github.com/kovidgoyal/calibre/releases/download/v8.5.0/calibre-8.5.0-arm64.txz" \
   | tar Jxvf - -C /opt/calibre \
-  && /app/calibre_postinstall \
-  && apt-get purge -y --auto-remove libldap2-dev libsasl2-dev python3-dev gcc g++\
-  && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
+  && apt-get purge -y \
+  libldap2-dev \
+  libsasl2-dev \
+  python3-dev \
+  gcc \
+  g++ \
+  libc6-dev \
+  linux-libc-dev \
   && apt-get autoremove -y \
   && apt-get clean \
-  && \
-  rm -rf \
-  /tmp/* \
-  /var/lib/apt/lists/* \
-  /var/tmp/ \
+  && rm -rf /var/lib/apt/lists/* /tmp/* \
   && chown -R root:root /app \
-  && chmod -R 755 /app \
-  && printf "umask %d" "${UMASK}" >> /etc/bash.bashrc
+  && chmod -R 755 /app
 
 USER nobody:nogroup
 WORKDIR /config

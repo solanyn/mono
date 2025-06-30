@@ -9,9 +9,9 @@ variable "CALIBRE_VERSION" {
   default = "8.5.0"
 }
 
-variable "UBUNTU_VERSION" {
-  // renovate: datasource=docker depName=ubuntu
-  default = "24.04"
+variable "DEBIAN_VERSION" {
+  // renovate: datasource=docker depName=debian
+  default = "bookworm-slim"
 }
 
 variable "VERSION" {
@@ -29,7 +29,7 @@ group "default" {
 target "image" {
   args = {
     CALIBRE_VERSION = "${CALIBRE_VERSION}"
-    UBUNTU_VERSION = "${UBUNTU_VERSION}"
+    DEBIAN_VERSION = "${DEBIAN_VERSION}"
   }
   labels = {
     "org.opencontainers.image.source" = "${SOURCE}"

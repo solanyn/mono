@@ -1,13 +1,15 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
-if [[ "${CALIBRE__CREATE_LIBRARY}" == "true" && ! -f "${CALIBRE__LIBRARY}/metadata.db" ]]; then
+export LD_LIBRARY_PATH="/app/lib:${LD_LIBRARY_PATH}"
+
+if [ "${CALIBRE__CREATE_LIBRARY}" = "true" ] && [ ! -f "${CALIBRE__LIBRARY}/metadata.db" ]; then
   # Populate a blank library
-  /app/calibredb --library-path="${CALIBRE__LIBRARY}" list
+  /app/bin/calibredb --library-path="${CALIBRE__LIBRARY}" list
 fi
 
 #shellcheck disable=SC2086
 exec \
-  /app/calibre-server \
+  /app/bin/calibre-server \
   --port=${CALIBRE__PORT} \
   ${CALIBRE__LIBRARY} \
   "$@"

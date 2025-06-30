@@ -19,9 +19,9 @@ variable "CALIBRE_WEB_VERSION" {
   default = "0.6.24"
 }
 
-variable "UBUNTU_VERSION" {
-  // renovate: datasource=docker depName=ubuntu
-  default = "24.04"
+variable "DEBIAN_VERSION" {
+  // renovate: datasource=docker depName=debian
+  default = "bookworm-slim"
 }
 
 variable "VERSION" {
@@ -41,7 +41,7 @@ target "image" {
     CALIBRE_VERSION = "${CALIBRE_VERSION}"
     CALIBRE_WEB_VERSION = "${CALIBRE_WEB_VERSION}"
     KEPUBIFY_VERSION = "${KEPUBIFY_VERSION}"
-    UBUNTU_VERSION = "${UBUNTU_VERSION}"
+    DEBIAN_VERSION = "${DEBIAN_VERSION}"
   }
   labels = {
     "org.opencontainers.image.source" = "${SOURCE}"
