@@ -1,0 +1,9 @@
+schemaVersion: 2.0.0
+
+fileExistenceTests:
+  - name: "cronprint executable exists"
+    path: "/cronprint/cronprint_app"
+    shouldExist: true
+
+metadataTest:
+  entrypoint: ["/cronprint/cronprint_app"]

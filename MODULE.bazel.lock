@@ -872,7 +872,7 @@
     "@@rules_oci+//oci:extensions.bzl%oci": {
       "general": {
         "bzlTransitiveDigest": "y6GRuwGM7WCiVKZTyPKoDYJYUcp9tcPDSuFjR0cNePY=",
-        "usagesDigest": "bDn72/D9NoL/RmT9gXBovVtuIv1xSiPNROptRoXwOKE=",
+        "usagesDigest": "RnPBFkzUES1WOOtgoV68G9vJs6flbvBtlIyu7IATMR8=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -917,6 +917,49 @@
                 "@@platforms//cpu:arm64": "@distroless_cc_linux_arm64_v8"
               },
               "bzlmod_repository": "distroless_cc",
+              "reproducible": true
+            }
+          },
+          "distroless_base_linux_amd64": {
+            "repoRuleId": "@@rules_oci+//oci/private:pull.bzl%oci_pull",
+            "attributes": {
+              "www_authenticate_challenges": {},
+              "scheme": "https",
+              "registry": "gcr.io",
+              "repository": "distroless/base-debian12",
+              "identifier": "latest",
+              "platform": "linux/amd64",
+              "target_name": "distroless_base_linux_amd64",
+              "bazel_tags": []
+            }
+          },
+          "distroless_base_linux_arm64_v8": {
+            "repoRuleId": "@@rules_oci+//oci/private:pull.bzl%oci_pull",
+            "attributes": {
+              "www_authenticate_challenges": {},
+              "scheme": "https",
+              "registry": "gcr.io",
+              "repository": "distroless/base-debian12",
+              "identifier": "latest",
+              "platform": "linux/arm64/v8",
+              "target_name": "distroless_base_linux_arm64_v8",
+              "bazel_tags": []
+            }
+          },
+          "distroless_base": {
+            "repoRuleId": "@@rules_oci+//oci/private:pull.bzl%oci_alias",
+            "attributes": {
+              "target_name": "distroless_base",
+              "www_authenticate_challenges": {},
+              "scheme": "https",
+              "registry": "gcr.io",
+              "repository": "distroless/base-debian12",
+              "identifier": "latest",
+              "platforms": {
+                "@@platforms//cpu:x86_64": "@distroless_base_linux_amd64",
+                "@@platforms//cpu:arm64": "@distroless_base_linux_arm64_v8"
+              },
+              "bzlmod_repository": "distroless_base",
               "reproducible": true
             }
           },
@@ -1038,7 +1081,10 @@
           "explicitRootModuleDirectDeps": [
             "distroless_cc",
             "distroless_cc_linux_amd64",
-            "distroless_cc_linux_arm64_v8"
+            "distroless_cc_linux_arm64_v8",
+            "distroless_base",
+            "distroless_base_linux_amd64",
+            "distroless_base_linux_arm64_v8"
           ],
           "explicitRootModuleDirectDevDeps": [],
           "useAllRepos": "NO",

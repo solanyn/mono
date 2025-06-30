@@ -1,6 +1,11 @@
+load("@aspect_bazel_lib//lib:expand_template.bzl", "expand_template")
+load("@aspect_bazel_lib//lib:tar.bzl", "tar")
+load("@aspect_rules_py//py:defs.bzl", "py_binary", "py_library")
 load("@rules_multirun//:defs.bzl", "multirun")
 load("@rules_uv//uv:pip.bzl", "pip_compile")
 load("@rules_uv//uv:venv.bzl", "create_venv")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
+load("@container_structure_test//:defs.bzl", "container_structure_test")
 
 
 package(default_visibility = ["//visibility:public"])
@@ -18,4 +23,64 @@ create_venv(
     requirements_txt = "requirements_lock.txt",
 )
 
+py_library(
+    name = "lib",
+    srcs = [
+        "config.py",
+        "health.py",
+        "printer.py",
+        "scheduler.py",
+    ],
+)
+
+py_binary(
+    name = "app",
+    srcs = ["main.py"],
+    main = "main.py",
+    deps = [":lib"],
+)
+
+tar(
+    name = "app_layer",
+    srcs = [":app"],
+)
+
+oci_image(
+    name = "image",
+    base = "@distroless_base",
+    entrypoint = ["/cronprint/app"],
+    tars = [":app_layer"],
+    visibility = ["//visibility:public"],
+)
+
+expand_template(
+    name = "stamped_tags",
+    out = "_stamped_tags.txt",
+    template = ["latest\n{{VERSION}}"],
+    stamp_substitutions = {
+        "{{VERSION}}": "{{STABLE_VERSION}}",
+    },
+)
+
+oci_load(
+    name = "tarball",
+    image = ":image",
+    repo_tags = ["ghcr.io/solanyn/cronprint:latest"],
+    visibility = ["//visibility:public"],
+)
+
+oci_push(
+    name = "push",
+    image = ":image",
+    repository = "ghcr.io/solanyn/cronprint",
+    remote_tags = ":stamped_tags",
+    visibility = ["//visibility:public"],
+)
+
+container_structure_test(
+    name = "container_test",
+    configs = ["tests.yaml"],
+    image = ":image",
+    visibility = ["//visibility:public"],
+)
 
