@@ -37,6 +37,7 @@ group "default" {
 
 target "image" {
   args = {
+    DEBIAN_VERSION = "${DEBIAN_VERSION}"
     CNPG_VERSION = "${CNPG_VERSION}"
     TIMESCALEDB_VERSION = "${TIMESCALEDB_VERSION}"
     PG_MAJOR = "${PG_MAJOR}"
