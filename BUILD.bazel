@@ -13,7 +13,7 @@ multirun(
     name = "requirements",
     commands = [
         "//jaxes:requirements",
-        "//cronprint:requirements", 
+        "//cronprint:requirements",
         "//torches:requirements",
     ],
 )
