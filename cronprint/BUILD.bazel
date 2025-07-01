@@ -55,7 +55,7 @@ expand_template(
 )
 
 oci_load(
-    name = "tarball",
+    name = "load",
     image = ":image",
     repo_tags = ["ghcr.io/solanyn/cronprint:latest"],
     visibility = ["//visibility:public"],

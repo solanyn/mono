@@ -1,37 +1,50 @@
-load("@aspect_rules_py//py:defs.bzl", "py_binary")
 load("@rules_uv//uv:pip.bzl", "pip_compile")
+load("@rules_uv//uv:venv.bzl", "create_venv")
 load("@rules_multirun//:defs.bzl", "multirun")
-
-py_binary(
-    name = "main",
-    srcs = ["main.py"],
-    main = "main.py",
-    deps = [
-        "@torches_deps//torch:pkg",
-        "@torches_deps//numpy:pkg",
-    ],
-)
+load("@buildx//:defs.bzl", "buildx", "context")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
 
 pip_compile(
-    name = "requirements_gpu",
-    requirements_in = "requirements_gpu.txt",
-    requirements_txt = "requirements_gpu_lock.txt",
-)
-
-pip_compile(
-    name = "requirements_darwin",
-    requirements_in = "requirements_darwin.txt",
-    requirements_txt = "requirements_darwin_lock.txt",
-)
-
-multirun(
     name = "requirements",
-    commands = [
-        ":requirements_gpu",
-        ":requirements_darwin",
-    ],
-    # Running in a single threaded mode allows consecutive `uv` invocations to benefit
-    # from the `uv` cache from the first run.
-    jobs = 1,
+    requirements_in = "requirements.txt",
+    requirements_txt = "requirements_lock.txt",
     visibility = ["//visibility:public"],
+)
+
+create_venv(
+    name = "venv",
+    requirements_txt = ":requirements_lock.txt",
+    destination_folder = ".venv",
+)
+
+buildx(
+    name = "base_image",
+    build_context = [
+        context.oci_layout(
+            "ghcr.io/astral-sh/uv:python3.12-bookworm-slim",
+            "@python_3_12-bookworm-slim",
+        ),
+        context.sources(
+            "requirements",
+            ["requirements_gpu.txt"],
+            override_path = "torches",
+        ),
+        context.sources(
+            "torcheslib",
+            glob(["*.py"]),
+            override_path = "torches",
+        ),
+    ],
+    dockerfile = ":Dockerfile",
+)
+
+oci_image(
+    name = "image",
+    base = ":base_image",
+)
+
+oci_load(
+    name = "load",
+    image = ":image",
+    repo_tags = ["ghcr.io/solanyn/torches:latest"],
 )

@@ -201,6 +201,89 @@
   },
   "selectedYankedVersions": {},
   "moduleExtensions": {
+    "//:buildx.bzl%buildx": {
+      "general": {
+        "bzlTransitiveDigest": "gacuHMAQQtF1W3IQHsqr+PeY9p0TO68dCJL0hQPvJf8=",
+        "usagesDigest": "ghGzLWrJ86byXevCTyVOgnQNDmb6Ib+qzDzYKkz4EoM=",
+        "recordedFileInputs": {},
+        "recordedDirentsInputs": {},
+        "envVariables": {},
+        "generatedRepoSpecs": {
+          "buildx_linux-arm64": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_file",
+            "attributes": {
+              "urls": [
+                "https://github.com/docker/buildx/releases/download/v0.22.0/buildx-v0.22.0.linux-arm64"
+              ],
+              "sha256": "6e9e455b5ec1c7ac708f2640a86c5cecce38c72e48acff6cb219dfdfa2dda781",
+              "executable": true
+            }
+          },
+          "buildx_linux-amd64": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_file",
+            "attributes": {
+              "urls": [
+                "https://github.com/docker/buildx/releases/download/v0.22.0/buildx-v0.22.0.linux-amd64"
+              ],
+              "sha256": "805195386fba0cea5a1487cf0d47da82a145ea0a792bd3fb477583e2dbcdcc2f",
+              "executable": true
+            }
+          },
+          "buildx_darwin-arm64": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_file",
+            "attributes": {
+              "urls": [
+                "https://github.com/docker/buildx/releases/download/v0.22.0/buildx-v0.22.0.darwin-arm64"
+              ],
+              "sha256": "5898c338abb1f673107bc087997dc3cb63b4ea66d304ce4223472f57bd8d616e",
+              "executable": true
+            }
+          },
+          "buildx_darwin-amd64": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_file",
+            "attributes": {
+              "urls": [
+                "https://github.com/docker/buildx/releases/download/v0.22.0/buildx-v0.22.0.darwin-amd64"
+              ],
+              "sha256": "5221ad6b8acd2283f8fbbeebc79ae4b657e83519ca1c1e4cfbb9405230b3d933",
+              "executable": true
+            }
+          },
+          "buildx": {
+            "repoRuleId": "@@//:buildx.bzl%configure_buildx",
+            "attributes": {
+              "buildx": "@@+buildx+buildx_darwin-arm64//file:downloaded",
+              "buildx_platforms": {
+                "@@+buildx+buildx_linux-amd64//file:file": "@bazel_tools//src/conditions:linux_x86_64",
+                "@@+buildx+buildx_linux-arm64//file:file": "@bazel_tools//src/conditions:linux_aarch64",
+                "@@+buildx+buildx_darwin-amd64//file:file": "@bazel_tools//src/conditions:darwin_x86_64",
+                "@@+buildx+buildx_darwin-arm64//file:file": "@bazel_tools//src/conditions:darwin_arm64"
+              }
+            }
+          }
+        },
+        "moduleExtensionMetadata": {
+          "explicitRootModuleDirectDeps": [
+            "buildx"
+          ],
+          "explicitRootModuleDirectDevDeps": [],
+          "useAllRepos": "NO",
+          "reproducible": false
+        },
+        "recordedRepoMappingEntries": [
+          [
+            "",
+            "aspect_bazel_lib",
+            "aspect_bazel_lib+"
+          ],
+          [
+            "",
+            "bazel_tools",
+            "bazel_tools"
+          ]
+        ]
+      }
+    },
     "@@apple_support+//crosstool:setup.bzl%apple_cc_configure_extension": {
       "general": {
         "bzlTransitiveDigest": "xcBTf2+GaloFpg7YEh/Bv+1yAczRkiCt3DGws4K7kSk=",
@@ -654,7 +737,7 @@
     },
     "@@rules_multitool+//multitool:extension.bzl%multitool": {
       "general": {
-        "bzlTransitiveDigest": "0UX4ybuW2hFpohWUqPMU3EToE1JVGZRoJ3nILfyTduY=",
+        "bzlTransitiveDigest": "F/gq5cF9lcIjruwcMimPkE1tSGYtXAE1r4NFG6NkBFg=",
         "usagesDigest": "xFTJbApg7Af6sigw0PPMkNq0Dx2la1wrwMc5wHaNJuA=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -872,7 +955,7 @@
     "@@rules_oci+//oci:extensions.bzl%oci": {
       "general": {
         "bzlTransitiveDigest": "y6GRuwGM7WCiVKZTyPKoDYJYUcp9tcPDSuFjR0cNePY=",
-        "usagesDigest": "RnPBFkzUES1WOOtgoV68G9vJs6flbvBtlIyu7IATMR8=",
+        "usagesDigest": "rYeHKegF20PEKjV96EDF9LEn6mnMfZIjzKplxVjSIr4=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -960,6 +1043,49 @@
                 "@@platforms//cpu:arm64": "@distroless_base_linux_arm64_v8"
               },
               "bzlmod_repository": "distroless_base",
+              "reproducible": true
+            }
+          },
+          "python_3_12-bookworm-slim_linux_arm64": {
+            "repoRuleId": "@@rules_oci+//oci/private:pull.bzl%oci_pull",
+            "attributes": {
+              "www_authenticate_challenges": {},
+              "scheme": "https",
+              "registry": "ghcr.io",
+              "repository": "astral-sh/uv",
+              "identifier": "sha256:b2d0c4817830f4c208386f46cf244b6be2e212b27952e11266f7997e267ecbd4",
+              "platform": "linux/arm64",
+              "target_name": "python_3_12-bookworm-slim_linux_arm64",
+              "bazel_tags": []
+            }
+          },
+          "python_3_12-bookworm-slim_linux_amd64": {
+            "repoRuleId": "@@rules_oci+//oci/private:pull.bzl%oci_pull",
+            "attributes": {
+              "www_authenticate_challenges": {},
+              "scheme": "https",
+              "registry": "ghcr.io",
+              "repository": "astral-sh/uv",
+              "identifier": "sha256:b2d0c4817830f4c208386f46cf244b6be2e212b27952e11266f7997e267ecbd4",
+              "platform": "linux/amd64",
+              "target_name": "python_3_12-bookworm-slim_linux_amd64",
+              "bazel_tags": []
+            }
+          },
+          "python_3_12-bookworm-slim": {
+            "repoRuleId": "@@rules_oci+//oci/private:pull.bzl%oci_alias",
+            "attributes": {
+              "target_name": "python_3_12-bookworm-slim",
+              "www_authenticate_challenges": {},
+              "scheme": "https",
+              "registry": "ghcr.io",
+              "repository": "astral-sh/uv",
+              "identifier": "sha256:b2d0c4817830f4c208386f46cf244b6be2e212b27952e11266f7997e267ecbd4",
+              "platforms": {
+                "@@platforms//cpu:arm64": "@python_3_12-bookworm-slim_linux_arm64",
+                "@@platforms//cpu:x86_64": "@python_3_12-bookworm-slim_linux_amd64"
+              },
+              "bzlmod_repository": "python_3_12-bookworm-slim",
               "reproducible": true
             }
           },
@@ -1084,7 +1210,10 @@
             "distroless_cc_linux_arm64_v8",
             "distroless_base",
             "distroless_base_linux_amd64",
-            "distroless_base_linux_arm64_v8"
+            "distroless_base_linux_arm64_v8",
+            "python_3_12-bookworm-slim",
+            "python_3_12-bookworm-slim_linux_arm64",
+            "python_3_12-bookworm-slim_linux_amd64"
           ],
           "explicitRootModuleDirectDevDeps": [],
           "useAllRepos": "NO",
@@ -1157,7 +1286,7 @@
     },
     "@@rules_rust+//crate_universe:extension.bzl%crate": {
       "general": {
-        "bzlTransitiveDigest": "1qb/TyjrOixpGMmT2BIQTSMsl9/Qz29244JBKQWWBqQ=",
+        "bzlTransitiveDigest": "LboqPfAA1HcwPx7XbNHfhmrC50J6o5ZEI6tseOvhx/Q=",
         "usagesDigest": "Ra+1kbDtapAhz/B/kbIAa9Ows1ZfK+SiyMXzJIOYD7g=",
         "recordedFileInputs": {
           "@@//Cargo.lock": "607fa5aa7bbb0655cd0ef41ed8e044d599d1e75e87941408771e50d4e091f126",

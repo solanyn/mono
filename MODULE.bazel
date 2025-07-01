@@ -23,28 +23,13 @@ python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(python_version = "3.12")
 
 pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
-pip.parse(
-    hub_name = "jaxes_deps",
-    python_version = "3.12",
-    requirements_by_platform = {
-        "//jaxes:requirements_darwin_lock.txt": "osx_*",
-        "//jaxes:requirements_gpu_lock.txt": "linux_*",
-    },
-)
-pip.parse(
-    hub_name = "torches_deps", 
-    python_version = "3.12",
-    requirements_by_platform = {
-        "//torches:requirements_darwin_lock.txt": "osx_*",
-        "//torches:requirements_gpu_lock.txt": "linux_*",
-    },
-)
+
 pip.parse(
     hub_name = "cronprint_deps",
     python_version = "3.12",
     requirements_lock = "//cronprint:requirements_lock.txt",
 )
-use_repo(pip, "jaxes_deps", "torches_deps", "cronprint_deps")
+use_repo(pip, "cronprint_deps")
 
 # rust
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
@@ -105,6 +90,22 @@ oci.pull(
     tag = "latest",
 )
 use_repo(oci, "distroless_base", "distroless_base_linux_amd64", "distroless_base_linux_arm64_v8", "distroless_cc", "distroless_cc_linux_amd64", "distroless_cc_linux_arm64_v8")
+
+# python non-hermetic containers
+buildx = use_extension(":buildx.bzl", "buildx")
+buildx.toolchains()
+use_repo(buildx, "buildx")
+
+oci.pull(
+    name = "python_3_12-bookworm-slim",
+    digest = "sha256:b2d0c4817830f4c208386f46cf244b6be2e212b27952e11266f7997e267ecbd4",
+    image = "ghcr.io/astral-sh/uv:python3.13-bookworm-slim",
+    platforms = [
+        "linux/arm64",
+        "linux/amd64",
+    ],
+)
+use_repo(oci, "python_3_12-bookworm-slim", "python_3_12-bookworm-slim_linux_amd64", "python_3_12-bookworm-slim_linux_arm64")
 
 # Nixpkgs for hermetic cross-compilation
 nixpkgs = use_extension("@rules_nixpkgs_core//:extensions.bzl", "nixpkgs")

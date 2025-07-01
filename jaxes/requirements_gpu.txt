@@ -1,3 +1,2 @@
-numpy
-jax[cuda12]
-jaxlib
+jax[cuda12]==0.6.2
+jaxlib==0.6.2
