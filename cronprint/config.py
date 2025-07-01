@@ -1,5 +1,5 @@
 import os
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 
 def load_config() -> Dict[str, Any]:
@@ -11,6 +11,7 @@ def load_config() -> Dict[str, Any]:
         },
         "printing": {
             "default_printer": os.getenv("CRONPRINT_DEFAULT_PRINTER"),
+            "add_printer": _parse_printer_config_from_env(),
             "jobs": _parse_job_schedules_from_env(),
         },
         "timezone": os.getenv("CRONPRINT_TIMEZONE", "UTC"),
@@ -52,3 +53,22 @@ def _parse_job_schedules_from_env() -> List[Dict[str, Any]]:
 
     return jobs
 
+
+def _parse_printer_config_from_env() -> Optional[Dict[str, str]]:
+    """Parse printer configuration from environment variables.
+
+    Format: CRONPRINT_PRINTER_NAME, CRONPRINT_PRINTER_URI (driver optional for IPP)
+    """
+    name = os.getenv("CRONPRINT_PRINTER_NAME")
+    uri = os.getenv("CRONPRINT_PRINTER_URI")
+
+    if name and uri:
+        return {
+            "name": name,
+            "uri": uri,
+            "driver": os.getenv("CRONPRINT_PRINTER_DRIVER"),
+            "description": os.getenv("CRONPRINT_PRINTER_DESCRIPTION", ""),
+            "location": os.getenv("CRONPRINT_PRINTER_LOCATION", ""),
+        }
+
+    return None

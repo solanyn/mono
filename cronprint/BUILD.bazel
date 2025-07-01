@@ -1,6 +1,7 @@
 load("@aspect_bazel_lib//lib:expand_template.bzl", "expand_template")
 load("@aspect_bazel_lib//lib:tar.bzl", "tar")
-load("@aspect_rules_py//py:defs.bzl", "py_binary", "py_library")
+load("@aspect_rules_py//py:defs.bzl", "py_library", "py_binary")
+load("@buildx//:defs.bzl", "buildx", "context")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
 load("@container_structure_test//:defs.bzl", "container_structure_test")
 load("@rules_uv//uv:pip.bzl", "pip_compile")
@@ -24,25 +25,56 @@ py_library(
 
 py_binary(
     name = "app",
-    srcs = ["main.py"],
     main = "main.py",
     imports = ["."],
-    deps = [
-        ":lib",
-    ],
+    srcs = ["main.py"],
+    deps = [":lib"],
 )
 
-tar(
-    name = "app_layer",
-    srcs = [":app"],
+pip_compile(
+    name = "requirements",
+    requirements_in = "requirements.txt",
+    requirements_txt = "requirements_lock.txt",
+    visibility = ["//visibility:public"],
+)
+
+buildx(
+    name = "base_image",
+    build_context = [
+        context.oci_layout(
+            "ghcr.io/astral-sh/uv:python3.13-bookworm-slim",
+            "@python_3_13-bookworm-slim",
+        ),
+        context.sources(
+            "requirements",
+            [":requirements_lock.txt"],
+            override_path = "cronprint",
+        ),
+        context.sources(
+            "cups",
+            [":cupsd.conf"],
+            override_path = "cronprint",
+        ),
+        context.sources(
+            "app",
+            ["//cronprint:app"],
+            override_path = "cronprint",
+        ),
+    ],
+    dockerfile = ":Dockerfile",
 )
 
 oci_image(
     name = "image",
-    base = "@distroless_base",
-    entrypoint = ["/cronprint/app"],
-    tars = [":app_layer"],
+    base = ":base_image",
+)
+
+container_structure_test(
+    name = "container_test",
+    configs = ["tests.yaml"],
+    image = ":image",
     visibility = ["//visibility:public"],
+    size="small",
 )
 
 expand_template(
@@ -68,19 +100,3 @@ oci_push(
     remote_tags = ":stamped_tags",
     visibility = ["//visibility:public"],
 )
-
-container_structure_test(
-    name = "container_test",
-    configs = ["tests.yaml"],
-    image = ":image",
-    visibility = ["//visibility:public"],
-    size="small",
-)
-
-pip_compile(
-    name = "requirements",
-    requirements_in = "requirements.txt",
-    requirements_txt = "requirements_lock.txt",
-    visibility = ["//visibility:public"],
-)
-

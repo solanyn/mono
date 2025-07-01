@@ -2,6 +2,7 @@ load("@aspect_bazel_lib//lib:tar.bzl", "tar")
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
 load("@container_structure_test//:defs.bzl", "container_structure_test")
+load("@aspect_bazel_lib//lib:expand_template.bzl", "expand_template")
 
 rust_library(
     name = "lib",
@@ -82,11 +83,20 @@ oci_load(
     visibility = ["//visibility:public"],
 )
 
+expand_template(
+    name = "stamped_tags",
+    out = "_stamped_tags.txt",
+    template = ["latest\n{{VERSION}}"],
+    stamp_substitutions = {
+        "{{VERSION}}": "{{STABLE_VERSION}}",
+    },
+)
+
 oci_push(
     name = "push",
     image = ":image",
     repository = "ghcr.io/solanyn/gt7-telemetry",
-    remote_tags = ["latest"],
+    remote_tags = ":stamped_tags",
     visibility = ["//visibility:public"],
 )
 

@@ -955,7 +955,7 @@
     "@@rules_oci+//oci:extensions.bzl%oci": {
       "general": {
         "bzlTransitiveDigest": "y6GRuwGM7WCiVKZTyPKoDYJYUcp9tcPDSuFjR0cNePY=",
-        "usagesDigest": "rYeHKegF20PEKjV96EDF9LEn6mnMfZIjzKplxVjSIr4=",
+        "usagesDigest": "nJLNzMUtY+0Yo/H+1K3ZLmdWr8cuxZb168ync6gOIWs=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -1010,7 +1010,7 @@
               "scheme": "https",
               "registry": "gcr.io",
               "repository": "distroless/base-debian12",
-              "identifier": "latest",
+              "identifier": "sha256:201ef9125ff3f55fda8e0697eff0b3ce9078366503ef066653635a3ac3ed9c26",
               "platform": "linux/amd64",
               "target_name": "distroless_base_linux_amd64",
               "bazel_tags": []
@@ -1023,7 +1023,7 @@
               "scheme": "https",
               "registry": "gcr.io",
               "repository": "distroless/base-debian12",
-              "identifier": "latest",
+              "identifier": "sha256:201ef9125ff3f55fda8e0697eff0b3ce9078366503ef066653635a3ac3ed9c26",
               "platform": "linux/arm64/v8",
               "target_name": "distroless_base_linux_arm64_v8",
               "bazel_tags": []
@@ -1037,7 +1037,7 @@
               "scheme": "https",
               "registry": "gcr.io",
               "repository": "distroless/base-debian12",
-              "identifier": "latest",
+              "identifier": "sha256:201ef9125ff3f55fda8e0697eff0b3ce9078366503ef066653635a3ac3ed9c26",
               "platforms": {
                 "@@platforms//cpu:x86_64": "@distroless_base_linux_amd64",
                 "@@platforms//cpu:arm64": "@distroless_base_linux_arm64_v8"
@@ -1046,7 +1046,7 @@
               "reproducible": true
             }
           },
-          "python_3_12-bookworm-slim_linux_arm64": {
+          "python_3_13-bookworm-slim_linux_arm64": {
             "repoRuleId": "@@rules_oci+//oci/private:pull.bzl%oci_pull",
             "attributes": {
               "www_authenticate_challenges": {},
@@ -1055,11 +1055,11 @@
               "repository": "astral-sh/uv",
               "identifier": "sha256:b2d0c4817830f4c208386f46cf244b6be2e212b27952e11266f7997e267ecbd4",
               "platform": "linux/arm64",
-              "target_name": "python_3_12-bookworm-slim_linux_arm64",
+              "target_name": "python_3_13-bookworm-slim_linux_arm64",
               "bazel_tags": []
             }
           },
-          "python_3_12-bookworm-slim_linux_amd64": {
+          "python_3_13-bookworm-slim_linux_amd64": {
             "repoRuleId": "@@rules_oci+//oci/private:pull.bzl%oci_pull",
             "attributes": {
               "www_authenticate_challenges": {},
@@ -1068,24 +1068,24 @@
               "repository": "astral-sh/uv",
               "identifier": "sha256:b2d0c4817830f4c208386f46cf244b6be2e212b27952e11266f7997e267ecbd4",
               "platform": "linux/amd64",
-              "target_name": "python_3_12-bookworm-slim_linux_amd64",
+              "target_name": "python_3_13-bookworm-slim_linux_amd64",
               "bazel_tags": []
             }
           },
-          "python_3_12-bookworm-slim": {
+          "python_3_13-bookworm-slim": {
             "repoRuleId": "@@rules_oci+//oci/private:pull.bzl%oci_alias",
             "attributes": {
-              "target_name": "python_3_12-bookworm-slim",
+              "target_name": "python_3_13-bookworm-slim",
               "www_authenticate_challenges": {},
               "scheme": "https",
               "registry": "ghcr.io",
               "repository": "astral-sh/uv",
               "identifier": "sha256:b2d0c4817830f4c208386f46cf244b6be2e212b27952e11266f7997e267ecbd4",
               "platforms": {
-                "@@platforms//cpu:arm64": "@python_3_12-bookworm-slim_linux_arm64",
-                "@@platforms//cpu:x86_64": "@python_3_12-bookworm-slim_linux_amd64"
+                "@@platforms//cpu:arm64": "@python_3_13-bookworm-slim_linux_arm64",
+                "@@platforms//cpu:x86_64": "@python_3_13-bookworm-slim_linux_amd64"
               },
-              "bzlmod_repository": "python_3_12-bookworm-slim",
+              "bzlmod_repository": "python_3_13-bookworm-slim",
               "reproducible": true
             }
           },
@@ -1211,9 +1211,9 @@
             "distroless_base",
             "distroless_base_linux_amd64",
             "distroless_base_linux_arm64_v8",
-            "python_3_12-bookworm-slim",
-            "python_3_12-bookworm-slim_linux_arm64",
-            "python_3_12-bookworm-slim_linux_amd64"
+            "python_3_13-bookworm-slim",
+            "python_3_13-bookworm-slim_linux_arm64",
+            "python_3_13-bookworm-slim_linux_amd64"
           ],
           "explicitRootModuleDirectDevDeps": [],
           "useAllRepos": "NO",

@@ -31,4 +31,3 @@ def setup_health_endpoints(app: FastAPI):
         except Exception as e:
             logger.error(f"Health check failed: {e}")
             raise HTTPException(status_code=503, detail=f"Service not ready: {str(e)}")
-

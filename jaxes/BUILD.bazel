@@ -2,7 +2,8 @@ load("@rules_uv//uv:pip.bzl", "pip_compile")
 load("@rules_uv//uv:venv.bzl", "create_venv")
 load("@rules_multirun//:defs.bzl", "multirun")
 load("@buildx//:defs.bzl", "buildx", "context")
-load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
+load("@aspect_bazel_lib//lib:expand_template.bzl", "expand_template")
 
 pip_compile(
     name = "requirements",
@@ -21,8 +22,8 @@ buildx(
     name = "base_image",
     build_context = [
         context.oci_layout(
-            "ghcr.io/astral-sh/uv:python3.12-bookworm-slim",
-            "@python_3_12-bookworm-slim",
+            "ghcr.io/astral-sh/uv:python3.13-bookworm-slim",
+            "@python_3_13-bookworm-slim",
         ),
         context.sources(
             "requirements",
@@ -47,4 +48,21 @@ oci_load(
     name = "load",
     image = ":image",
     repo_tags = ["ghcr.io/solanyn/jaxes:latest"],
+)
+
+expand_template(
+    name = "stamped_tags",
+    out = "_stamped_tags.txt",
+    template = ["latest\n{{VERSION}}"],
+    stamp_substitutions = {
+        "{{VERSION}}": "{{STABLE_VERSION}}",
+    },
+)
+
+oci_push(
+    name = "push",
+    image = ":image",
+    repository = "ghcr.io/solanyn/jaxes",
+    remote_tags = ":stamped_tags",
+    visibility = ["//visibility:public"],
 )

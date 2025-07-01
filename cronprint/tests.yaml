@@ -1,10 +1,14 @@
 schemaVersion: 2.0.0
 
 fileExistenceTests:
-  - name: "cronprint executable exists"
-    path: "/cronprint/app"
+  - name: "cronprint exists"
+    path: "/app/main.py"
     shouldExist: true
 
-metadataTest:
-  entrypoint: ["/cronprint/app"]
+  - name: "CUPS daemon"
+    path: "/usr/sbin/cupsd"
+    shouldExist: true
 
+  - name: "cups config"
+    path: "/etc/cups/cupsd.conf"
+    shouldExist: true

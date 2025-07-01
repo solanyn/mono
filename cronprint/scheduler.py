@@ -126,4 +126,3 @@ class PrintScheduler:
     def is_healthy(self) -> bool:
         """Check if scheduler is healthy."""
         return self.scheduler.running
-

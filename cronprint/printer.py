@@ -1,11 +1,8 @@
 import logging
 import os
-from typing import Optional
+from typing import Optional, Dict
 
-try:
-    import cups
-except ImportError:
-    cups = None
+import cups
 
 logger = logging.getLogger(__name__)
 
@@ -16,24 +13,17 @@ class PrintManager:
     def __init__(self, default_printer: Optional[str] = None):
         self.default_printer = default_printer
         self.conn = None
-        self.cups_host = os.getenv("CRONPRINT_CUPS_HOST")
+        self.cups_host = "localhost:631"
 
-        if cups is None:
-            logger.warning("pycups not available, printing will be simulated")
-        else:
-            try:
-                if self.cups_host:
-                    cups.setServer(self.cups_host)
-                self.conn = cups.Connection()
-                logger.info(f"Connected to CUPS server at {self.cups_host or 'localhost'}")
-            except Exception as e:
-                logger.error(f"Failed to connect to CUPS: {e}")
+        try:
+            cups.setServer(self.cups_host)
+            self.conn = cups.Connection()
+            logger.info(f"Connected to CUPS server at {self.cups_host}")
+        except Exception as e:
+            logger.error(f"Failed to connect to CUPS: {e}")
 
     def get_printers(self) -> dict:
         """Get available printers."""
-        if not self.conn:
-            return {"simulator": {"printer-info": "Print Simulator"}}
-
         try:
             return self.conn.getPrinters()
         except Exception as e:
@@ -99,3 +89,27 @@ class PrintManager:
             logger.error(f"Failed to check printer status: {e}")
             return False
 
+    def add_printer(self, printer_config: Dict[str, str]) -> bool:
+        """Add a printer to the CUPS server."""
+        if not self.conn:
+            logger.info(f"SIMULATION: Would add printer {printer_config['name']}")
+            return True
+
+        try:
+            # Use driver if specified, otherwise let CUPS auto-detect (for IPP)
+            ppdname = printer_config.get("driver") or None
+
+            self.conn.addPrinter(
+                name=printer_config["name"],
+                device=printer_config["uri"],
+                info=printer_config.get("description", ""),
+                location=printer_config.get("location", ""),
+                ppdname=ppdname,
+            )
+            logger.info(
+                f"Added printer {printer_config['name']} with URI {printer_config['uri']}"
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to add printer {printer_config['name']}: {e}")
+            return False

@@ -19,14 +19,15 @@ bazel_dep(name = "rules_oci", version = "2.2.6")
 bazel_dep(name = "container_structure_test", version = "1.19.1")
 
 # python
+PYTHON_VERSION = "3.13"
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
-python.toolchain(python_version = "3.12")
+python.toolchain(python_version = PYTHON_VERSION)
 
 pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
 
 pip.parse(
     hub_name = "cronprint_deps",
-    python_version = "3.12",
+    python_version = PYTHON_VERSION,
     requirements_lock = "//cronprint:requirements_lock.txt",
 )
 use_repo(pip, "cronprint_deps")
@@ -82,6 +83,7 @@ oci.pull(
 )
 oci.pull(
     name = "distroless_base",
+    digest = "sha256:201ef9125ff3f55fda8e0697eff0b3ce9078366503ef066653635a3ac3ed9c26",
     image = "gcr.io/distroless/base-debian12",
     platforms = [
         "linux/amd64",
@@ -97,7 +99,7 @@ buildx.toolchains()
 use_repo(buildx, "buildx")
 
 oci.pull(
-    name = "python_3_12-bookworm-slim",
+    name = "python_3_13-bookworm-slim",
     digest = "sha256:b2d0c4817830f4c208386f46cf244b6be2e212b27952e11266f7997e267ecbd4",
     image = "ghcr.io/astral-sh/uv:python3.13-bookworm-slim",
     platforms = [
@@ -105,7 +107,7 @@ oci.pull(
         "linux/amd64",
     ],
 )
-use_repo(oci, "python_3_12-bookworm-slim", "python_3_12-bookworm-slim_linux_amd64", "python_3_12-bookworm-slim_linux_arm64")
+use_repo(oci, "python_3_13-bookworm-slim", "python_3_13-bookworm-slim_linux_amd64", "python_3_13-bookworm-slim_linux_arm64")
 
 # Nixpkgs for hermetic cross-compilation
 nixpkgs = use_extension("@rules_nixpkgs_core//:extensions.bzl", "nixpkgs")
