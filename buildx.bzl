@@ -227,9 +227,14 @@ def _oci_extension(module_ctx):
         "@buildx_darwin-arm64//file": "@bazel_tools//src/conditions:darwin_arm64",
     }
 
+    # Get platform, defaulting to linux-amd64 for CI environments
+    platform = repo_utils.platform(module_ctx).replace("_", "-")
+    if platform not in buildx_platforms:
+        platform = "linux-amd64"
+
     configure_buildx(
         name = "buildx",
-        buildx = "@buildx_%s//file:downloaded" % repo_utils.platform(module_ctx).replace("_", "-"),
+        buildx = "@buildx_%s//file:downloaded" % platform,
         buildx_platforms = buildx_selects,
     )
 

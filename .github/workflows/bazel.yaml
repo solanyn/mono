@@ -62,10 +62,10 @@ jobs:
         run: |
           # Get monorepo version
           MONOREPO_VERSION=$(./tools/get-version.sh .)
-          
+
           # Find and run all oci_push targets
           OCI_TARGETS=$(bazel query 'kind("oci_push", //...)' --config=ci)
-          
+
           for target in $OCI_TARGETS; do
             echo "Pushing $target"
             # Push with latest tag (defined in BUILD.bazel)
