@@ -30,8 +30,6 @@ jobs:
         run: bazel build //... --config=ci
       - name: Test all targets
         run: bazel test //... --config=ci
-      - name: Run container structure tests
-        run: bazel test $(bazel query 'kind("container_structure_test", //...)') --config=ci
 
   push-images:
     runs-on: ubuntu-latest
