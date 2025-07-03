@@ -26,6 +26,10 @@ jobs:
           bazelisk-cache: true
           disk-cache: ${{ github.workflow }}
           repository-cache: true
+      - name: Check disk usage
+        run: df -h
+      - name: Check directory sizes
+        run: du -sh /usr/local/* /opt/* /usr/* | sort -hr
       - name: Build all targets
         run: bazel build //... --config=ci
       - name: Test all targets
