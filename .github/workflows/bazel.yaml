@@ -26,82 +26,17 @@ jobs:
           bazelisk-cache: true
           disk-cache: ${{ github.workflow }}
           repository-cache: true
-      - name: Clean
-        run: bazel clean --expunge
       - name: Build all targets
         run: bazel build //... --config=ci
       - name: Test all targets
         run: bazel test //... --config=ci
       - name: Run container structure tests
-        run: |
-          # Find and run all container structure tests
-          STRUCTURE_TESTS=$(bazel query 'kind("container_structure_test", //...)' 2>/dev/null || echo "")
-          if [ -n "$STRUCTURE_TESTS" ]; then
-            echo "Running container structure tests: $STRUCTURE_TESTS"
-            bazel test $STRUCTURE_TESTS --config=ci
-          else
-            echo "No container structure tests found"
-          fi
+        run: bazel test $(bazel query 'kind("container_structure_test", //...)') --config=ci
 
-  discover-images:
+  push-images:
     runs-on: ubuntu-latest
     needs: test
-    outputs:
-      matrix: ${{ steps.discover.outputs.matrix }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Install Nix
-        uses: cachix/install-nix-action@v31
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-cache: true
-          disk-cache: ${{ github.workflow }}
-          repository-cache: true
-      - name: Discover OCI targets
-        id: discover
-        run: |
-          # Find all oci_push targets
-          OCI_TARGETS=$(bazel query 'kind("oci_push", //...)' 2>/dev/null || echo "")
-
-          # Generate monorepo version
-          MONOREPO_VERSION=$(./tools/get-version.sh .)
-
-          # Build matrix JSON
-          MATRIX_ITEMS='[]'
-          for target in $OCI_TARGETS; do
-            # Extract package path and target name
-            package=$(echo $target | sed 's|//||; s|:.*||')
-            target_name=$(echo $target | sed 's|.*:||; s|_push$||')
-            
-            # Use monorepo version for all containers
-            VERSION="$MONOREPO_VERSION"
-            
-            # Add to matrix
-            ITEM=$(jq -n \
-              --arg target "$target" \
-              --arg package "$package" \
-              --arg target_name "$target_name" \
-              --arg version "$VERSION" \
-              --arg monorepo_version "$MONOREPO_VERSION" \
-              '{target: $target, package: $package, target_name: $target_name, version: $version, monorepo_version: $monorepo_version}')
-            MATRIX_ITEMS=$(echo "$MATRIX_ITEMS" | jq ". + [$ITEM]")
-          done
-
-          MATRIX=$(echo "$MATRIX_ITEMS" | jq -c '{include: .}')
-          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
-          echo "Generated matrix: $MATRIX"
-
-  build-images:
-    runs-on: ubuntu-latest
-    needs: discover-images
-    if: ${{ needs.discover-images.outputs.matrix != '' && fromJson(needs.discover-images.outputs.matrix).include[0] }}
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.discover-images.outputs.matrix) }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -123,36 +58,19 @@ jobs:
           bazelisk-cache: true
           disk-cache: ${{ github.workflow }}
           repository-cache: true
-      - name: Build and push container image
+      - name: Push all OCI images
         run: |
-          echo "Building and pushing ${{ matrix.target }}"
-
-          # For main branch, push to registry
-          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+          # Get monorepo version
+          MONOREPO_VERSION=$(./tools/get-version.sh .)
+          
+          # Find and run all oci_push targets
+          OCI_TARGETS=$(bazel query 'kind("oci_push", //...)' --config=ci)
+          
+          for target in $OCI_TARGETS; do
+            echo "Pushing $target"
             # Push with latest tag (defined in BUILD.bazel)
-            bazel run ${{ matrix.target }} --config=ci
+            bazel run $target --config=ci
             
             # Push with version tag
-            bazel run ${{ matrix.target }} --config=ci -- --tag ${{ matrix.monorepo_version }}
-          else
-            # For PRs, just test build without pushing
-            echo "PR build - testing build without push"
-            # Build the underlying image to verify it works
-            IMAGE_TARGET=$(echo "${{ matrix.target }}" | sed 's|_push$|_image|')
-            bazel build $IMAGE_TARGET --config=ci
-          fi
-  results:
-    if: ${{ always() }}
-    runs-on: ubuntu-latest
-    name: Build results
-    needs: [test, build-images]
-    steps:
-      - run: |
-          test_result="${{ needs.test.result }}"
-          build_result="${{ needs.build-images.result }}"
-          if [[ $test_result == "success" && ($build_result == "success" || $build_result == "skipped") ]]; then
-            exit 0
-          else
-            exit 1
-          fi
-
+            bazel run $target --config=ci -- --tag $MONOREPO_VERSION
+          done
