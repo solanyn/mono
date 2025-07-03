@@ -6,6 +6,9 @@
   "workspaces": [
     "tldr/frontend"
   ],
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  },
   "scripts": {},
   "devDependencies": {
     "@types/node": "^22.15.34",
