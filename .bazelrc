@@ -56,6 +56,7 @@ build:remote --dynamic_mode=off
 # CI configuration
 build:ci --config=remote
 build:ci --stamp
+build:ci --platforms=//platforms:linux_amd64
 
 # Workspace status for stamping
 build --workspace_status_command=tools/workspace_status.sh
