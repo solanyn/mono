@@ -6,31 +6,6 @@ load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
 load("@container_structure_test//:defs.bzl", "container_structure_test")
 load("@rules_uv//uv:pip.bzl", "pip_compile")
 
-py_library(
-    name = "lib",
-    srcs = [
-        "config.py",
-        "health.py",
-        "printer.py",
-        "scheduler.py",
-    ],
-    deps = [
-        "@cronprint_deps//fastapi:pkg",
-        "@cronprint_deps//uvicorn:pkg",
-        "@cronprint_deps//apscheduler:pkg",
-        "@cronprint_deps//pycups:pkg",
-        "@cronprint_deps//requests:pkg",
-    ],
-)
-
-py_binary(
-    name = "app",
-    main = "main.py",
-    imports = ["."],
-    srcs = ["main.py"],
-    deps = [":lib"],
-)
-
 pip_compile(
     name = "requirements",
     requirements_in = "requirements.txt",
@@ -57,7 +32,7 @@ buildx(
         ),
         context.sources(
             "app",
-            ["//cronprint:app"],
+            glob(["*.py"]),
             override_path = "cronprint",
         ),
     ],
