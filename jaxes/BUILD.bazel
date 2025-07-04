@@ -1,0 +1,15 @@
+load("@rules_uv//uv:pip.bzl", "pip_compile")
+load("@rules_uv//uv:venv.bzl", "create_venv")
+
+pip_compile(
+    name = "requirements",
+    requirements_in = "requirements.txt",
+    requirements_txt = "requirements_lock.txt",
+    visibility = ["//visibility:public"],
+)
+
+create_venv(
+    name = "venv",
+    requirements_txt = ":requirements_lock.txt",
+    destination_folder = ".venv",
+)
