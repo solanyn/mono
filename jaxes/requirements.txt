@@ -1,5 +1,5 @@
 numpy
 jax
 jaxlib
-jax-metal
+jax-metal; sys_platform == "darwin"
 
