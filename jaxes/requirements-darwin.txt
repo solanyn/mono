@@ -1,0 +1,4 @@
+numpy
+jax
+jaxlib
+jax-metal; sys_platform == "darwin"

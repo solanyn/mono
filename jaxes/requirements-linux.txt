@@ -1,0 +1,4 @@
+--index-url https://download.pytorch.org/whl/cu121
+numpy
+jax[cuda12]==0.6.2
+jaxlib==0.6.2

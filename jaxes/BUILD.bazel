@@ -3,13 +3,22 @@ load("@rules_uv//uv:venv.bzl", "create_venv")
 
 pip_compile(
     name = "requirements",
-    requirements_in = "requirements.txt",
-    requirements_txt = "requirements_lock.txt",
+    requirements_in = select({
+        "@platforms//os:macos": "requirements-darwin.txt",
+        "@platforms//os:linux": "requirements-linux.txt",
+    }),
+    requirements_txt = select({
+        "@platforms//os:macos": "requirements-darwin.lock",
+        "@platforms//os:linux": "requirements-linux.lock",
+    }),
     visibility = ["//visibility:public"],
 )
 
 create_venv(
     name = "venv",
-    requirements_txt = ":requirements_lock.txt",
+    requirements_txt = select({
+        "@platforms//os:macos": ":requirements-darwin.lock",
+        "@platforms//os:linux": ":requirements-linux.lock",
+    }),
     destination_folder = ".venv",
 )
