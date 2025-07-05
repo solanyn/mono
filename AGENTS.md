@@ -113,8 +113,8 @@ bazelisk build //gt7/telemetry:telemetry_server
 
 ### Python
 
-- **Build System**: Bazel with `rules_uv` to build virtual environments
-- **Dependency Management**: requirements.txt with rules_uv
+- **Build System**: Bazel with `rules_uv` using uv's pip_compile
+- **Dependency Management**: pyproject.toml with uv resolver
 
 ```bash
 bazelisk run //torches:requirements

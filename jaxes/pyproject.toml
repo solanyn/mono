@@ -1,0 +1,19 @@
+[project]
+name = "jaxes"
+version = "0.1.0"
+description = "JAX ML components"
+dependencies = [
+    "numpy",
+    "jax; sys_platform == 'darwin'",
+    "jaxlib; sys_platform == 'darwin'",
+    "jax-metal; sys_platform == 'darwin'",
+    "jax[cuda12]; sys_platform == 'linux'",
+]
+requires-python = ">=3.8"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv]
+dev-dependencies = []

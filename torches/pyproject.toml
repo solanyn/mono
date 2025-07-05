@@ -1,0 +1,29 @@
+[project]
+name = "torches"
+version = "0.1.0"
+description = "PyTorch ML components"
+dependencies = [
+    "numpy",
+    "torch @ pytorch-cpu; sys_platform == 'darwin'",
+    "torchvision @ pytorch-cpu; sys_platform == 'darwin'",
+    "torch @ pytorch-cuda; sys_platform == 'linux'",
+    "torchvision @ pytorch-cuda; sys_platform == 'linux'",
+]
+requires-python = ">=3.8"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv]
+dev-dependencies = []
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cuda"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
