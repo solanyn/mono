@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
   poppler-utils \
   && rm -rf /var/lib/apt/lists/*
 
-COPY ../../cronprint/** ./
+COPY cronprint/** ./
 ENV UV_PROJECT_ENVIRONMENT="/usr/local/"
 RUN uv sync --locked --no-dev
 
