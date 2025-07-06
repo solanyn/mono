@@ -38,5 +38,4 @@ create_venv(
         "@platforms//os:linux": "requirements-linux.lock",
     }),
     destination_folder = ".venv",
-    visibility = ["//visibility:public"],
 )
