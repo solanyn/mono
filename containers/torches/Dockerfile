@@ -2,7 +2,7 @@ FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
 
 WORKDIR /app
 
-COPY torches/** ./
+COPY torches/ ./
 ENV UV_PROJECT_ENVIRONMENT="/usr/local/"
 RUN uv sync --locked --no-dev
 
