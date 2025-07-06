@@ -2,8 +2,9 @@ FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
 
 WORKDIR /app
 
-COPY ../../jaxes/requirements_gpu.txt .
-RUN uv pip install --system --no-cache-dir -r requirements_gpu.txt
+COPY ../../jaxes/pyproject.toml ../../jaxes/requirements-linux.lock ./
+ENV UV_PROJECT_ENVIRONMENT="/usr/local/"
+RUN uv sync --locked --no-dev
 
 COPY ../../jaxes/*.py ./
 

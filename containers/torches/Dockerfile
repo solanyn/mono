@@ -2,8 +2,9 @@ FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
 
 WORKDIR /app
 
-COPY ../../torches/requirements_gpu.txt .
-RUN uv pip install --system --no-cache-dir -r requirements_gpu.txt
+COPY ../../torches/pyproject.toml ../../torches/requirements-linux.lock ./
+ENV UV_PROJECT_ENVIRONMENT="/usr/local/"
+RUN uv sync --locked --no-dev
 
 COPY ../../torches/*.py ./
 

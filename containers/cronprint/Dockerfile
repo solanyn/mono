@@ -3,14 +3,15 @@ FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y \
-    cups \
-    cups-filters \
-    ghostscript \
-    poppler-utils \
-    && rm -rf /var/lib/apt/lists/*
+  cups \
+  cups-filters \
+  ghostscript \
+  poppler-utils \
+  && rm -rf /var/lib/apt/lists/*
 
-COPY ../../cronprint/requirements.txt .
-RUN uv pip install --system --no-cache-dir -r requirements.txt
+COPY ../../cronprint/pyproject.toml ../../cronprint/requirements-linux.lock ./
+ENV UV_PROJECT_ENVIRONMENT="/usr/local/"
+RUN uv sync --locked --no-dev
 
 COPY cupsd.conf /etc/cups/cupsd.conf
 COPY ../../cronprint/*.py ./
