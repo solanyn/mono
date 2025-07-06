@@ -19,7 +19,7 @@ bazel_dep(name = "rules_oci", version = "2.2.6")
 bazel_dep(name = "container_structure_test", version = "1.19.1")
 
 # python
-PYTHON_VERSION = "3.13"
+PYTHON_VERSION = "3.12"
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(python_version = PYTHON_VERSION)
 
@@ -92,22 +92,6 @@ oci.pull(
     tag = "latest",
 )
 use_repo(oci, "distroless_base", "distroless_base_linux_amd64", "distroless_base_linux_arm64_v8", "distroless_cc", "distroless_cc_linux_amd64", "distroless_cc_linux_arm64_v8")
-
-# python non-hermetic containers
-buildx = use_extension(":buildx.bzl", "buildx")
-buildx.toolchains()
-use_repo(buildx, "buildx")
-
-oci.pull(
-    name = "python_3_13-bookworm-slim",
-    digest = "sha256:b2d0c4817830f4c208386f46cf244b6be2e212b27952e11266f7997e267ecbd4",
-    image = "ghcr.io/astral-sh/uv:python3.13-bookworm-slim",
-    platforms = [
-        "linux/arm64",
-        "linux/amd64",
-    ],
-)
-use_repo(oci, "python_3_13-bookworm-slim", "python_3_13-bookworm-slim_linux_amd64", "python_3_13-bookworm-slim_linux_arm64")
 
 # Nixpkgs for hermetic cross-compilation
 nixpkgs = use_extension("@rules_nixpkgs_core//:extensions.bzl", "nixpkgs")

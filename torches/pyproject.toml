@@ -4,10 +4,8 @@ version = "0.1.0"
 description = "PyTorch ML components"
 dependencies = [
     "numpy",
-    "torch @ pytorch-cpu; sys_platform == 'darwin'",
-    "torchvision @ pytorch-cpu; sys_platform == 'darwin'",
-    "torch @ pytorch-cuda; sys_platform == 'linux'",
-    "torchvision @ pytorch-cuda; sys_platform == 'linux'",
+    "torch",
+    "torchvision",
 ]
 requires-python = ">=3.8"
 
@@ -20,8 +18,8 @@ dev-dependencies = []
 
 [tool.uv.sources]
 torch = [
-  { index = "pytorch-cuda", markers = "sys_platform != 'darwin'" },
-  { index = "pytorch-cpu", markers = "sys_platform == 'darwin'" },
+  { index = "pytorch-cuda", marker = "sys_platform != 'darwin'" },
+  { index = "pytorch-cpu", marker = "sys_platform == 'darwin'" },
 ]
 
 [[tool.uv.index]]
@@ -31,5 +29,5 @@ explicit = true
 
 [[tool.uv.index]]
 name = "pytorch-cuda"
-url = "https://download.pytorch.org/whl/cu128"
+url = "https://download.pytorch.org/whl/cu118"
 explicit = true
