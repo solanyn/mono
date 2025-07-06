@@ -23,5 +23,5 @@ create_venv(
         "@platforms//os:macos": "requirements-darwin.lock",
         "@platforms//os:linux": "requirements-linux.lock",
     }),
-    destination_folder = ".venv",
+    destination_folder = "cronprint/.venv",
 )
