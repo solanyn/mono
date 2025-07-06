@@ -20,8 +20,8 @@ dev-dependencies = []
 
 [tool.uv.sources]
 torch = [
-  { index = "pytorch-cuda", "sys_platform != 'darwin'" },
-  { index = "pytorch-cpu", "sys_platform == 'darwin'" },
+  { index = "pytorch-cuda", markers = "sys_platform != 'darwin'" },
+  { index = "pytorch-cpu", markers = "sys_platform == 'darwin'" },
 ]
 
 [[tool.uv.index]]
