@@ -2,11 +2,7 @@
 name = "torches"
 version = "0.1.0"
 description = "PyTorch ML components"
-dependencies = [
-    "numpy",
-    "torch",
-    "torchvision",
-]
+dependencies = ["numpy", "torch", "torchvision"]
 requires-python = ">=3.8"
 
 [build-system]
