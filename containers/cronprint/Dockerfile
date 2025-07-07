@@ -3,6 +3,7 @@ FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y \
+  gcc \
   cups \
   cups-filters \
   ghostscript \
@@ -18,4 +19,4 @@ USER cronprint
 
 EXPOSE 8080
 
-CMD ["python", "main.py"]
+CMD ["cronprint"]

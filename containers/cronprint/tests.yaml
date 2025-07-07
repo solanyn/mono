@@ -2,7 +2,7 @@ schemaVersion: 2.0.0
 
 fileExistenceTests:
   - name: "cronprint exists"
-    path: "/app/main.py"
+    path: "/app/app.py"
     shouldExist: true
 
   - name: "CUPS daemon"
@@ -12,3 +12,7 @@ fileExistenceTests:
   - name: "cups config"
     path: "/etc/cups/cupsd.conf"
     shouldExist: true
+
+commandTests:
+  - name: "cronprint command available"
+    command: "cronprint"

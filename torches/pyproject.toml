@@ -5,6 +5,9 @@ description = "PyTorch ML components"
 dependencies = ["numpy", "torch", "torchvision"]
 requires-python = ">=3.8"
 
+[project.scripts]
+torches = "app:main"
+
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
