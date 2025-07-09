@@ -17,6 +17,9 @@ group "default" {
 }
 
 target "image" {
+  # Use workspace root as context to access source code in jaxes/ directory
+  context = "../.."
+  dockerfile = "./containers/jaxes/Dockerfile"
   labels = {
     "org.opencontainers.image.source" = "${SOURCE}"
   }

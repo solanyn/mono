@@ -6,9 +6,9 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 
-from config import load_config
-from health import setup_health_endpoints
-from scheduler import PrintScheduler
+from cronprint.config import load_config
+from cronprint.health import setup_health_endpoints
+from cronprint.scheduler import PrintScheduler
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

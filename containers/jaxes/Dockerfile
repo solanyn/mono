@@ -2,7 +2,8 @@ FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
 
 WORKDIR /app
 
-COPY ./ ./
+COPY ./jaxes/pyproject.toml ./jaxes/uv.lock ./
+COPY ./jaxes/jaxes ./jaxes
 ENV UV_PROJECT_ENVIRONMENT="/usr/local/"
 RUN uv sync --locked --no-editable && rm -rf /app/jaxes
 

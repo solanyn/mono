@@ -7,7 +7,8 @@ RUN apt-get update && apt-get install -y \
   libcups2-dev \
   && rm -rf /var/lib/apt/lists/*
 
-COPY ./ ./
+COPY ./cronprint/pyproject.toml ./cronprint/uv.lock ./
+COPY ./cronprint/cronprint ./cronprint
 ENV UV_PROJECT_ENVIRONMENT="/usr/local/"
 RUN uv sync --locked --no-editable && rm -rf /app/cronprint
 

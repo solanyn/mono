@@ -17,6 +17,9 @@ group "default" {
 }
 
 target "image" {
+  # Use workspace root as context to access source code in torches/ directory
+  context = "../.."
+  dockerfile = "./containers/torches/Dockerfile"
   labels = {
     "org.opencontainers.image.source" = "${SOURCE}"
   }
