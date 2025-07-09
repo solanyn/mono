@@ -2,14 +2,14 @@ variable "APP" {
   default = "mysql-init"
 }
 
-variable "ALPINE_VERSION" {
-  // renovate: datasource=docker depName=alpine
-  default = "3.22"
+variable "DEBIAN_VERSION" {
+  // renovate: datasource=docker depName=debian
+  default = "bookworm-slim"
 }
 
 variable "MYSQL_CLIENT_VERSION" {
-  // renovate: datasource=repology depName=alpine_3_22/mysql-client versioning=loose
-  default = "11"
+  // renovate: datasource=repology depName=debian_12/mysql-client versioning=loose
+  default = "8.0"
 }
 
 variable "VERSION" {
@@ -18,7 +18,7 @@ variable "VERSION" {
 }
 
 variable "SOURCE" {
-  default = "https://github.com/alpinelinux/aports"
+  default = "https://github.com/solanyn/goyangi"
 }
 
 group "default" {
@@ -27,7 +27,7 @@ group "default" {
 
 target "image" {
   args = {
-    ALPINE_VERSION = "${ALPINE_VERSION}"
+    DEBIAN_VERSION = "${DEBIAN_VERSION}"
     MYSQL_CLIENT_VERSION = "${MYSQL_CLIENT_VERSION}"
   }
   labels = {
