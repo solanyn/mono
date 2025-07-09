@@ -11,4 +11,6 @@ fileExistenceTests:
 
 commandTests:
   - name: "cronprint command available"
-    command: "cronprint"
+    command: "which"
+    args: ["cronprint"]
+    expectedOutput: ["/usr/local/bin/cronprint"]
