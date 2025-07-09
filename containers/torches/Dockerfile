@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY ./ ./
 ENV UV_PROJECT_ENVIRONMENT="/usr/local/"
-RUN uv sync --locked --no-dev
+RUN uv sync --locked --no-editable && rm -rf /app/torches
 
 RUN useradd -m -s /bin/bash torches
 USER torches

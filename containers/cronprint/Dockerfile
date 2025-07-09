@@ -1,18 +1,26 @@
-FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS builder
 
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y \
   gcc \
-  cups \
-  cups-filters \
-  ghostscript \
-  poppler-utils \
+  libcups2-dev \
   && rm -rf /var/lib/apt/lists/*
 
 COPY ./ ./
 ENV UV_PROJECT_ENVIRONMENT="/usr/local/"
-RUN uv sync --locked --no-dev
+RUN uv sync --locked --no-editable && rm -rf /app/cronprint
+
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+  cups \
+  libcups2 \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /usr/local /usr/local
 
 RUN useradd -m -s /bin/bash cronprint
 USER cronprint

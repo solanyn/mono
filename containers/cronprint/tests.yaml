@@ -1,10 +1,6 @@
 schemaVersion: 2.0.0
 
 fileExistenceTests:
-  - name: "cronprint exists"
-    path: "/app/app.py"
-    shouldExist: true
-
   - name: "CUPS daemon"
     path: "/usr/sbin/cupsd"
     shouldExist: true
