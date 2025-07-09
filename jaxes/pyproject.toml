@@ -12,7 +12,7 @@ dependencies = [
 requires-python = ">=3.12"
 
 [project.scripts]
-jaxes = "app:main"
+jaxes = "jaxes.app:main"
 
 [build-system]
 requires = ["setuptools>=61.0"]

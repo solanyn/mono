@@ -6,7 +6,7 @@ dependencies = ["fastapi", "uvicorn", "apscheduler", "pycups", "requests"]
 requires-python = ">=3.12"
 
 [project.scripts]
-cronprint = "app:main"
+cronprint = "cronprint.app:main"
 
 [build-system]
 requires = ["setuptools>=61.0"]

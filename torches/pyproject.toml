@@ -6,7 +6,7 @@ dependencies = ["numpy", "torch", "torchvision"]
 requires-python = ">=3.8"
 
 [project.scripts]
-torches = "app:main"
+torches = "torches.app:main"
 
 [build-system]
 requires = ["setuptools>=61.0"]
