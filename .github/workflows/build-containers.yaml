@@ -119,7 +119,7 @@ jobs:
       - name: Copy Source Code to Container Directory
         run: |
           if [ -d "${{ inputs.app }}" ]; then
-            cp -r "${{ inputs.app }}"/* "./containers/${{ inputs.app }}/"
+            rsync -av --ignore-existing "${{ inputs.app }}/" "./containers/${{ inputs.app }}/"
           fi
 
       - name: Setup Docker Buildx
