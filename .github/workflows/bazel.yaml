@@ -107,7 +107,7 @@ jobs:
         run: |
           # Get monorepo version
           MONOREPO_VERSION=$(./tools/get-version.sh .)
-          
+
           # Create manifest for latest tag
           docker buildx imagetools create \
             --tag ghcr.io/solanyn/gt7-telemetry:latest \
