@@ -33,8 +33,8 @@ target "image-local" {
 
 target "image-all" {
   inherits = ["image"]
+  # Only build for amd64 due to CUDA support limitations on arm64
   platforms = [
-    "linux/amd64",
-    "linux/arm64"
+    "linux/amd64"
   ]
 }
