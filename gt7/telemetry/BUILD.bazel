@@ -66,13 +66,23 @@ rust_binary(
 tar(
     name = "app_layer",
     srcs = [":app"],
+    target_compatible_with = [
+        "@platforms//os:linux",
+    ],
 )
 
 oci_image(
     name = "image",
-    base = "@distroless_cc",
+    base = select({
+        "//platforms:linux_arm64_config": "@distroless_cc_linux_arm64_v8",
+        "//platforms:linux_amd64_config": "@distroless_cc_linux_amd64",
+        "//conditions:default": "@distroless_cc",
+    }),
     entrypoint = ["/gt7/telemetry/app"],
     tars = [":app_layer"],
+    target_compatible_with = [
+        "@platforms//os:linux",
+    ],
     visibility = ["//visibility:public"],
 )
 
