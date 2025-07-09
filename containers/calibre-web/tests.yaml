@@ -1,0 +1,24 @@
+schemaVersion: 2.0.0
+
+fileExistenceTests:
+  - name: "calibre binary"
+    path: "/opt/calibre/calibre"
+    shouldExist: true
+
+  - name: "kepubify binary"
+    path: "/opt/kepubify/kepubify"
+    shouldExist: true
+
+  - name: "calibre-web entrypoint"
+    path: "/app/cps.py"
+    shouldExist: true
+
+  - name: "Config directory"
+    path: "/config"
+    shouldExist: true
+
+metadataTest:
+  workdir: "/config"
+  volumes: ["/config"]
+  entrypoint:
+    ["/usr/bin/catatonit", "--", "python3", "/app/cps.py", "-o", "/dev/stdout"]

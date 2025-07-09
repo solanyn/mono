@@ -1,21 +1,27 @@
-load("@rules_multirun//:defs.bzl", "multirun")
 load("@rules_uv//uv:pip.bzl", "pip_compile")
 load("@rules_uv//uv:venv.bzl", "create_venv")
 
-
-package(default_visibility = ["//visibility:public"])
-
+pip_compile(
+    name = "requirements_linux",
+    requirements_in = "pyproject.toml",
+    requirements_txt = "requirements-linux.lock",
+    python_platform = "x86_64-unknown-linux-gnu",
+    visibility = ["//visibility:public"],
+)
 
 pip_compile(
-    name = "requirements",
-    requirements_in = ":requirements.txt",
-    requirements_txt = ":requirements_lock.txt",
+    name = "requirements_darwin",
+    requirements_in = "pyproject.toml",
+    requirements_txt = "requirements-darwin.lock",
+    python_platform = "aarch64-apple-darwin",
+    visibility = ["//visibility:public"],
 )
 
 create_venv(
     name = "venv",
+    requirements_txt = select({
+        "@platforms//os:macos": "requirements-darwin.lock",
+        "@platforms//os:linux": "requirements-linux.lock",
+    }),
     destination_folder = "cronprint/.venv",
-    requirements_txt = "requirements_lock.txt",
 )
-
-

@@ -1,5 +1,0 @@
-numpy
-jax>=0.4.35
-jaxlib>=0.4.35
-jax-metal>=0.1.0
-

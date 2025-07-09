@@ -2,18 +2,23 @@ variable "APP" {
   default = "mysql-init"
 }
 
-
-variable "ALPINE_VERSION" {
-  // renovate: datasource=docker depName=alpine
-  default = "3.22"
+variable "DEBIAN_VERSION" {
+  // renovate: datasource=docker depName=debian
+  default = "bookworm-slim"
 }
 
-variable "REGISTRY" {
-  default = "ghcr.io/solanyn"
+variable "MYSQL_CLIENT_VERSION" {
+  // renovate: datasource=repology depName=debian_12/mysql-client versioning=loose
+  default = "8.0"
+}
+
+variable "VERSION" {
+  // renovate: datasource=docker depName=mysql versioning=semver updateType=major
+  default = "8"
 }
 
 variable "SOURCE" {
-  default = "https://github.com/alpinelinux/aports"
+  default = "https://github.com/solanyn/goyangi"
 }
 
 group "default" {
@@ -22,30 +27,24 @@ group "default" {
 
 target "image" {
   args = {
-    ALPINE_VERSION = "${ALPINE_VERSION}"
+    DEBIAN_VERSION = "${DEBIAN_VERSION}"
+    MYSQL_CLIENT_VERSION = "${MYSQL_CLIENT_VERSION}"
   }
   labels = {
     "org.opencontainers.image.source" = "${SOURCE}"
-    "org.opencontainers.image.title" = "${APP}"
-    "org.opencontainers.image.version" = "${ALPINE_VERSION}"
   }
 }
 
 target "image-local" {
   inherits = ["image"]
   output = ["type=docker"]
-  tags = ["${APP}:${ALPINE_VERSION}", "${APP}:latest"]
+  tags = ["${APP}:${VERSION}"]
 }
 
 target "image-all" {
   inherits = ["image"]
-  output = ["type=registry"]
   platforms = [
     "linux/amd64",
     "linux/arm64"
-  ]
-  tags = [
-    "${REGISTRY}/${APP}:${ALPINE_VERSION}",
-    "${REGISTRY}/${APP}:latest"
   ]
 }

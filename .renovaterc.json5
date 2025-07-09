@@ -45,6 +45,10 @@
       "postUpdateOptions": ["cargoUpdateLockfile"]
     },
     {
+      "matchManagers": ["npm"],
+      "postUpdateOptions": ["pnpmDedupe"]
+    },
+    {
       "description": "Auto-merge Container Updates",
       "automerge": true,
       "automergeType": "pr",

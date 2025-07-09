@@ -1,41 +1,27 @@
-load("@rules_multirun//:defs.bzl", "multirun")
 load("@rules_uv//uv:pip.bzl", "pip_compile")
-load("@rules_uv//uv:venv.bzl", "create_venv", "sync_venv")
-
+load("@rules_uv//uv:venv.bzl", "create_venv")
 
 pip_compile(
     name = "requirements_linux",
+    requirements_in = "pyproject.toml",
+    requirements_txt = "requirements-linux.lock",
     python_platform = "x86_64-unknown-linux-gnu",
-    requirements_in = ":requirements_gpu.txt",
-    requirements_txt = ":requirements_gpu_lock.txt",
+    visibility = ["//visibility:public"],
 )
 
 pip_compile(
-    name = "requirements_macos",
+    name = "requirements_darwin",
+    requirements_in = "pyproject.toml",
+    requirements_txt = "requirements-darwin.lock",
     python_platform = "aarch64-apple-darwin",
-    requirements_in = ":requirements_darwin.txt",
-    requirements_txt = ":requirements_darwin_lock.txt",
-)
-
-multirun(
-    name = "requirements",
-    commands = [
-        ":requirements_linux",
-        ":requirements_macos",
-    ],
-    # Running in a single threaded mode allows consecutive `uv` invocations to benefit
-    # from the `uv` cache from the first run.
-    jobs = 1,
+    visibility = ["//visibility:public"],
 )
 
 create_venv(
     name = "venv",
-    destination_folder = "torches/.venv",
     requirements_txt = select({
-        "@platforms//os:linux": ":requirements_lock.txt",
-        "@platforms//os:osx": ":requirements_darwin_lock.txt",
+        "@platforms//os:macos": "requirements-darwin.lock",
+        "@platforms//os:linux": "requirements-linux.lock",
     }),
+    destination_folder = "torches/.venv",
 )
-
-
-

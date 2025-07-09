@@ -1,0 +1,37 @@
+schemaVersion: 2.0.0
+
+fileExistenceTests:
+  - name: "Calibre binary"
+    path: "/app/calibre"
+    shouldExist: true
+
+  - name: "Entrypoint script"
+    path: "/entrypoint.sh"
+    shouldExist: true
+
+  - name: "Config directory"
+    path: "/config"
+    shouldExist: true
+
+commandTests:
+  - name: "calibre-server version"
+    command: "/app/calibre-server"
+    args: ["--version"]
+    exitCode: 0
+
+  - name: "entrypoint is executable"
+    command: "stat"
+    args: ["-c", "%A", "/entrypoint.sh"]
+    expectedOutput: ["-rwxr-xr-x"]
+
+metadataTest:
+  envVars:
+    - key: "CALIBRE__CREATE_LIBRARY"
+      value: "true"
+    - key: "CALIBRE__LIBRARY"
+      value: "/config"
+    - key: "CALIBRE__PORT"
+      value: "8080"
+  workdir: "/config"
+  volumes: ["/config"]
+  entrypoint: ["/usr/bin/catatonit", "--", "/entrypoint.sh"]

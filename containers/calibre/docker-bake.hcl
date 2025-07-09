@@ -1,3 +1,5 @@
+target "docker-metadata-action" {}
+
 variable "APP" {
   default = "calibre"
 }
@@ -7,13 +9,13 @@ variable "CALIBRE_VERSION" {
   default = "8.5.0"
 }
 
-variable "UBUNTU_VERSION" {
-  // renovate: datasource=docker depName=ubuntu
-  default = "24.04"
+variable "DEBIAN_VERSION" {
+  // renovate: datasource=docker depName=debian
+  default = "bookworm-slim"
 }
 
-variable "REGISTRY" {
-  default = "ghcr.io/solanyn"
+variable "VERSION" {
+  default = "${CALIBRE_VERSION}"
 }
 
 variable "SOURCE" {
@@ -27,30 +29,23 @@ group "default" {
 target "image" {
   args = {
     CALIBRE_VERSION = "${CALIBRE_VERSION}"
-    UBUNTU_VERSION = "${UBUNTU_VERSION}"
+    DEBIAN_VERSION = "${DEBIAN_VERSION}"
   }
   labels = {
     "org.opencontainers.image.source" = "${SOURCE}"
-    "org.opencontainers.image.title" = "${APP}"
-    "org.opencontainers.image.version" = "${CALIBRE_VERSION}"
   }
 }
 
 target "image-local" {
   inherits = ["image"]
   output = ["type=docker"]
-  tags = ["${APP}:${CALIBRE_VERSION}", "${APP}:latest"]
+  tags = ["${APP}:${VERSION}"]
 }
 
 target "image-all" {
   inherits = ["image"]
-  output = ["type=registry"]
   platforms = [
     "linux/amd64",
     "linux/arm64"
-  ]
-  tags = [
-    "${REGISTRY}/${APP}:${CALIBRE_VERSION}",
-    "${REGISTRY}/${APP}:latest"
   ]
 }

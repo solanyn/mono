@@ -1,4 +1,5 @@
 load("@npm//:defs.bzl", "npm_link_all_packages")
+load("@rules_multirun//:defs.bzl", "multirun")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -7,4 +8,16 @@ package(default_visibility = ["//visibility:public"])
 # gazelle:map_kind py_test py_test @aspect_rules_py//py:defs.bzl
 
 npm_link_all_packages(name = "node_modules")
+
+PROJECTS = ["//jaxes", "//torches", "//cronprint"]
+PLATFORMS = ["darwin", "linux"]
+
+multirun(
+    name = "requirements",
+    commands = [
+        "{}:requirements_{}".format(project, platform)
+        for platform in PLATFORMS
+        for project in PROJECTS
+    ],
+)
 

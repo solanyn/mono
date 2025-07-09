@@ -2,9 +2,10 @@ load("@aspect_bazel_lib//lib:tar.bzl", "tar")
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
 load("@container_structure_test//:defs.bzl", "container_structure_test")
+load("@aspect_bazel_lib//lib:expand_template.bzl", "expand_template")
 
 rust_library(
-    name = "gt7_telemetry_core",
+    name = "lib",
     srcs = [
         "src/config.rs",
         "src/constants.rs",
@@ -28,14 +29,14 @@ rust_library(
 )
 
 rust_test(
-    name = "gt7_telemetry_core_test",
-    crate = ":gt7_telemetry_core",
+    name = "test",
+    crate = ":lib",
     edition = "2021",
     size = "small",
 )
 
 rust_binary(
-    name = "telemetry_server",
+    name = "app",
     srcs = [
         "src/http_server.rs",
         "src/kafka_handler.rs",
@@ -48,7 +49,7 @@ rust_binary(
     edition = "2021",
     visibility = ["//visibility:public"],
     deps = [
-        ":gt7_telemetry_core",
+        ":lib",
         "@crates//:axum",
         "@crates//:axum-extra",
         "@crates//:env_logger",
@@ -63,36 +64,56 @@ rust_binary(
 )
 
 tar(
-    name = "telemetry_server_layer",
-    srcs = [":telemetry_server"],
+    name = "app_layer",
+    srcs = [":app"],
+    target_compatible_with = [
+        "@platforms//os:linux",
+    ],
 )
 
 oci_image(
-    name = "telemetry_image",
-    base = "@distroless_cc",
-    entrypoint = ["/gt7/telemetry/telemetry_server"],
-    tars = [":telemetry_server_layer"],
+    name = "image",
+    base = select({
+        "//platforms:linux_arm64_config": "@distroless_cc_linux_arm64_v8",
+        "//platforms:linux_amd64_config": "@distroless_cc_linux_amd64",
+        "//conditions:default": "@distroless_cc",
+    }),
+    entrypoint = ["/gt7/telemetry/app"],
+    tars = [":app_layer"],
+    target_compatible_with = [
+        "@platforms//os:linux",
+    ],
     visibility = ["//visibility:public"],
 )
 
 oci_load(
-    name = "telemetry_tarball",
-    image = ":telemetry_image",
-    repo_tags = ["telemetry:latest"],
+    name = "load",
+    image = ":image",
+    repo_tags = ["ghcr.io/solanyn/gt7-telemetry:latest"],
     visibility = ["//visibility:public"],
 )
 
+expand_template(
+    name = "stamped_tags",
+    out = "_stamped_tags.txt",
+    template = ["latest\n{{VERSION}}"],
+    stamp_substitutions = {
+        "{{VERSION}}": "{{STABLE_VERSION}}",
+    },
+)
+
 oci_push(
-    name = "telemetry_push",
-    image = ":telemetry_image",
-    repository = "ghcr.io/solanyn/telemetry",
-    remote_tags = ["latest"],
+    name = "push",
+    image = ":image",
+    repository = "ghcr.io/solanyn/gt7-telemetry",
+    remote_tags = ":stamped_tags",
     visibility = ["//visibility:public"],
 )
 
 container_structure_test(
-    name = "telemetry_structure_test",
-    configs = ["container-structure-test.yaml"],
-    image = ":telemetry_image",
+    name = "container_test",
+    configs = ["tests.yaml"],
+    image = ":image",
     visibility = ["//visibility:public"],
+    size="small",
 )

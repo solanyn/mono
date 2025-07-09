@@ -113,8 +113,8 @@ bazelisk build //gt7/telemetry:telemetry_server
 
 ### Python
 
-- **Build System**: Bazel with `rules_uv` to build virtual environments
-- **Dependency Management**: requirements.txt with rules_uv
+- **Build System**: Bazel with `rules_uv` using uv's pip_compile
+- **Dependency Management**: pyproject.toml with uv resolver
 
 ```bash
 bazelisk run //torches:requirements
@@ -200,6 +200,7 @@ bazelisk info
 - Check CI compatibility - all commands should work in GitHub Actions
 - Use `.yaml` extension for all YAML files (not `.yml`)
 - Update this documentation when adding new tools or workflows
+- Use Plan Mode + ultrathink when making TODOs.
 
 ## External Dependencies
 
@@ -218,4 +219,3 @@ For questions about this setup:
 1. Check the Aspect CLI documentation: <https://docs.aspect.build/cli>
 2. Consult Bazel Bzlmod guide: <https://bazel.build/external/migration>
 3. See the specific Bazel ruleset documentation
-

@@ -1,7 +1,8 @@
 ARG CNPG_VERSION
 ARG TIMESCALEDB_VERSION
+ARG DEBIAN_VERSION
 
-FROM ghcr.io/cloudnative-pg/postgresql:$CNPG_VERSION-bookworm
+FROM ghcr.io/cloudnative-pg/postgresql:${CNPG_VERSION}-${DEBIAN_VERSION}
 
 ARG PG_MAJOR
 ARG CNPG_VERSION
