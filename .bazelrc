@@ -54,10 +54,10 @@ build:remote --dynamic_mode=off
 # build:remote --extra_execution_platforms=//tools/remote-toolchains:ubuntu-act-22-04-platform
 
 # CI configuration
-build:ci --config=remote
 build:ci --stamp
+build:ci --platforms=//platforms:linux_amd64
 
-test:ci --config=remote
+test:ci --stamp
 
 # Workspace status for stamping
 build --workspace_status_command=tools/workspace_status.sh
