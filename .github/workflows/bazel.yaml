@@ -65,10 +65,7 @@ jobs:
           repository-cache: true
       - name: Push all OCI images for ${{ matrix.platform.bazel-platform }}
         run: |
-          # Get monorepo version
           MONOREPO_VERSION=$(./tools/get-version.sh .)
-
-          # Find and run all oci_push targets for this platform
           OCI_TARGETS=$(bazel query 'kind("oci_push", //...)' --config=ci 2>/dev/null || echo "")
 
           if [ -z "$OCI_TARGETS" ]; then
@@ -76,7 +73,6 @@ jobs:
             exit 0
           fi
 
-          # Determine platform suffix
           if [[ "${{ matrix.platform.bazel-platform }}" == "//platforms:linux_amd64" ]]; then
             PLATFORM_SUFFIX="linux-amd64"
           elif [[ "${{ matrix.platform.bazel-platform }}" == "//platforms:linux_arm64" ]]; then
@@ -88,11 +84,8 @@ jobs:
 
           for target in $OCI_TARGETS; do
             echo "Pushing $target for ${{ matrix.platform.bazel-platform }}"
-            
-            # Push with platform-specific latest tag
+            bazel run $target --config=ci --platforms=${{ matrix.platform.bazel-platform }}
             bazel run $target --config=ci --platforms=${{ matrix.platform.bazel-platform }} -- --tag latest-$PLATFORM_SUFFIX
-            
-            # Push with platform-specific version tag  
             bazel run $target --config=ci --platforms=${{ matrix.platform.bazel-platform }} -- --tag $MONOREPO_VERSION-$PLATFORM_SUFFIX
           done
 
@@ -113,16 +106,13 @@ jobs:
           password: "${{ github.token }}"
       - name: Create multi-platform manifest
         run: |
-          # Get monorepo version
           MONOREPO_VERSION=$(./tools/get-version.sh .)
 
-          # Create manifest for latest tag
           docker buildx imagetools create \
             --tag ghcr.io/solanyn/gt7-telemetry:latest \
             ghcr.io/solanyn/gt7-telemetry:latest-linux-amd64 \
             ghcr.io/solanyn/gt7-telemetry:latest-linux-arm64
             
-          # Create manifest for version tag
           docker buildx imagetools create \
             --tag ghcr.io/solanyn/gt7-telemetry:$MONOREPO_VERSION \
             ghcr.io/solanyn/gt7-telemetry:$MONOREPO_VERSION-linux-amd64 \
