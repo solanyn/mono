@@ -55,10 +55,8 @@ build:remote --dynamic_mode=off
 
 # CI configuration
 build:ci --stamp
+build:ci --workspace_status_command=tools/workspace_status.sh
 
 test:ci --stamp
-
-# Workspace status for stamping
-build --workspace_status_command=tools/workspace_status.sh
 
 try-import %workspace%/.aspect/bazelrc/user.bazelrc
