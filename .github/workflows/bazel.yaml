@@ -69,13 +69,21 @@ jobs:
           MONOREPO_VERSION=$(./tools/get-version.sh .)
 
           # Find and run all oci_push targets for this platform
-          OCI_TARGETS=$(bazel query 'kind("oci_push", //...)' --config=ci)
+          OCI_TARGETS=$(bazel query 'kind("oci_push", //...)' --config=ci 2>/dev/null || echo "")
+          
+          if [ -z "$OCI_TARGETS" ]; then
+            echo "No OCI push targets found, skipping container push"
+            exit 0
+          fi
 
           # Determine platform suffix
           if [[ "${{ matrix.platform.bazel-platform }}" == "//platforms:linux_amd64" ]]; then
             PLATFORM_SUFFIX="linux-amd64"
-          else
+          elif [[ "${{ matrix.platform.bazel-platform }}" == "//platforms:linux_arm64" ]]; then
             PLATFORM_SUFFIX="linux-arm64"
+          else
+            echo "Unknown platform: ${{ matrix.platform.bazel-platform }}"
+            exit 1
           fi
 
           for target in $OCI_TARGETS; do

@@ -9,7 +9,7 @@ import %workspace%/.aspect/bazelrc/performance.bazelrc
 common --incompatible_enable_proto_toolchain_resolution
 
 build:linux --platforms=//platforms:linux_amd64
-build:macos --platforms=//platforms:darwin_arm64
+build:macos --platforms=//platforms:darwin_arm64_platform
 
 # proto
 build --incompatible_enable_proto_toolchain_resolution
