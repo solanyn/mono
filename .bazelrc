@@ -55,7 +55,6 @@ build:remote --dynamic_mode=off
 
 # CI configuration
 build:ci --stamp
-build:ci --platforms=//platforms:linux_amd64
 
 test:ci --stamp
 
