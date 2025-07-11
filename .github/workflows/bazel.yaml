@@ -69,10 +69,19 @@ jobs:
         id: push
         run: |
           MONOREPO_VERSION=$(./tools/get-version.sh .)
-          OCI_TARGETS=$(bazel query 'kind("oci_push", //...)' --config=ci 2>/dev/null || echo "")
+          
+          # Debug: try query without --config=ci first
+          echo "Trying basic query..."
+          bazel query 'kind("oci_push", //...)' || echo "Basic query failed"
+          
+          # Try with --config=ci and capture stderr
+          echo "Trying query with --config=ci..."
+          OCI_TARGETS=$(bazel query 'kind("oci_push", //...)' --config=ci 2>&1 || echo "")
+          echo "Query result: '$OCI_TARGETS'"
 
-          if [ -z "$OCI_TARGETS" ]; then
-            echo "No OCI push targets found, skipping container push"
+          if [ -z "$OCI_TARGETS" ] || [[ "$OCI_TARGETS" == *"ERROR"* ]]; then
+            echo "No OCI push targets found or query failed, skipping container push"
+            echo "Query output: $OCI_TARGETS"
             echo "tags=" >> $GITHUB_OUTPUT
             exit 0
           fi
