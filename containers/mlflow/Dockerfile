@@ -1,22 +1,28 @@
 FROM ghcr.io/astral-sh/uv:python3.13-alpine AS builder
 
 ARG VERSION=3.1.1
+
+ENV UV_COMPILE_BYTECODE=1
+ENV UV_LINK_MODE=copy
+
 RUN uv venv /app/venv && \
-    uv pip install --venv /app/venv \
-    "mlflow==${VERSION}" \
-    psycopg2-binary \
-    boto3
+  uv pip install --venv /app/venv \
+  "mlflow==${VERSION}" \
+  psycopg2-binary \
+  boto3
+
+FROM python:3.13-alpine
 
 ARG TARGETARCH
 ARG VERSION=3.1.1
 
 RUN addgroup -g 1001 mlflow && \
-    adduser -u 1001 -G mlflow -s /bin/sh -D mlflow
+  adduser -u 1001 -G mlflow -s /bin/sh -D mlflow
 
 RUN apk add --no-cache \
-    curl \
-    postgresql-client \
-    && rm -rf /var/cache/apk/*
+  curl \
+  postgresql-client \
+  && rm -rf /var/cache/apk/*
 
 COPY --from=builder /app/venv /app/venv
 
@@ -35,7 +41,7 @@ ENV MLFLOW_HOST=0.0.0.0
 ENV MLFLOW_PORT=5000
 
 CMD ["mlflow", "server", \
-     "--backend-store-uri", "${MLFLOW_BACKEND_STORE_URI}", \
-     "--default-artifact-root", "${MLFLOW_DEFAULT_ARTIFACT_ROOT}", \
-     "--host", "${MLFLOW_HOST}", \
-     "--port", "${MLFLOW_PORT}"]
+  "--backend-store-uri", "${MLFLOW_BACKEND_STORE_URI}", \
+  "--default-artifact-root", "${MLFLOW_DEFAULT_ARTIFACT_ROOT}", \
+  "--host", "${MLFLOW_HOST}", \
+  "--port", "${MLFLOW_PORT}"]
