@@ -80,7 +80,7 @@ jobs:
           echo "Debug: Trying specific target..."
           bazel query '//gt7/telemetry:push' --config=ci || echo "Specific target query failed"
 
-          OCI_TARGETS=$(bazel query 'kind("oci_push", //...)' --config=ci 2>/dev/null || echo "")
+          OCI_TARGETS=$(bazel query 'kind("oci_push", //...)' 2>/dev/null || echo "")
           echo "Found targets: '$OCI_TARGETS'"
 
           if [ -z "$OCI_TARGETS" ]; then
@@ -101,11 +101,11 @@ jobs:
           PUSHED_TAGS=""
           for target in $OCI_TARGETS; do
             echo "Pushing $target for ${{ matrix.platform.bazel-platform }}"
-            if bazel run $target --config=ci --platforms=${{ matrix.platform.bazel-platform }}; then
-              if bazel run $target --config=ci --platforms=${{ matrix.platform.bazel-platform }} -- --tag latest-$PLATFORM_SUFFIX; then
+            if bazel run $target --platforms=${{ matrix.platform.bazel-platform }}; then
+              if bazel run $target --platforms=${{ matrix.platform.bazel-platform }} -- --tag latest-$PLATFORM_SUFFIX; then
                 PUSHED_TAGS="$PUSHED_TAGS latest-$PLATFORM_SUFFIX"
               fi
-              if bazel run $target --config=ci --platforms=${{ matrix.platform.bazel-platform }} -- --tag $MONOREPO_VERSION-$PLATFORM_SUFFIX; then
+              if bazel run $target --platforms=${{ matrix.platform.bazel-platform }} -- --tag $MONOREPO_VERSION-$PLATFORM_SUFFIX; then
                 PUSHED_TAGS="$PUSHED_TAGS $MONOREPO_VERSION-$PLATFORM_SUFFIX"
               fi
             fi
