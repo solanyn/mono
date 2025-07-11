@@ -13,7 +13,7 @@ fileExistenceTests:
     isDirectory: true
 
   - name: "virtual environment exists"
-    path: "/app/venv"
+    path: "/app/.venv"
     shouldExist: true
     isDirectory: true
 

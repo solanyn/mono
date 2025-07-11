@@ -5,8 +5,9 @@ ARG VERSION=3.1.1
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 
-RUN uv venv /app/venv && \
-  uv pip install --venv /app/venv \
+WORKDIR /app
+RUN uv venv && \
+  uv pip install \
   "mlflow==${VERSION}" \
   psycopg2-binary \
   boto3
@@ -24,7 +25,7 @@ RUN apk add --no-cache \
   postgresql-client \
   && rm -rf /var/cache/apk/*
 
-COPY --from=builder /app/venv /app/venv
+COPY --from=builder /app/.venv /app/.venv
 
 RUN mkdir -p /config && chown mlflow:mlflow /config
 
@@ -34,7 +35,7 @@ WORKDIR /config
 
 EXPOSE 5000
 
-ENV PATH="/app/venv/bin:$PATH"
+ENV PATH="/app/.venv/bin:$PATH"
 ENV MLFLOW_BACKEND_STORE_URI=sqlite:///config/mlflow.db
 ENV MLFLOW_DEFAULT_ARTIFACT_ROOT=file:///config/artifacts
 ENV MLFLOW_HOST=0.0.0.0
