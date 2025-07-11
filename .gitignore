@@ -45,6 +45,7 @@ tmp
 .bazelversion
 # User-specific .bazelrc
 user.bazelrc
+.aspect/bazelrc/user.bazelrc
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

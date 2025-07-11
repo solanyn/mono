@@ -59,4 +59,12 @@ build:ci --workspace_status_command=tools/workspace_status.sh
 
 test:ci --stamp
 
+# BuildBuddy remote cache and execution
+build:remote --bes_results_url=https://goyangi.buildbuddy.io/invocation/
+build:remote --bes_backend=grpcs://goyangi.buildbuddy.io
+build:remote --remote_cache=grpcs://goyangi.buildbuddy.io
+build:remote --noremote_upload_local_results
+build:remote --remote_timeout=10m
+build:remote --remote_executor=grpcs://goyangi.buildbuddy.io
+
 try-import %workspace%/.aspect/bazelrc/user.bazelrc
