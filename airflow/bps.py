@@ -20,11 +20,6 @@ NSW_PROPERTY_SALES_INFORMATION_URL = (
 @task
 @retry(retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)))
 def fetch_zip_file_links() -> List[str]:
-    """Fetch all ZIP file links from the NSW property sales information page.
-
-    Returns:
-        List[str]: List of URLs to ZIP files
-    """
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -62,14 +57,6 @@ def fetch_zip_file_links() -> List[str]:
 @task
 @retry(retry=retry_if_exception_type((IOError)))
 def download_link_to_s3(url: str) -> str:
-    """Download a file from URL and upload to S3.
-
-    Args:
-        url (str): Source URL of the file
-
-    Returns:
-        str: Status message
-    """
     s3 = s3fs.S3FileSystem(
         key=os.getenv("AWS_ACCESS_KEY_ID"),
         secret=os.getenv("AWS_SECRET_ACCESS_KEY"),
@@ -97,21 +84,20 @@ def download_link_to_s3(url: str) -> str:
     start_date=days_ago(1),
     catchup=False,
     tags=["property", "sales"],
-    max_active_runs=1,  # Only allow one run at a time
+    max_active_runs=1,
     default_args={
         "retries": 3,
         "retry_delay": timedelta(minutes=5),
-        "execution_timeout": timedelta(minutes=30),  # Timeout if task takes too long
+        "execution_timeout": timedelta(minutes=30),
     },
 )
 def nsw_property_sales_dag():
-    """DAG to download NSW property sales data and upload to S3."""
     try:
         urls = fetch_zip_file_links()
         if not urls:
             raise ValueError("No ZIP files found to download")
 
-        download_link_to_s3.expand(url=urls)  # task mapping
+        download_link_to_s3.expand(url=urls)
     except Exception as e:
         logging.error(f"DAG execution failed: {str(e)}")
         raise
