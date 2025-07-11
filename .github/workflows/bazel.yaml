@@ -42,6 +42,8 @@ jobs:
     runs-on: ${{ matrix.platform.runner }}
     needs: test
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    outputs:
+      pushed-tags: ${{ steps.push.outputs.tags }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -64,12 +66,14 @@ jobs:
           disk-cache: ${{ github.workflow }}
           repository-cache: true
       - name: Push all OCI images for ${{ matrix.platform.bazel-platform }}
+        id: push
         run: |
           MONOREPO_VERSION=$(./tools/get-version.sh .)
           OCI_TARGETS=$(bazel query 'kind("oci_push", //...)' --config=ci 2>/dev/null || echo "")
 
           if [ -z "$OCI_TARGETS" ]; then
             echo "No OCI push targets found, skipping container push"
+            echo "tags=" >> $GITHUB_OUTPUT
             exit 0
           fi
 
@@ -82,10 +86,53 @@ jobs:
             exit 1
           fi
 
+          PUSHED_TAGS=""
           for target in $OCI_TARGETS; do
             echo "Pushing $target for ${{ matrix.platform.bazel-platform }}"
-            bazel run $target --config=ci --platforms=${{ matrix.platform.bazel-platform }}
-            bazel run $target --config=ci --platforms=${{ matrix.platform.bazel-platform }} -- --tag latest-$PLATFORM_SUFFIX
-            bazel run $target --config=ci --platforms=${{ matrix.platform.bazel-platform }} -- --tag $MONOREPO_VERSION-$PLATFORM_SUFFIX
+            if bazel run $target --config=ci --platforms=${{ matrix.platform.bazel-platform }}; then
+              if bazel run $target --config=ci --platforms=${{ matrix.platform.bazel-platform }} -- --tag latest-$PLATFORM_SUFFIX; then
+                PUSHED_TAGS="$PUSHED_TAGS latest-$PLATFORM_SUFFIX"
+              fi
+              if bazel run $target --config=ci --platforms=${{ matrix.platform.bazel-platform }} -- --tag $MONOREPO_VERSION-$PLATFORM_SUFFIX; then
+                PUSHED_TAGS="$PUSHED_TAGS $MONOREPO_VERSION-$PLATFORM_SUFFIX"
+              fi
+            fi
           done
+          echo "tags=$PUSHED_TAGS" >> $GITHUB_OUTPUT
+
+  create-manifest:
+    runs-on: ubuntu-latest
+    needs: push-images
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(needs.push-images.outputs.pushed-tags, 'latest-linux-') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3.4.0
+        with:
+          registry: ghcr.io
+          username: "${{ github.actor }}"
+          password: "${{ github.token }}"
+      - name: Create multi-platform manifest
+        run: |
+          MONOREPO_VERSION=$(./tools/get-version.sh .)
+          
+          # Only create manifests if we have both platform tags
+          PUSHED_TAGS="${{ needs.push-images.outputs.pushed-tags }}"
+          if [[ "$PUSHED_TAGS" == *"latest-linux-amd64"* && "$PUSHED_TAGS" == *"latest-linux-arm64"* ]]; then
+            docker buildx imagetools create \
+              --tag ghcr.io/solanyn/gt7-telemetry:latest \
+              ghcr.io/solanyn/gt7-telemetry:latest-linux-amd64 \
+              ghcr.io/solanyn/gt7-telemetry:latest-linux-arm64
+              
+            docker buildx imagetools create \
+              --tag ghcr.io/solanyn/gt7-telemetry:$MONOREPO_VERSION \
+              ghcr.io/solanyn/gt7-telemetry:$MONOREPO_VERSION-linux-amd64 \
+              ghcr.io/solanyn/gt7-telemetry:$MONOREPO_VERSION-linux-arm64
+          else
+            echo "Insufficient platform tags to create multi-platform manifest"
+            echo "Available tags: $PUSHED_TAGS"
+          fi
 
