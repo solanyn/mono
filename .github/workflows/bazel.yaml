@@ -69,10 +69,19 @@ jobs:
         id: push
         run: |
           MONOREPO_VERSION=$(./tools/get-version.sh .)
-          
+
           echo "Finding OCI push targets..."
+          echo "Debug: Trying basic query first..."
+          bazel query 'kind("oci_push", //...)' || echo "Basic query failed"
+
+          echo "Debug: Trying with CI config..."
+          bazel query 'kind("oci_push", //...)' --config=ci || echo "CI config query failed"
+
+          echo "Debug: Trying specific target..."
+          bazel query '//gt7/telemetry:push' --config=ci || echo "Specific target query failed"
+
           OCI_TARGETS=$(bazel query 'kind("oci_push", //...)' --config=ci 2>/dev/null || echo "")
-          echo "Found targets: $OCI_TARGETS"
+          echo "Found targets: '$OCI_TARGETS'"
 
           if [ -z "$OCI_TARGETS" ]; then
             echo "No OCI push targets found, skipping container push"
@@ -121,7 +130,7 @@ jobs:
       - name: Create multi-platform manifest
         run: |
           MONOREPO_VERSION=$(./tools/get-version.sh .)
-          
+
           # Only create manifests if we have both platform tags
           PUSHED_TAGS="${{ needs.push-images.outputs.pushed-tags }}"
           if [[ "$PUSHED_TAGS" == *"latest-linux-amd64"* && "$PUSHED_TAGS" == *"latest-linux-arm64"* ]]; then
@@ -138,4 +147,3 @@ jobs:
             echo "Insufficient platform tags to create multi-platform manifest"
             echo "Available tags: $PUSHED_TAGS"
           fi
-
