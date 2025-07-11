@@ -37,7 +37,7 @@ jobs:
         platform:
           - runner: ubuntu-latest
             bazel-platform: //platforms:linux_amd64
-          - runner: ubuntu-24.04-arm64
+          - runner: ubuntu-24.04-arm
             bazel-platform: //platforms:linux_arm64
     runs-on: ${{ matrix.platform.runner }}
     needs: test
@@ -70,7 +70,7 @@ jobs:
 
           # Find and run all oci_push targets for this platform
           OCI_TARGETS=$(bazel query 'kind("oci_push", //...)' --config=ci 2>/dev/null || echo "")
-          
+
           if [ -z "$OCI_TARGETS" ]; then
             echo "No OCI push targets found, skipping container push"
             exit 0
