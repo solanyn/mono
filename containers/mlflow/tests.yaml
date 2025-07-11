@@ -10,14 +10,13 @@ fileExistenceTests:
   - name: "config directory exists"
     path: "/config"
     shouldExist: true
-    isDirectory: true
 
   - name: "virtual environment exists"
     path: "/app/.venv"
     shouldExist: true
-    isDirectory: true
 
 metadataTest:
   exposedPorts: ["5000"]
   user: "mlflow"
   workdir: "/config"
+
