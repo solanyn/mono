@@ -1,4 +1,4 @@
-FROM ghcr.io/astral-sh/uv:python3.13-alpine AS builder
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS builder
 
 ARG VERSION=3.1.1
 
@@ -12,18 +12,18 @@ RUN uv venv && \
   psycopg2-binary \
   boto3
 
-FROM python:3.13-alpine
+FROM python:3.13-slim-bookworm
 
 ARG TARGETARCH
 ARG VERSION=3.1.1
 
-RUN addgroup -g 1001 mlflow && \
-  adduser -u 1001 -G mlflow -s /bin/sh -D mlflow
+RUN groupadd -g 1001 mlflow && \
+  useradd -u 1001 -g mlflow -s /bin/bash -m mlflow
 
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y \
   curl \
   postgresql-client \
-  && rm -rf /var/cache/apk/*
+  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/.venv /app/.venv
 
