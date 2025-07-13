@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Install xz
+        run: sudo apt-get update && sudo apt-get install -y xz-utils
       - name: Install Nix
         uses: cachix/install-nix-action@v31
         with:
@@ -25,9 +27,9 @@ jobs:
         with:
           bazelisk-cache: true
       - name: Build all targets
-        run: bazel build //... --config=ci --config=remote
+        run: bazel build //... --config=ci --config=ci:remote
       - name: Test all targets
-        run: bazel test //... --config=ci --config=remote
+        run: bazel test //... --config=ci --config=ci:remote
 
   push-images:
     strategy:
@@ -47,6 +49,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Install xz
+        run: sudo apt-get update && sudo apt-get install -y xz-utils
       - name: Install Nix
         uses: cachix/install-nix-action@v31
         with:
@@ -97,7 +101,7 @@ jobs:
           # Build targets first to generate stamped tags
           echo "Building OCI targets with stamping..."
           for target in $OCI_TARGETS; do
-            bazel build $target --config=ci --config=remote --platforms=${{ matrix.platform.bazel-platform }}
+            bazel build $target --config=ci --config=ci:remote --platforms=${{ matrix.platform.bazel-platform }}
           done
 
           PUSHED_TAGS=""

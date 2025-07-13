@@ -1,0 +1,22 @@
+schemaVersion: 2.0.0
+
+commandTests:
+  - name: "mlflow command exists"
+    command: "which"
+    args: ["mlflow"]
+    exitCode: 0
+
+fileExistenceTests:
+  - name: "config directory exists"
+    path: "/config"
+    shouldExist: true
+
+  - name: "virtual environment exists"
+    path: "/app/.venv"
+    shouldExist: true
+
+metadataTest:
+  exposedPorts: ["5000"]
+  user: "mlflow"
+  workdir: "/config"
+

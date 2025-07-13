@@ -20,10 +20,16 @@ build:ci --workspace_status_command=tools/workspace_status.sh
 
 test:ci --stamp
 
-# BuildBarn remote cache and execution (commented out - service not accessible)
-# build:remote --remote_cache=grpc://buildbarn.goyangi.io:8980
-# build:remote --remote_executor=grpc://buildbarn.goyangi.io:8980
-# build:remote --remote_timeout=10m
-# build:remote --jobs=50
+# BuildBarn remote cache and execution - CI
+build:ci:remote --remote_cache=grpc://buildbarn-frontend.bazel.svc.cluster.local:8980
+build:ci:remote --remote_executor=grpc://buildbarn-frontend.bazel.svc.cluster.local:8980
+build:ci:remote --remote_timeout=10m
+build:ci:remote --jobs=50
+
+# BuildBarn remote cache and execution - Local development
+build:dev:remote --remote_cache=grpc://buildbarn.goyangi.io:8980
+build:dev:remote --remote_executor=grpc://buildbarn.goyangi.io:8980
+build:dev:remote --remote_timeout=10m
+build:dev:remote --jobs=50
 
 try-import %workspace%/.aspect/bazelrc/user.bazelrc

@@ -1,0 +1,13 @@
+schemaVersion: 2.0.0
+
+commandTests:
+  - name: "airflow command available"
+    command: "which"
+    args: ["airflow", "python"]
+    exitCode: 0
+
+metadataTest:
+  envVars:
+    - key: "AIRFLOW_HOME"
+      value: "/opt/airflow"
+

@@ -1,0 +1,25 @@
+schemaVersion: 2.0.0
+
+fileExistenceTests:
+  - name: "PostgreSQL binary"
+    path: "/usr/lib/postgresql/17/bin/postgres"
+    shouldExist: true
+
+  - name: "TimescaleDB extension"
+    path: "/usr/lib/postgresql/17/lib"
+    shouldExist: true
+
+commandTests:
+  - name: "postgres version"
+    command: "/usr/lib/postgresql/17/bin/postgres"
+    args: ["--version"]
+    exitCode: 0
+
+  - name: "psql available"
+    command: "/usr/lib/postgresql/17/bin/psql"
+    args: ["--version"]
+    exitCode: 0
+
+metadataTest:
+  user: "postgres"
+
