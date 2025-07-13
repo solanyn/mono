@@ -1,5 +1,0 @@
-s3fs
-beautifulsoup4
-httpx
-polars
-pyarrow
