@@ -12,7 +12,7 @@ permissions:
   packages: write
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: goyangi-runner
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,15 +25,15 @@ jobs:
         with:
           bazelisk-cache: true
       - name: Build all targets
-        run: bazel build //... --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }}
+        run: bazel build //... --config=ci --config=remote
       - name: Test all targets
-        run: bazel test //... --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }}
+        run: bazel test //... --config=ci --config=remote
 
   push-images:
     strategy:
       matrix:
         platform:
-          - runner: ubuntu-latest
+          - runner: goyangi-runner
             bazel-platform: //platforms:linux_amd64
           - runner: ubuntu-24.04-arm
             bazel-platform: //platforms:linux_arm64
@@ -97,7 +97,7 @@ jobs:
           # Build targets first to generate stamped tags
           echo "Building OCI targets with stamping..."
           for target in $OCI_TARGETS; do
-            bazel build $target --config=ci --config=remote --platforms=${{ matrix.platform.bazel-platform }} --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }}
+            bazel build $target --config=ci --config=remote --platforms=${{ matrix.platform.bazel-platform }}
           done
 
           PUSHED_TAGS=""
