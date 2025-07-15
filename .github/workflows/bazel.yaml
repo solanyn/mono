@@ -139,17 +139,26 @@ jobs:
 
           # Only create manifests if we have both platform tags
           PUSHED_TAGS="${{ needs.push-images.outputs.pushed-tags }}"
-          if [[ "$PUSHED_TAGS" == *"latest-linux-amd64"* && "$PUSHED_TAGS" == *"latest-linux-arm64"* ]]; then
-            docker buildx imagetools create \
-              --tag ghcr.io/solanyn/gt7-telemetry:latest \
-              ghcr.io/solanyn/gt7-telemetry:latest-linux-amd64 \
-              ghcr.io/solanyn/gt7-telemetry:latest-linux-arm64
+          
+          # Create manifests for all apps
+          APPS=("gt7-telemetry" "cronprint" "jaxes" "torches")
+          
+          for app in "${APPS[@]}"; do
+            if [[ "$PUSHED_TAGS" == *"latest-linux-amd64"* && "$PUSHED_TAGS" == *"latest-linux-arm64"* ]]; then
+              echo "Creating multi-platform manifest for $app"
               
-            docker buildx imagetools create \
-              --tag ghcr.io/solanyn/gt7-telemetry:$MONOREPO_VERSION \
-              ghcr.io/solanyn/gt7-telemetry:$MONOREPO_VERSION-linux-amd64 \
-              ghcr.io/solanyn/gt7-telemetry:$MONOREPO_VERSION-linux-arm64
-          else
-            echo "Insufficient platform tags to create multi-platform manifest"
-            echo "Available tags: $PUSHED_TAGS"
-          fi
+              docker buildx imagetools create \
+                --tag ghcr.io/solanyn/$app:latest \
+                ghcr.io/solanyn/$app:latest-linux-amd64 \
+                ghcr.io/solanyn/$app:latest-linux-arm64 || echo "Failed to create latest manifest for $app"
+                
+              docker buildx imagetools create \
+                --tag ghcr.io/solanyn/$app:$MONOREPO_VERSION \
+                ghcr.io/solanyn/$app:$MONOREPO_VERSION-linux-amd64 \
+                ghcr.io/solanyn/$app:$MONOREPO_VERSION-linux-arm64 || echo "Failed to create versioned manifest for $app"
+            else
+              echo "Insufficient platform tags to create multi-platform manifest for $app"
+            fi
+          done
+          
+          echo "Available tags: $PUSHED_TAGS"

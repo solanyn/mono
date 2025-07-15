@@ -1,14 +1,5 @@
 # Agent Documentation for `goyangi`
 
-## Agent Guidelines
-
-- Do not attribute agents in commit messages
-- Always use `gh` CLI to interact with GitHub
-- PRs must be linked to an issue. Open one if there is no relevant issue.
-- Documentation is always informative and technical in detail
-- Do not add unnecessary information
-- Do not use emojis
-
 ## Project Overview
 
 Goyangi is a polyglot monorepo using Bazel with Bzlmod for build management and hybrid Nix toolchains for hermetic cross-compilation. The project includes:

@@ -1,27 +1,39 @@
-load("@rules_uv//uv:pip.bzl", "pip_compile")
-load("@rules_uv//uv:venv.bzl", "create_venv")
+load("@aspect_rules_py//py:defs.bzl", "py_binary", "py_library")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
+load("@dbx_build_tools//build_tools/py:py.bzl", "dbx_py_binary", "dbx_py_library")
 
-pip_compile(
-    name = "requirements_linux",
-    requirements_in = "pyproject.toml",
-    requirements_txt = "requirements-linux.lock",
-    python_platform = "x86_64-unknown-linux-gnu",
+dbx_py_library(
+    name = "lib",
+    srcs = glob(["torches/*.py"]),
     visibility = ["//visibility:public"],
 )
 
-pip_compile(
-    name = "requirements_darwin",
-    requirements_in = "pyproject.toml",
-    requirements_txt = "requirements-darwin.lock",
-    python_platform = "aarch64-apple-darwin",
+dbx_py_binary(
+    name = "app",
+    main = "torches/app.py",
+    deps = [":lib"],
     visibility = ["//visibility:public"],
 )
 
-create_venv(
-    name = "venv",
-    requirements_txt = select({
-        "@platforms//os:macos": "requirements-darwin.lock",
-        "@platforms//os:linux": "requirements-linux.lock",
-    }),
-    destination_folder = "torches/.venv",
+oci_image(
+    name = "image",
+    base = "@distroless_base",
+    entrypoint = ["./app"],
+    tars = [":app"],
+    env = {
+        "CUDA_VISIBLE_DEVICES": "0",
+        "TORCH_CUDA_ARCH_LIST": "7.5;8.0;8.6",
+    },
+)
+
+oci_load(
+    name = "load",
+    image = ":image",
+    repo_tags = ["torches:latest"],
+)
+
+oci_push(
+    name = "push",
+    image = ":image",
+    repository = "ghcr.io/solanyn/torches",
 )

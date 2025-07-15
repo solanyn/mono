@@ -1,0 +1,21 @@
+name: ml_env
+channels:
+  - conda-forge
+  - pytorch
+  - nvidia
+dependencies:
+  - python=3.12
+  - numpy
+  - pip
+  # JAX with CUDA support
+  - jax
+  - jaxlib
+  # PyTorch with CUDA support
+  - pytorch
+  - torchvision
+  - torchaudio
+  - pytorch-cuda=12.1
+  # Additional ML dependencies
+  - scipy
+  - matplotlib
+  - pandas
