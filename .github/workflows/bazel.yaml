@@ -12,7 +12,7 @@ permissions:
   packages: write
 jobs:
   test:
-    runs-on: goyangi-runner
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
