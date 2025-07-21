@@ -16,9 +16,9 @@ git_repository(
 http_archive(
     name = "net_zlib",
     build_file = "@dbx_build_tools//thirdparty/zlib:BUILD.zlib",
-    sha256 = "629380c90a77b964d896ed37163f5c3a34f6e6d897311f1df2a7016355c45eff",
-    strip_prefix = "zlib-1.2.11",
-    urls = ["https://github.com/madler/zlib/archive/v1.2.11.tar.gz"],
+    sha256 = "17e88863f3600672ab49182f217281b6fc4d3c762bde361935e436a95214d05c",
+    strip_prefix = "zlib-1.3.1",
+    urls = ["https://github.com/madler/zlib/archive/v1.3.1.tar.gz"],
 )
 
 http_archive(
