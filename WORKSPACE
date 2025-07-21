@@ -64,9 +64,9 @@ http_archive(
 http_archive(
     name = "org_sourceware_libffi",
     build_file = "@dbx_build_tools//thirdparty/libffi:BUILD.libffi",
-    sha256 = "72fba7922703ddfa7a028d513ac15a85c8d54c8d67f55fa5a4802885dc652056",
-    strip_prefix = "libffi-3.3",
-    urls = ["https://github.com/libffi/libffi/releases/download/v3.3/libffi-3.3.tar.gz"],
+    sha256 = "f99eb68a67c7d54866b7706af245e87ba060d419a062474b456d3bc8d4abdbd1",
+    strip_prefix = "libffi-3.5.1",
+    urls = ["https://github.com/libffi/libffi/releases/download/v3.5.1/libffi-3.5.1.tar.gz"],
 )
 
 http_archive(
