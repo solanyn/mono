@@ -1,14 +1,14 @@
 load("@aspect_rules_py//py:defs.bzl", "py_binary", "py_library")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
-load("@dbx_build_tools//build_tools/py:py.bzl", "dbx_py_binary", "dbx_py_library")
+load("@rules_uv//uv:defs.bzl", "uv_binary", "uv_pip_compile")
 
-dbx_py_library(
+py_library(
     name = "lib",
     srcs = glob(["jaxes/*.py"]),
     visibility = ["//visibility:public"],
 )
 
-dbx_py_binary(
+py_binary(
     name = "app",
     main = "jaxes/app.py",
     deps = [":lib"],

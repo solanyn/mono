@@ -1,212 +1,89 @@
-# Agent Documentation for `goyangi`
+# Agent Documentation
 
-## Project Overview
+## Projects
 
-Goyangi is a polyglot monorepo using Bazel with Bzlmod for build management and hybrid Nix toolchains for hermetic cross-compilation. The project includes:
+Build polyglot services using Bazel with Bzlmod and Nix toolchains:
 
-- **Frontend**: SvelteKit application (TypeScript)
-- **Backend**: Rust services
-- **Python**: ML/data processing components with JAX support
+- **tldr**: News aggregation (SvelteKit + Rust)
+- **cronprint**: Scheduled printing (Python + CUPS)
+- **gt7**: GT7 telemetry bridge (Rust + Pulsar)
+- **jaxes**: JAX ML components (Python + GPU)
+- **torches**: PyTorch ML components (Python + CUDA)
+- **chorus-rs**: Speaker diarization API (Rust, design phase)
+
+## Build Patterns
+
+**TypeScript/JavaScript**:
+- Check `package.json` for dependencies
+- Use `bazel run //project:dev` for development
+- Use `bazel build //project:build` for production
+
+**Rust**:
+- Check `Cargo.toml` for dependencies
+- Use `bazel run //project:binary_name` to run
+- Use `bazel build //project:image` for containers
+
+**Python**:
+- Check `pyproject.toml` and `requirements-*.lock` for dependencies
+- Use `bazel run //project:venv` for virtual environments
+- Use `bazel build //project:image` for containers
+
+## Repository Structure
+
+- Look for `design/` folders for technical context
+- Check `tests.yaml` for container validation requirements
+- Expect `BUILD.bazel` files for all buildable targets
 
 ## Build System
 
-### Prerequisites
-
-Install Nix before development:
+Alias bazel to bazelisk for all builds:
 
 ```bash
-curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
+alias bazel=bazelisk
+bazel build //...
+bazel test //...
+bazel run //target:name
 ```
 
-### Bazel with Aspect CLI
+## Essential Commands
 
-All bazel commands use bazelisk (which uses Aspect CLI):
-
+**Build and Test**:
 ```bash
-bazelisk build //...
-bazelisk test //...
-bazelisk run //target:name
+bazel build //...
+bazel test //...
 ```
 
-**Configuration Files:**
-
-- `.bazeliskrc` - Configures bazelisk to use Aspect CLI
-- `MODULE.bazel` - Bzlmod dependencies
-- `.bazelrc` - Bazel configuration options
-
-Use Bazel to build all projects except Python projects. For Python projects, use Bazel to setup a common virtual environment with `bazelisk run //{project}:venv`.
-
-Package using Dockerfiles and GitHub Actions Docker builds. Add dependencies to `requirements.txt` and `requirements_darwin.txt` files. Run `bazelisk run //{project}:requirements` to update lock files.
-
-### Essential Commands
-
-#### Build and Test
-
+**Development**:
 ```bash
-bazelisk build //...
-bazelisk test //...
-bazelisk build //tldr/frontend:svelte_app
-bazelisk run //tldr/frontend:dev
-bazelisk run //torches:venv
-bazelisk run //jaxes:venv
-bazelisk run //cronprint:venv
+bazel run //project:dev          # Frontend development
+bazel run //project:binary_name  # Run Rust binaries
+bazel run //project:venv         # Python virtual environments
 ```
 
-#### Build containers
-
+**Containers**:
 ```bash
-./tools/containers/build.sh airflow
-./tools/containers/build.sh calibre-web
-./tools/containers/build.sh calibre
-./tools/containers/build.sh cnpg
-./tools/containers/build.sh cups
-for container in containers/*/; do ./tools/containers/build.sh $(basename "$container"); done
+bazel build //project:image
+./tools/build-linux.sh build //project:image  # Cross-platform builds
 ```
-
-**Container build requirements:**
-
-- Docker Desktop running with buildx support
-- Network access to pull base images
-- For registry push: authentication to ghcr.io
-
-**Container versioning:**
-
-- Containers in `./containers/` use their main dependency version (e.g., Airflow version for airflow container)
-- Applications built with Bazel use monorepo version from `./tools/get-version.sh`
-
-#### Dependency Management
-
-```bash
-cd tldr/frontend && npm update
-```
-
-## Language-Specific Guidelines
-
-### TypeScript/JavaScript (Frontend)
-
-- **Framework**: SvelteKit with Vite
-- **Package Manager**: npm (with Bazel npm rules)
-
-```bash
-bazelisk run //tldr/frontend:dev
-bazelisk run //tldr/frontend:build
-```
-
-### Rust
-
-- **Build System**: Bazel with rules_rust
-- **Dependency Management**: Cargo.toml with Bazel crate_universe
-
-```bash
-bazelisk build //tldr/backend:tldr-backend
-bazelisk build //gt7/telemetry:telemetry_server
-```
-
-### Python
-
-- **Build System**: Bazel with `rules_uv` using uv's pip_compile
-- **Dependency Management**: pyproject.toml with uv resolver
-
-```bash
-bazelisk run //torches:requirements
-bazelisk run //jaxes:requirements
-bazelisk run //cronprint:requirements
-```
-
-## Development Workflow
-
-### After Making Changes
-
-```bash
-bazelisk test //...
-bazelisk build //...
-```
-
-### CI/CD Integration
-
-The project uses GitHub Actions with Nix and bazelisk:
-
-- **Nix**: Installed via `cachix/install-nix-action@v25` for hermetic toolchains
-- **Bazel**: All commands use `bazel` but this runs through bazelisk → Aspect CLI
-- **Cross-compilation**: Linux x86_64 and ARM64 targets supported via Nix
-
-#### GitHub Workflows
-
-**Bazel Build (`bazel.yaml`)**
-
-- Builds and tests all targets with `//...`
-- Builds container images using Bazel OCI targets
-- Tags containers with both service-specific and monorepo versions
-- Pushes to GHCR on main branch commits
-
-**Container Build (`containers.yaml`)**
-
-- Auto-discovers all containers in `./containers/` directory
-- Builds only changed containers on PRs/pushes
-- Supports manual dispatch for specific containers or all containers
-- Multi-platform builds (linux/amd64, linux/arm64) with Docker Buildx
-- Uses unified build script `./tools/containers/build.sh`
-
-**Other Workflows**
-
-- `renovate.yaml` - Dependency updates via Renovate bot
-- `website.yaml` - Builds and deploys Quartz documentation site
 
 ## Configuration Files
 
-### `.bazeliskrc`
+- `.bazeliskrc` - Aspect CLI configuration
+- `MODULE.bazel` - Bzlmod dependencies
+- `.bazelrc` - Bazel build options
 
-```
-BAZELISK_BASE_URL=https://github.com/aspect-build/aspect-cli/releases/download
-USE_BAZEL_VERSION=aspect/2025.11.0
-```
+## Development Workflow
 
-## Troubleshooting
-
-### Common Issues
-
-**"No repository visible as '@repo_name'"**
-
-- Check MODULE.bazel for missing dependencies
-- Ensure Bzlmod is enabled in .bazelrc
-
-**Build failures after adding new files**
-
-- Check that new dependencies are added to MODULE.bazel
-- Ensure BUILD files include new targets
-
-### Debug Commands
-
-```bash
-bazelisk query //...
-bazelisk query //tldr/frontend:all
-bazelisk query "deps(//target:name)"
-bazelisk info
-```
-
-## Best Practices
-
-- Always use `bazelisk` instead of `bazel` directly
-- Test changes with `bazelisk test //...` before submitting
-- Check CI compatibility - all commands should work in GitHub Actions
-- Use `.yaml` extension for all YAML files (not `.yml`)
-- Update this documentation when adding new tools or workflows
-- Use Plan Mode + ultrathink when making TODOs.
+1. Alias bazel to bazelisk: `alias bazel=bazelisk`
+2. Test with `bazel test //...` before submitting
+3. Check container builds with `bazel build //project:image`
+4. Use `./tools/build-linux.sh` for cross-platform containers
 
 ## External Dependencies
 
-- **Nix**: Hermetic cross-compilation toolchains for system dependencies
+- **LLVM toolchain**: Hermetic C++/Rust builds
 - **Aspect CLI**: Enhanced Bazel experience
-- **Bzlmod**: Modern Bazel dependency management (preferred over WORKSPACE)
+- **Bzlmod**: Modern dependency management
 - **rules_js**: JavaScript/TypeScript support
-- **rules_rust**: Rust language support with cross-compilation targets
-- **aspect_rules_py**: Python support with modern tooling
-- **rules_nixpkgs_core**: Nix integration for hermetic builds
-
-## Support
-
-For questions about this setup:
-
-1. Check the Aspect CLI documentation: <https://docs.aspect.build/cli>
-2. Consult Bazel Bzlmod guide: <https://bazel.build/external/migration>
-3. See the specific Bazel ruleset documentation
+- **rules_rust**: Rust language support
+- **aspect_rules_py**: Python support
