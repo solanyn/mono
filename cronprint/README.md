@@ -1,29 +1,16 @@
 # cronprint
 
-Scheduled printing service using CUPS with health monitoring.
-
-## Features
-
-- Cron-style scheduling with timezone support
-- CUPS integration for print job management
-- Health monitoring endpoint
-- Environment variable configuration
+Scheduled printing service using CUPS.
 
 ## Development
 
 ```bash
-# Setup virtual environment
-bazelisk run //cronprint:venv
-
-# Run service
-cd cronprint
-source .venv/bin/activate
-python app.py
+bazelisk run //cronprint:app
 ```
 
 ## Usage
 
-Service runs on `http://0.0.0.0:8080` with health check at `/healthz`
+Service runs on `http://0.0.0.0:8080`
 
 ## Configuration
 
@@ -42,4 +29,3 @@ export CRONPRINT_JOB_DAILY_FILE="/tmp/report.pdf"
 ```bash
 bazelisk build //cronprint:image
 ```
-

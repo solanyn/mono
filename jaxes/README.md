@@ -1,37 +1,19 @@
 # jaxes
 
-JAX ML components with platform-specific GPU support.
-
-## Features
-
-- JAX import testing and validation
-- Platform-specific GPU acceleration (CUDA/Metal)
-- Basic computation and tensor operations
-- Compatible with ML workflows
+A library and/or CLI for training models using jax and friends. Since Bazel and pip don't play nice, we use `rules_uv` to create a uv venv for dependency resolution. Source code is built and run outside of Bazel.
 
 ## Development
 
 ```bash
-# Setup virtual environment
-bazelisk run //jaxes:venv
+bazel run //jaxes:venv
 
-# Run JAX test application
 cd jaxes
-source .venv/bin/activate
-python -m jaxes.app
-```
-
-## Usage
-
-Tests JAX installation, version, backend detection, and basic computation:
-
-```python
-import jax
-import jax.numpy as jnp
+uv run python jaxes/app.py
 ```
 
 ## Container
 
 ```bash
-bazelisk build //jaxes:image
+bazel build //jaxes:image
 ```
+
