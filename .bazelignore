@@ -2,3 +2,4 @@ node_modules
 bazel-*
 .git
 .venv
+tldr/frontend/node_modules
