@@ -27,7 +27,7 @@ py_image_layer(
 oci_image(
     name = "image",
     base = "@distroless_base",
-    entrypoint = ["./app"],
+    entrypoint = ["/jaxes/app"],
     tars = [":layers"],
     env = {
         "XLA_PYTHON_CLIENT_PREALLOCATE": "false",

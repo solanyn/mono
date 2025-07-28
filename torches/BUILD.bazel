@@ -27,7 +27,7 @@ py_image_layer(
 oci_image(
     name = "image",
     base = "@distroless_base",
-    entrypoint = ["./app"],
+    entrypoint = ["/torches/app"],
     tars = [":layers"],
     env = {
         "CUDA_VISIBLE_DEVICES": "0",
