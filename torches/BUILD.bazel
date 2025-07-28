@@ -1,6 +1,5 @@
 load("@aspect_rules_py//py:defs.bzl", "py_binary", "py_library")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
-load("@rules_uv//uv:defs.bzl", "uv_binary", "uv_pip_compile")
 
 py_library(
     name = "lib",

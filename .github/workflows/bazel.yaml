@@ -21,9 +21,9 @@ jobs:
         with:
           bazelisk-cache: true
       - name: Build all targets
-        run: bazel build //... --config=ci --config=ci:remote
+        run: bazel build //... --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }}
       - name: Test all targets
-        run: bazel test //... --config=ci --config=ci:remote
+        run: bazel test //... --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }}
 
   push-images:
     strategy:
@@ -89,7 +89,7 @@ jobs:
           # Build targets first to generate stamped tags
           echo "Building OCI targets with stamping..."
           for target in $OCI_TARGETS; do
-            bazel build $target --config=ci --config=ci:remote --platforms=${{ matrix.platform.bazel-platform }}
+            bazel build $target --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }} --platforms=${{ matrix.platform.bazel-platform }}
           done
 
           PUSHED_TAGS=""
