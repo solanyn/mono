@@ -1,6 +1,5 @@
 load("@aspect_rules_js//js:defs.bzl", "js_library")
 load("@npm//:defs.bzl", "npm_link_all_packages")
-load("@rules_multirun//:defs.bzl", "multirun")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -14,16 +13,3 @@ js_library(
         ":node_modules/typescript-eslint",
     ],
 )
-
-PROJECTS = ["//jaxes", "//torches"]
-PLATFORMS = ["darwin", "linux"]
-
-multirun(
-    name = "requirements",
-    commands = [
-        "{}:requirements_{}".format(project, platform)
-        for platform in PLATFORMS
-        for project in PROJECTS
-    ],
-)
-

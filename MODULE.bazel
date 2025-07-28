@@ -18,10 +18,9 @@ bazel_dep(name = "rules_uv", version = "0.84.0")
 bazel_dep(name = "rules_shell", version = "0.5.0")
 bazel_dep(name = "rules_python", version = "1.5.1")
 bazel_dep(name = "rules_oci", version = "2.2.6")
-
-# cc toolchain
 bazel_dep(name = "toolchains_llvm", version = "1.4.0")
 
+# cc toolchain
 llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm")
 llvm.toolchain(
     name = "llvm_toolchain",
@@ -41,7 +40,22 @@ pip.parse(
     python_version = PYTHON_VERSION,
     requirements_lock = "//cronprint:requirements-linux.lock",
 )
+
+pip.parse(
+    hub_name = "jaxes_deps",
+    python_version = PYTHON_VERSION,
+    requirements_lock = "//jaxes:requirements-linux.lock",
+)
+
+pip.parse(
+    hub_name = "torches_deps",
+    python_version = PYTHON_VERSION,
+    requirements_lock = "//torches:requirements-linux.lock",
+)
+
 use_repo(pip, "cronprint_deps")
+use_repo(pip, "jaxes_deps")
+use_repo(pip, "torches_deps")
 
 # rust
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")

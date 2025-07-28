@@ -1,24 +1,34 @@
-load("@aspect_rules_py//py:defs.bzl", "py_binary", "py_library")
+load("@aspect_rules_py//py:defs.bzl", "py_binary", "py_library", "py_image_layer")
+load("@jaxes_deps//:requirements.bzl", "requirement")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
 
 py_library(
     name = "lib",
     srcs = glob(["jaxes/*.py"]),
+    deps = [
+        requirement("jax"),
+        requirement("jaxlib"),
+    ],
     visibility = ["//visibility:public"],
 )
 
 py_binary(
     name = "app",
     main = "jaxes/app.py",
-    deps = [":lib"],
+    srcs = [":lib"],
     visibility = ["//visibility:public"],
+)
+
+py_image_layer(
+    name = "layers",
+    binary = ":app",
 )
 
 oci_image(
     name = "image",
     base = "@distroless_base",
     entrypoint = ["./app"],
-    tars = [":app"],
+    tars = [":layers"],
     env = {
         "XLA_PYTHON_CLIENT_PREALLOCATE": "false",
         "JAX_PLATFORM_NAME": "gpu",
