@@ -15,7 +15,7 @@ jobs:
       current_version: ${{ steps.get_current_version.outputs.original_version_string }}
     steps:
       - name: Checkout your repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Get current Quartz version from website/package.json
         id: get_current_version
         run: |
@@ -92,7 +92,7 @@ jobs:
           fi
       - name: Checkout upstream jackyzha0/quartz (specific tag)
         if: steps.find_latest_tag.outputs.new_tag_found == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: jackyzha0/quartz
           ref: ${{ steps.find_latest_tag.outputs.new_tag }}
