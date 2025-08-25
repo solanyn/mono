@@ -4,7 +4,7 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-packageExtensionsChecksum: 91e202e2fa14fff4546e9fa952101463
+packageExtensionsChecksum: 267b5367b90b0efbb6f611920f1ad917
 
 importers:
 
@@ -29,8 +29,8 @@ importers:
   tldr/frontend:
     dependencies:
       marked:
-        specifier: ^14.1.0
-        version: 14.1.0
+        specifier: ^16.0.0
+        version: 16.1.1
       react:
         specifier: ~18.3.0
         version: 18.3.0
@@ -5556,9 +5556,9 @@ packages:
       '@jridgewell/sourcemap-codec': 1.5.4
     dev: true
 
-  /marked@14.1.0:
-    resolution: {integrity: sha512-P93GikH/Pde0hM5TAXEd8I4JAYi8IB03n8qzW8Bh1BIEFpEyBoYxi/XWZA53LSpTeLBiMQOoSMj0u5E/tiVYTA==}
-    engines: {node: '>= 18'}
+  /marked@16.1.1:
+    resolution: {integrity: sha512-ij/2lXfCRT71L6u0M29tJPhP0bM5shLL3u5BePhFwPELj2blMJ6GDtD7PfJhRLhJ/c2UwrK17ySVcDzy2YHjHQ==}
+    engines: {node: '>= 20'}
     hasBin: true
     dev: false
 
