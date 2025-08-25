@@ -4,7 +4,7 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-packageExtensionsChecksum: 91e202e2fa14fff4546e9fa952101463
+packageExtensionsChecksum: 267b5367b90b0efbb6f611920f1ad917
 
 importers:
 
@@ -42,8 +42,8 @@ importers:
         version: 2.1.4
     devDependencies:
       '@bazel/ibazel':
-        specifier: 0.25.0
-        version: 0.25.0
+        specifier: 0.26.10
+        version: 0.26.10
       '@testing-library/jest-dom':
         specifier: 4.2.4
         version: 4.2.4
@@ -1496,8 +1496,8 @@ packages:
       '@babel/helper-validator-identifier': 7.27.1
     dev: true
 
-  /@bazel/ibazel@0.25.0:
-    resolution: {integrity: sha512-dtosfsuZCSaqlUe5EyxNdaN7Gow0Y+ZJixdlciytcSieUcB/1lXPFTx6OihxhjgtTHkeFovlQ/QbvArRPnk+nQ==}
+  /@bazel/ibazel@0.26.10:
+    resolution: {integrity: sha512-+Is7qK/NKz70t1HlrJqLZmDeys6Tg1KaUPF3JB3Xjlm64xA4rX2FeojcYjvdlaZko717lXY29DGsX/B4HSnaqw==}
     hasBin: true
     dev: true
 
