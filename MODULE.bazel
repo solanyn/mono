@@ -108,7 +108,7 @@ use_repo(rules_ts_ext, "npm_typescript")
 oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 oci.pull(
     name = "distroless_cc",
-    digest = "sha256:aa435f48941dbbd18b4a1f3f71992a3afddc6fb913beb411cd4c0fb174e0bfb8",
+    digest = "sha256:00cc20b928afcc8296b72525fa68f39ab332f758c4f2a9e8d90845d3e06f1dc4",
     image = "gcr.io/distroless/cc-debian12",
     platforms = [
         "linux/amd64",
