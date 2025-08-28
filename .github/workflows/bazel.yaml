@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@0.15.0
         with:
@@ -40,7 +40,7 @@ jobs:
       pushed-tags: ${{ steps.push.outputs.tags }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Login to GitHub Container Registry
@@ -112,7 +112,7 @@ jobs:
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(needs.push-images.outputs.pushed-tags, 'latest-linux-') }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Login to GitHub Container Registry
