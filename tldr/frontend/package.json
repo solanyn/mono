@@ -30,7 +30,7 @@
     "jest-transform-stub": "2.0.0",
     "tsconfig-to-swcconfig": "2.4.0",
     "typescript": "4.9.5",
-    "vite": "4.2.0"
+    "vite": "4.5.14"
   },
   "browserslist": {
     "production": [
