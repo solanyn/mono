@@ -38,8 +38,8 @@ importers:
         specifier: ~18.3.0
         version: 18.3.0(react@18.3.0)
       web-vitals:
-        specifier: 2.1.4
-        version: 2.1.4
+        specifier: 5.1.0
+        version: 5.1.0
     devDependencies:
       '@bazel/ibazel':
         specifier: 0.26.10
@@ -6953,8 +6953,8 @@ packages:
       xml-name-validator: 5.0.0
     dev: true
 
-  /web-vitals@2.1.4:
-    resolution: {integrity: sha512-sVWcwhU5mX6crfI5Vd2dC4qchyTqxV8URinzt25XqVh+bHEPGH4C3NPrNionCP7Obx59wrYEbNlw4Z8sjALzZg==}
+  /web-vitals@5.1.0:
+    resolution: {integrity: sha512-ArI3kx5jI0atlTtmV0fWU3fjpLmq/nD3Zr1iFFlJLaqa5wLBkUSzINwBPySCX/8jRyjlmy1Volw1kz1g9XE4Jg==}
     dev: false
 
   /webidl-conversions@7.0.0:
