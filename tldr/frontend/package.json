@@ -17,7 +17,7 @@
     "@bazel/ibazel": "0.26.10",
     "@testing-library/jest-dom": "4.2.4",
     "@testing-library/react": "13.4.0",
-    "@testing-library/user-event": "14.5.2",
+    "@testing-library/user-event": "14.6.1",
     "@types/jest": "29.2.3",
     "@types/react": "~18.3.12",
     "@typescript-eslint/eslint-plugin": "5.44.0",
