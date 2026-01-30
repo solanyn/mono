@@ -17,7 +17,7 @@ axum = { version = "0.8", features = ["ws"] }
 axum-extra = { version = "0.10", features = [
   "typed-header",
 ], default-features = false }
-axum-server = { version = "0.7", features = ["tls-rustls"] }
+axum-server = { version = "0.8", features = ["tls-rustls"] }
 futures-util = "0.3"
 rustls = "0.23"
 rustls-pemfile = "2.0"
