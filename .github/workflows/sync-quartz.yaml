@@ -107,7 +107,7 @@ jobs:
           echo "Sync complete. website/package.json should now reflect version ${{ steps.find_latest_tag.outputs.new_tag }}."
       - name: Create Pull Request with synced changes
         if: steps.find_latest_tag.outputs.new_tag_found == 'true'
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: |
