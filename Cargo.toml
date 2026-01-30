@@ -14,7 +14,7 @@ log = "0.4"
 env_logger = "0.11"
 tokio = { version = "1", features = ["full"] }
 axum = { version = "0.8", features = ["ws"] }
-axum-extra = { version = "0.10", features = [
+axum-extra = { version = "0.12", features = [
   "typed-header",
 ], default-features = false }
 axum-server = { version = "0.7", features = ["tls-rustls"] }
