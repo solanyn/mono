@@ -8,15 +8,6 @@ import %workspace%/.aspect/bazelrc/performance.bazelrc
 
 common --incompatible_enable_proto_toolchain_resolution
 
-# Enable WORKSPACE for hybrid bzlmod + WORKSPACE setup (nixpkgs ML packages)
-common --enable_workspace
-
-build:linux --platforms=//platforms:linux_amd64
-build:macos --platforms=//platforms:darwin_arm64_platform
-
-# proto
-build --incompatible_enable_proto_toolchain_resolution
-
 # CI configuration
 build:ci --stamp
 build:ci --workspace_status_command=tools/workspace_status.sh
@@ -28,6 +19,7 @@ build:remote --bes_results_url=https://goyangi.buildbuddy.io/invocation/
 build:remote --bes_backend=grpcs://goyangi.buildbuddy.io
 build:remote --remote_cache=grpcs://goyangi.buildbuddy.io
 build:remote --remote_executor=grpcs://goyangi.buildbuddy.io
+build:remote --experimental_remote_cache_compression
 build:remote --noremote_upload_local_results
 build:remote --remote_timeout=10m
 build:remote --jobs=50

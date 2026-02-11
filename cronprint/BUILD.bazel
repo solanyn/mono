@@ -1,39 +1,46 @@
-load("@aspect_rules_py//py:defs.bzl", "py_binary", "py_library", "py_image_layer")
-load("@cronprint_deps//:requirements.bzl", "requirement")
+load("@rules_go//go:def.bzl", "go_binary", "go_cross_binary", "go_library")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
+load("@aspect_bazel_lib//lib:tar.bzl", "tar")
 
-py_library(
+go_library(
     name = "lib",
-    srcs = glob(["*.py"]),
+    srcs = glob(["*.go"]),
+    importpath = "github.com/solanyn/mono/cronprint",
     deps = [
-        requirement("fastapi"),
-        requirement("uvicorn"),
-        requirement("pycups"),
-        requirement("apscheduler"),
+        "@com_github_openprinting_goipp//:goipp",
+        "@com_github_robfig_cron_v3//:cron",
     ],
     visibility = ["//visibility:public"],
 )
 
-py_binary(
-    name = "app",
-    main = "app.py",
-    srcs = [":lib"],
+go_binary(
+    name = "cronprint",
+    embed = [":lib"],
     visibility = ["//visibility:public"],
 )
 
-py_image_layer(
-    name = "layers",
-    binary = ":app",
+go_cross_binary(
+    name = "cronprint_linux_amd64",
+    platform = "@rules_go//go/toolchain:linux_amd64",
+    target = ":cronprint",
+)
+
+go_cross_binary(
+    name = "cronprint_linux_arm64",
+    platform = "@rules_go//go/toolchain:linux_arm64",
+    target = ":cronprint",
+)
+
+tar(
+    name = "layer",
+    srcs = [":cronprint_linux_amd64"],
 )
 
 oci_image(
     name = "image",
-    base = "@distroless_base",
-    entrypoint = ["./app"],
-    tars = [":layers"],
-    env = {
-        "CUPS_SERVER": "localhost:631",
-    },
+    base = "@distroless_static",
+    entrypoint = ["/cronprint_linux_amd64"],
+    tars = [":layer"],
 )
 
 oci_load(

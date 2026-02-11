@@ -3,126 +3,54 @@ module(
     version = "0.1.0",
 )
 
-bazel_dep(name = "aspect_bazel_lib", version = "2.21.1")
-bazel_dep(name = "aspect_rules_ts", version = "3.1.0")
-bazel_dep(name = "aspect_rules_py", version = "1.6.3")
-bazel_dep(name = "aspect_rules_js", version = "2.5.0")
+bazel_dep(name = "aspect_bazel_lib", version = "2.20.0")
+bazel_dep(name = "aspect_rules_js", version = "2.4.1")
 bazel_dep(name = "bazel_skylib", version = "1.8.1")
 bazel_dep(name = "buildifier_prebuilt", version = "8.2.0.2")
-bazel_dep(name = "container_structure_test", version = "1.19.1")
+bazel_dep(name = "gazelle", version = "0.47.0")
 bazel_dep(name = "platforms", version = "1.0.0")
-bazel_dep(name = "rules_multirun", version = "0.13.0")
-bazel_dep(name = "rules_nodejs", version = "6.2.0")
-bazel_dep(name = "rules_rust", version = "0.64.0")
-bazel_dep(name = "rules_uv", version = "0.88.0")
-bazel_dep(name = "rules_shell", version = "0.6.1")
-bazel_dep(name = "rules_python", version = "1.6.3")
+bazel_dep(name = "rules_go", version = "0.60.0")
+bazel_dep(name = "rules_nodejs", version = "6.7.3")
 bazel_dep(name = "rules_oci", version = "2.2.6")
-bazel_dep(name = "toolchains_llvm", version = "1.5.0")
 
-# cc toolchain
-llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm")
-llvm.toolchain(
-    name = "llvm_toolchain",
-    llvm_version = "17.0.6",
+# go
+go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
+go_sdk.download(version = "1.23.6")
+
+go_deps = use_extension("@gazelle//:extensions.bzl", "go_deps")
+go_deps.from_file(go_mod = "//cronprint:go.mod")
+use_repo(
+    go_deps,
+    "com_github_openprinting_goipp",
+    "com_github_robfig_cron_v3",
 )
-use_repo(llvm, "llvm_toolchain", "llvm_toolchain_llvm")
-
-# python
-PYTHON_VERSION = "3.12"
-python = use_extension("@rules_python//python/extensions:python.bzl", "python")
-python.toolchain(python_version = PYTHON_VERSION)
-
-pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
-
-pip.parse(
-    hub_name = "cronprint_deps",
-    python_version = PYTHON_VERSION,
-    requirements_lock = "//cronprint:requirements-linux.lock",
-)
-
-pip.parse(
-    hub_name = "jaxes_deps",
-    python_version = PYTHON_VERSION,
-    requirements_lock = "//jaxes:requirements-linux.lock",
-)
-
-pip.parse(
-    hub_name = "torches_deps",
-    python_version = PYTHON_VERSION,
-    requirements_lock = "//torches:requirements-linux.lock",
-)
-
-use_repo(pip, "cronprint_deps")
-use_repo(pip, "jaxes_deps")
-use_repo(pip, "torches_deps")
-
-# rust
-rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
-rust.toolchain(
-    edition = "2021",
-    extra_target_triples = [
-        "x86_64-unknown-linux-gnu",
-        "aarch64-unknown-linux-gnu",
-    ],
-)
-
-crate = use_extension("@rules_rust//crate_universe:extension.bzl", "crate")
-crate.from_cargo(
-    name = "crates",
-    cargo_lockfile = "//:Cargo.lock",
-    manifests = [
-        "//:Cargo.toml",
-        "//gt7/telemetry:Cargo.toml",
-        "//tldr/backend:Cargo.toml",
-    ],
-)
-use_repo(crate, "crates")
 
 # js
 node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node", dev_dependency = True)
-node.toolchain(node_version = "20.13.1")
+node.toolchain(node_version = "22.13.1")
 
-# bazel run -- @pnpm//:pnpm --dir $PWD install --lockfile-only
 pnpm = use_extension("@aspect_rules_js//npm:extensions.bzl", "pnpm")
 use_repo(pnpm, "pnpm")
 
 npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm", dev_dependency = True)
 npm.npm_translate_lock(
     name = "npm",
-    npmrc = "//:.npmrc",
     pnpm_lock = "//:pnpm-lock.yaml",
-    verify_node_modules_ignored = "//:.bazelignore",
+    public_hoist_packages = {
+        "astro": ["website"],
+    },
 )
 use_repo(npm, "npm")
-
-rules_ts_ext = use_extension(
-    "@aspect_rules_ts//ts:extensions.bzl",
-    "ext",
-    dev_dependency = True,
-)
-rules_ts_ext.deps()
-use_repo(rules_ts_ext, "npm_typescript")
 
 # containers
 oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 oci.pull(
-    name = "distroless_cc",
-    digest = "sha256:620d8b11ae800f0dbd7995f89ddc5344ad603269ea98770588b1b07a4a0a6872",
-    image = "gcr.io/distroless/cc-debian12",
+    name = "distroless_static",
+    digest = "sha256:3a03fc0826340c7deb82d4755ca391bef5adcedb8892e58412e1a6008199fa91",
+    image = "gcr.io/distroless/static-debian12",
     platforms = [
         "linux/amd64",
         "linux/arm64/v8",
     ],
 )
-oci.pull(
-    name = "distroless_base",
-    digest = "sha256:fa15492938650e1a5b87e34d47dc7d99a2b4e8aefd81b931b3f3eb6bb4c1d2f6",
-    image = "gcr.io/distroless/base-debian12",
-    platforms = [
-        "linux/amd64",
-        "linux/arm64/v8",
-    ],
-    tag = "latest",
-)
-use_repo(oci, "distroless_base", "distroless_base_linux_amd64", "distroless_base_linux_arm64_v8", "distroless_cc", "distroless_cc_linux_amd64", "distroless_cc_linux_arm64_v8")
+use_repo(oci, "distroless_static", "distroless_static_linux_amd64", "distroless_static_linux_arm64_v8")

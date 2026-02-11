@@ -1,0 +1,110 @@
+---
+import BaseHead from '../components/BaseHead.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { SITE_DESCRIPTION, SITE_TITLE } from '../consts';
+import { getCollection } from 'astro:content';
+import FormattedDate from '../components/FormattedDate.astro';
+
+const posts = (await getCollection('blog')).sort(
+	(a, b) => b.data.date.valueOf() - a.data.date.valueOf(),
+);
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
+	</head>
+	<body>
+		<Header />
+		<main>
+			<div class="about prose">
+				<p>
+					Reformed code writer, now prompt writer/software engineer, running an unnecessarily complex container orchestration platform on small scrapyard PCs. Interested in teaching models to use tools so they can replace us faster, next-word sequence predictors that are burning the world's resources and bidding on spare GPU cycles from our tech overlords. My cat Heather judges me for spending too much time on architecture decisions.
+				</p>
+			</div>
+			<ul>
+				{
+					posts.map((post) => (
+						<li>
+							<a href={`/blog/${post.id}/`}>
+								<div class="post-item">
+									<p class="title">{post.data.title}</p>
+									<div class="divider" />
+									<p class="date">
+										<FormattedDate date={post.data.date} />
+									</p>
+								</div>
+							</a>
+						</li>
+					))
+				}
+			</ul>
+		</main>
+		<Footer />
+	</body>
+</html>
+<style>
+	.about {
+		margin-bottom: 1.25rem;
+	}
+	ul {
+		padding: 0;
+		margin: 0;
+		list-style-type: none;
+		display: flex;
+		flex-direction: column;
+	}
+	ul a {
+		color: var(--text-primary);
+		display: block;
+		text-decoration: none;
+		transition: opacity 0.15s ease-out;
+	}
+	ul:hover a {
+		opacity: 0.4;
+	}
+	ul:hover a:hover {
+		opacity: 1;
+	}
+	ul:hover a:hover .divider {
+		background-color: var(--text-tertiary);
+		opacity: 0.75;
+	}
+	ul:hover a:hover .date {
+		color: var(--text-secondary);
+		opacity: 1;
+	}
+	.post-item {
+		height: 2.75rem;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 0.75rem;
+	}
+	.title {
+		margin: 0;
+		flex-shrink: 1;
+		min-width: 0;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.date {
+		margin: 0;
+		font-weight: var(--font-weight-light);
+		color: var(--text-secondary);
+		opacity: 0.75;
+		flex-shrink: 0;
+		letter-spacing: var(--spacing-s);
+		font-variant-numeric: tabular-nums;
+	}
+	.divider {
+		flex: 1 1 auto;
+		min-width: 3rem;
+		margin: 0 0.25rem;
+		height: 0.5px;
+		background-color: var(--border);
+	}
+</style>

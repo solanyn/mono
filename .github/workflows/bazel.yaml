@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@0.15.0
         with:
@@ -26,25 +26,16 @@ jobs:
         run: bazel test //... --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }}
 
   push-images:
-    strategy:
-      matrix:
-        platform:
-          - runner: goyangi-runner
-            bazel-platform: //platforms:linux_amd64
-          - runner: ubuntu-24.04-arm
-            bazel-platform: //platforms:linux_arm64
-    runs-on: ${{ matrix.platform.runner }}
+    runs-on: ubuntu-latest
     needs: test
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-    outputs:
-      pushed-tags: ${{ steps.push.outputs.tags }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3.6.0
+        uses: docker/login-action@v3.4.0
         with:
           registry: ghcr.io
           username: "${{ github.actor }}"
@@ -53,100 +44,17 @@ jobs:
         uses: bazel-contrib/setup-bazel@0.15.0
         with:
           bazelisk-cache: true
-      - name: Push all OCI images for ${{ matrix.platform.bazel-platform }}
-        id: push
+      - name: Push OCI images
         run: |
           MONOREPO_VERSION=$(./tools/get-version.sh .)
-
-          echo "Finding OCI push targets..."
-          echo "Debug: Trying basic query first..."
-          bazel query 'kind("oci_push", //...)' || echo "Basic query failed"
-
-          echo "Debug: Trying with CI config..."
-          bazel query 'kind("oci_push", //...)' --config=ci || echo "CI config query failed"
-
-          echo "Debug: Trying specific target..."
-          bazel query '//gt7/telemetry:push' --config=ci || echo "Specific target query failed"
-
           OCI_TARGETS=$(bazel query 'kind("oci_push", //...)' 2>/dev/null || echo "")
-          echo "Found targets: '$OCI_TARGETS'"
-
           if [ -z "$OCI_TARGETS" ]; then
-            echo "No OCI push targets found, skipping container push"
-            echo "tags=" >> $GITHUB_OUTPUT
+            echo "No OCI push targets found"
             exit 0
           fi
-
-          if [[ "${{ matrix.platform.bazel-platform }}" == "//platforms:linux_amd64" ]]; then
-            PLATFORM_SUFFIX="linux-amd64"
-          elif [[ "${{ matrix.platform.bazel-platform }}" == "//platforms:linux_arm64" ]]; then
-            PLATFORM_SUFFIX="linux-arm64"
-          else
-            echo "Unknown platform: ${{ matrix.platform.bazel-platform }}"
-            exit 1
-          fi
-
-          # Build targets first to generate stamped tags
-          echo "Building OCI targets with stamping..."
           for target in $OCI_TARGETS; do
-            bazel build $target --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }} --platforms=${{ matrix.platform.bazel-platform }}
+            echo "Pushing $target"
+            bazel run $target --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }}
+            bazel run $target --config=ci -- --tag "$MONOREPO_VERSION"
+            bazel run $target --config=ci -- --tag latest
           done
-
-          PUSHED_TAGS=""
-          for target in $OCI_TARGETS; do
-            echo "Pushing $target for ${{ matrix.platform.bazel-platform }}"
-            if bazel run $target --platforms=${{ matrix.platform.bazel-platform }}; then
-              if bazel run $target --platforms=${{ matrix.platform.bazel-platform }} -- --tag latest-$PLATFORM_SUFFIX; then
-                PUSHED_TAGS="$PUSHED_TAGS latest-$PLATFORM_SUFFIX"
-              fi
-              if bazel run $target --platforms=${{ matrix.platform.bazel-platform }} -- --tag $MONOREPO_VERSION-$PLATFORM_SUFFIX; then
-                PUSHED_TAGS="$PUSHED_TAGS $MONOREPO_VERSION-$PLATFORM_SUFFIX"
-              fi
-            fi
-          done
-          echo "tags=$PUSHED_TAGS" >> $GITHUB_OUTPUT
-
-  create-manifest:
-    runs-on: ubuntu-latest
-    needs: push-images
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(needs.push-images.outputs.pushed-tags, 'latest-linux-') }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3.6.0
-        with:
-          registry: ghcr.io
-          username: "${{ github.actor }}"
-          password: "${{ github.token }}"
-      - name: Create multi-platform manifest
-        run: |
-          MONOREPO_VERSION=$(./tools/get-version.sh .)
-
-          # Only create manifests if we have both platform tags
-          PUSHED_TAGS="${{ needs.push-images.outputs.pushed-tags }}"
-          
-          # Create manifests for all apps
-          APPS=("gt7-telemetry" "cronprint" "jaxes" "torches")
-          
-          for app in "${APPS[@]}"; do
-            if [[ "$PUSHED_TAGS" == *"latest-linux-amd64"* && "$PUSHED_TAGS" == *"latest-linux-arm64"* ]]; then
-              echo "Creating multi-platform manifest for $app"
-              
-              docker buildx imagetools create \
-                --tag ghcr.io/solanyn/$app:latest \
-                ghcr.io/solanyn/$app:latest-linux-amd64 \
-                ghcr.io/solanyn/$app:latest-linux-arm64 || echo "Failed to create latest manifest for $app"
-                
-              docker buildx imagetools create \
-                --tag ghcr.io/solanyn/$app:$MONOREPO_VERSION \
-                ghcr.io/solanyn/$app:$MONOREPO_VERSION-linux-amd64 \
-                ghcr.io/solanyn/$app:$MONOREPO_VERSION-linux-arm64 || echo "Failed to create versioned manifest for $app"
-            else
-              echo "Insufficient platform tags to create multi-platform manifest for $app"
-            fi
-          done
-          
-          echo "Available tags: $PUSHED_TAGS"
