@@ -46,7 +46,7 @@ use_repo(npm, "npm")
 oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 oci.pull(
     name = "distroless_static",
-    digest = "sha256:3a03fc0826340c7deb82d4755ca391bef5adcedb8892e58412e1a6008199fa91",
+    digest = "sha256:cd64bec9cec257044ce3a8dd3620cf83b387920100332f2b041f19c4d2febf93",
     image = "gcr.io/distroless/static-debian12",
     platforms = [
         "linux/amd64",
