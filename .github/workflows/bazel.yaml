@@ -17,7 +17,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@0.15.0
+        uses: bazel-contrib/setup-bazel@0.18.0
         with:
           bazelisk-cache: true
       - name: Build all targets
@@ -41,7 +41,7 @@ jobs:
           username: "${{ github.actor }}"
           password: "${{ github.token }}"
       - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@0.15.0
+        uses: bazel-contrib/setup-bazel@0.18.0
         with:
           bazelisk-cache: true
       - name: Push OCI images
