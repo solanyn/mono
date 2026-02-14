@@ -1,0 +1,71 @@
+---
+import BaseHead from '../../components/BaseHead.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+import RecipeCard from '../../components/recipe/RecipeCard.astro';
+import { FOOD_TITLE, FOOD_DESCRIPTION } from '../../consts';
+import { getCollection } from 'astro:content';
+
+const recipes = (await getCollection('recipes')).sort(
+	(a, b) => b.data.date.valueOf() - a.data.date.valueOf(),
+);
+const reviews = await getCollection('reviews');
+const gearItems = await getCollection('gear');
+const hasReviews = reviews.length > 0;
+const hasGear = gearItems.length > 0;
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead title={FOOD_TITLE} description={FOOD_DESCRIPTION} />
+	</head>
+	<body class="food">
+		<Header section="food" />
+		<main>
+			<div class="about prose">
+				<p>Recipe adaptations, restaurant reviews, and gear notes. No affiliate links — gear recommendations are based on what I actually use.</p>
+			</div>
+			{recipes.length > 0 ? (
+				<ul>
+					{recipes.map((recipe) => (
+						<li>
+							<RecipeCard
+								title={recipe.data.title}
+								slug={`/food/${recipe.id}/`}
+								date={recipe.data.date}
+								rating={recipe.data.rating}
+								tags={recipe.data.tags}
+								type={recipe.data.type}
+							/>
+						</li>
+					))}
+				</ul>
+			) : (
+				<p class="empty">No recipes yet.</p>
+			)}
+		</main>
+		<Footer section="food" />
+	</body>
+</html>
+<style>
+	.about {
+		margin-bottom: 1.25rem;
+	}
+	ul {
+		padding: 0;
+		margin: 0;
+		list-style-type: none;
+		display: flex;
+		flex-direction: column;
+	}
+	ul:hover :global(a) {
+		opacity: 0.4;
+	}
+	ul:hover :global(a:hover) {
+		opacity: 1;
+	}
+	.empty {
+		color: var(--text-tertiary);
+	}
+</style>

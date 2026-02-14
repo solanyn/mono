@@ -1,0 +1,87 @@
+---
+interface Props {
+	title: string;
+	slug: string;
+	date: Date;
+	rating: { overall: number };
+	tags?: string[];
+	type?: string;
+}
+
+import FormattedDate from '../FormattedDate.astro';
+
+const { title, slug, date, rating, tags, type } = Astro.props;
+---
+
+<a href={slug}>
+	<div class="recipe-item">
+		<div class="recipe-info">
+			<p class="title">{title}</p>
+			{type && <span class="type">{type}</span>}
+		</div>
+		<div class="divider" />
+		<div class="meta">
+			<span class="rating">{'●'.repeat(rating.overall)}{'○'.repeat(5 - rating.overall)}</span>
+			<p class="date"><FormattedDate date={date} /></p>
+		</div>
+	</div>
+</a>
+<style>
+	a {
+		color: var(--text-primary);
+		display: block;
+		text-decoration: none;
+		transition: opacity 0.15s ease-out;
+	}
+	.recipe-item {
+		height: 2.75rem;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 0.75rem;
+	}
+	.recipe-info {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		min-width: 0;
+		flex-shrink: 1;
+	}
+	.title {
+		margin: 0;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.type {
+		font-size: var(--font-size-s);
+		color: var(--text-tertiary);
+		flex-shrink: 0;
+	}
+	.divider {
+		flex: 1 1 auto;
+		min-width: 3rem;
+		margin: 0 0.25rem;
+		height: 0.5px;
+		background-color: var(--border);
+	}
+	.meta {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		flex-shrink: 0;
+	}
+	.rating {
+		font-size: var(--font-size-s);
+		color: var(--text-tertiary);
+		letter-spacing: 0.1em;
+	}
+	.date {
+		margin: 0;
+		font-weight: var(--font-weight-light);
+		color: var(--text-secondary);
+		opacity: 0.75;
+		letter-spacing: var(--spacing-s);
+		font-variant-numeric: tabular-nums;
+	}
+</style>

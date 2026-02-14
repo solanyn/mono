@@ -1,0 +1,19 @@
+---
+interface Props {
+	children: any;
+}
+---
+
+<aside class="note">
+	<slot />
+</aside>
+<style>
+	.note {
+		border-left: 2px solid var(--text-tertiary);
+		padding: 0.25em 0 0.25em 1em;
+		margin: 0.75em 0;
+		font-size: var(--font-size-s);
+		color: var(--text-secondary);
+		line-height: 1.6;
+	}
+</style>

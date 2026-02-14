@@ -9,6 +9,10 @@ import FormattedDate from '../components/FormattedDate.astro';
 const posts = (await getCollection('blog')).sort(
 	(a, b) => b.data.date.valueOf() - a.data.date.valueOf(),
 );
+const recipes = await getCollection('recipes');
+const reviews = await getCollection('reviews');
+const gearItems = await getCollection('gear');
+const hasFood = recipes.length > 0 || reviews.length > 0 || gearItems.length > 0;
 ---
 
 <!doctype html>
@@ -17,7 +21,7 @@ const posts = (await getCollection('blog')).sort(
 		<BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
 	</head>
 	<body>
-		<Header />
+		<Header section="main" />
 		<main>
 			<div class="about prose">
 				<p>

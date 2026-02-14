@@ -1,0 +1,63 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import BaseHead from '../components/BaseHead.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import FormattedDate from '../components/FormattedDate.astro';
+import RatingDisplay from '../components/recipe/RatingDisplay.astro';
+
+type Props = CollectionEntry<'reviews'>['data'];
+
+const { title, date, restaurant, location, rating, tags } = Astro.props;
+---
+
+<html lang="en">
+	<head>
+		<BaseHead title={`${restaurant} — Andrew's Kitchen`} description={title} />
+	</head>
+	<body class="food">
+		<Header section="food" />
+		<main>
+			<article class="prose">
+				<div class="title">
+					<h1>{title}</h1>
+					<div class="meta">
+						<FormattedDate date={date} />
+						<span class="restaurant">{restaurant}</span>
+						{location && <span class="location">{location}</span>}
+						{tags && tags.length > 0 && (
+							<span class="tags">
+								{tags.map((tag, i) => (
+									<span>{i > 0 && ', '}{tag}</span>
+								))}
+							</span>
+						)}
+					</div>
+				</div>
+				<RatingDisplay {...rating} />
+				<div class="content">
+					<slot />
+				</div>
+			</article>
+		</main>
+		<Footer section="food" />
+	</body>
+</html>
+<style>
+	.meta {
+		color: var(--text-secondary);
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5em;
+		align-items: center;
+	}
+	.restaurant {
+		font-weight: var(--font-weight-bold);
+	}
+	.location {
+		color: var(--text-tertiary);
+	}
+	.tags {
+		color: var(--text-tertiary);
+	}
+</style>

@@ -1,0 +1,55 @@
+---
+interface Props {
+	flavor: number;
+	effort: number;
+	accessibility: number;
+	overall: number;
+}
+
+const { flavor, effort, accessibility, overall } = Astro.props;
+
+function dots(n: number) {
+	return '●'.repeat(n) + '○'.repeat(5 - n);
+}
+---
+
+<div class="rating">
+	<a href="/food/scoring/" class="rating-link">
+		<div class="rating-row"><span class="label">Flavor</span><span class="dots">{dots(flavor)}</span></div>
+		<div class="rating-row"><span class="label">Effort</span><span class="dots">{dots(effort)}</span></div>
+		<div class="rating-row"><span class="label">Accessibility</span><span class="dots">{dots(accessibility)}</span></div>
+		<div class="rating-row overall"><span class="label">Would Make Again</span><span class="dots">{dots(overall)}</span></div>
+	</a>
+</div>
+<style>
+	.rating {
+		margin: 2em 0;
+	}
+	.rating-link {
+		text-decoration: none !important;
+		color: inherit !important;
+	}
+	.rating-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 0.25em 0;
+		font-size: var(--font-size-s);
+	}
+	.label {
+		color: var(--text-secondary);
+	}
+	.dots {
+		letter-spacing: 0.15em;
+		color: var(--text-tertiary);
+	}
+	.overall {
+		border-top: 1px solid var(--border);
+		margin-top: 0.25em;
+		padding-top: 0.5em;
+		font-weight: var(--font-weight-bold);
+	}
+	.overall .label {
+		color: var(--text-primary);
+	}
+</style>

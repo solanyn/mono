@@ -1,0 +1,61 @@
+body.food {
+  --content-width: 40rem;
+
+  --bg: #faf8f5;
+  --text-primary: #2c2420;
+  --text-secondary: #8a7e76;
+  --text-tertiary: #b8ada5;
+  --border: rgba(44, 36, 32, 0.12);
+  --selection: rgba(44, 36, 32, 0.08);
+  --code-bg: rgba(44, 36, 32, 0.04);
+  --mark: #f5e6c8;
+  --accent: #c45d3e;
+}
+
+@media (prefers-color-scheme: dark) {
+  body.food {
+    --bg: #1e1a17;
+    --text-primary: #e8e0d8;
+    --text-secondary: #9a8e84;
+    --text-tertiary: #6b6058;
+    --border: rgba(232, 224, 216, 0.1);
+    --selection: rgba(232, 224, 216, 0.08);
+    --code-bg: rgba(232, 224, 216, 0.04);
+    --mark: #4a3a28;
+    --accent: #d4785e;
+  }
+}
+
+body.food {
+  font-size: var(--font-size-l);
+  max-width: var(--content-width);
+}
+
+body.food .prose h1 {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 1.5rem;
+  font-weight: var(--font-weight-regular);
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+
+body.food .prose h2 {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 1.125rem;
+  font-weight: var(--font-weight-regular);
+  letter-spacing: 0;
+}
+
+body.food .prose img {
+  border-radius: 6px;
+}
+
+body.food .prose .note {
+  border-left-color: var(--accent);
+}
+
+body.food .prose a:hover {
+  text-decoration-color: var(--accent);
+}

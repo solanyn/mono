@@ -1,0 +1,30 @@
+---
+import BaseHead from '../../components/BaseHead.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+import { FOOD_TITLE } from '../../consts';
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead title={`About — ${FOOD_TITLE}`} description="About Andrew's Kitchen" />
+	</head>
+	<body class="food">
+		<Header section="food" />
+		<main>
+			<article class="prose">
+				<div class="title">
+					<h1>About</h1>
+				</div>
+				<div class="content">
+					<p>I'm a food hobbyist who chases flavour. Most of what I cook starts from someone else's recipe — I adapt it, take notes on what worked, and try to make it better next time.</p>
+					<p>At some point I realized I was consistently making food I preferred over eating out. Not because I'm a great cook, but because I can tune things exactly to my taste and I'm not afraid to spend time on it.</p>
+					<p>This site is my cooking journal. Recipes here are adaptations with inline notes on what I changed and why. Ratings are subjective and based on <a href="/food/scoring/">my scoring criteria</a>. Gear recommendations are things I actually own and use.</p>
+					<p>This site contains no affiliate links. If that changes, I'll disclose it here.</p>
+				</div>
+			</article>
+		</main>
+		<Footer section="food" />
+	</body>
+</html>

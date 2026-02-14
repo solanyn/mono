@@ -1,10 +1,48 @@
 ---
 import { SITE_TITLE } from '../consts';
+import { getCollection } from 'astro:content';
+
+interface Props {
+	section?: 'main' | 'food';
+}
+
+const { section = 'main' } = Astro.props;
+
+const blogPosts = await getCollection('blog');
+const recipes = await getCollection('recipes');
+const reviews = await getCollection('reviews');
+const gearItems = await getCollection('gear');
+
+const hasBlog = blogPosts.length > 0;
+const hasRecipes = recipes.length > 0;
+const hasReviews = reviews.length > 0;
+const hasGear = gearItems.length > 0;
+const hasFood = hasRecipes || hasReviews || hasGear;
 ---
 
 <header>
 	<nav>
-		<a href="/">{SITE_TITLE}</a>
+		{section === 'main' ? (
+			<>
+				<a href="/">{SITE_TITLE}</a>
+				<div class="links">
+					{hasBlog && <a href="/">Blog</a>}
+					{hasFood && <a href="/food/">Food</a>}
+				</div>
+			</>
+		) : (
+			<>
+				<a href="/food/">{SITE_TITLE}'s Kitchen</a>
+				<div class="links">
+					{hasRecipes && <a href="/food/">Recipes</a>}
+					{hasReviews && <a href="/food/reviews/">Reviews</a>}
+					{hasGear && <a href="/food/gear/">Gear</a>}
+					<a href="/food/scoring/">Scoring</a>
+					<a href="/food/about/">About</a>
+					<a href="/" class="back">Blog</a>
+				</div>
+			</>
+		)}
 	</nav>
 </header>
 <style>
@@ -20,5 +58,20 @@ import { SITE_TITLE } from '../consts';
 		font-weight: var(--font-weight-bold);
 		color: var(--text-primary);
 		text-decoration: none;
+	}
+	.links {
+		display: flex;
+		gap: 1rem;
+	}
+	.links a {
+		font-weight: var(--font-weight-regular);
+		color: var(--text-secondary);
+		transition: color 0.2s ease-out;
+	}
+	.links a:hover {
+		color: var(--text-primary);
+	}
+	.back {
+		color: var(--text-tertiary) !important;
 	}
 </style>

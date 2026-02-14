@@ -1,0 +1,123 @@
+---
+import BaseHead from '../../../components/BaseHead.astro';
+import Header from '../../../components/Header.astro';
+import Footer from '../../../components/Footer.astro';
+import FormattedDate from '../../../components/FormattedDate.astro';
+import { FOOD_TITLE } from '../../../consts';
+import { getCollection } from 'astro:content';
+
+const reviews = (await getCollection('reviews')).sort(
+	(a, b) => b.data.date.valueOf() - a.data.date.valueOf(),
+);
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead title={`Reviews — ${FOOD_TITLE}`} description="Restaurant reviews" />
+	</head>
+	<body class="food">
+		<Header section="food" />
+		<main>
+			{reviews.length > 0 ? (
+				<ul>
+					{reviews.map((review) => (
+						<li>
+							<a href={`/food/reviews/${review.id}/`}>
+								<div class="review-item">
+									<div class="info">
+										<p class="title">{review.data.title}</p>
+										<span class="restaurant">{review.data.restaurant}</span>
+									</div>
+									<div class="divider" />
+									<div class="meta">
+										<span class="rating">{'●'.repeat(review.data.rating.overall)}{'○'.repeat(5 - review.data.rating.overall)}</span>
+										<p class="date"><FormattedDate date={review.data.date} /></p>
+									</div>
+								</div>
+							</a>
+						</li>
+					))}
+				</ul>
+			) : (
+				<p class="empty">No reviews yet.</p>
+			)}
+		</main>
+		<Footer section="food" />
+	</body>
+</html>
+<style>
+	ul {
+		padding: 0;
+		margin: 0;
+		list-style-type: none;
+		display: flex;
+		flex-direction: column;
+	}
+	ul a {
+		color: var(--text-primary);
+		display: block;
+		text-decoration: none;
+		transition: opacity 0.15s ease-out;
+	}
+	ul:hover a {
+		opacity: 0.4;
+	}
+	ul:hover a:hover {
+		opacity: 1;
+	}
+	.review-item {
+		height: 2.75rem;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 0.75rem;
+	}
+	.info {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		min-width: 0;
+		flex-shrink: 1;
+	}
+	.title {
+		margin: 0;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.restaurant {
+		font-size: var(--font-size-s);
+		color: var(--text-tertiary);
+		flex-shrink: 0;
+	}
+	.divider {
+		flex: 1 1 auto;
+		min-width: 3rem;
+		margin: 0 0.25rem;
+		height: 0.5px;
+		background-color: var(--border);
+	}
+	.meta {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		flex-shrink: 0;
+	}
+	.rating {
+		font-size: var(--font-size-s);
+		color: var(--text-tertiary);
+		letter-spacing: 0.1em;
+	}
+	.date {
+		margin: 0;
+		font-weight: var(--font-weight-light);
+		color: var(--text-secondary);
+		opacity: 0.75;
+		letter-spacing: var(--spacing-s);
+		font-variant-numeric: tabular-nums;
+	}
+	.empty {
+		color: var(--text-tertiary);
+	}
+</style>

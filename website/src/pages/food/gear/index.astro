@@ -1,0 +1,108 @@
+---
+import BaseHead from '../../../components/BaseHead.astro';
+import Header from '../../../components/Header.astro';
+import Footer from '../../../components/Footer.astro';
+import FormattedDate from '../../../components/FormattedDate.astro';
+import { FOOD_TITLE } from '../../../consts';
+import { getCollection } from 'astro:content';
+
+const gearItems = (await getCollection('gear')).sort(
+	(a, b) => b.data.date.valueOf() - a.data.date.valueOf(),
+);
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead title={`Gear — ${FOOD_TITLE}`} description="Kitchen equipment and ingredient recommendations" />
+	</head>
+	<body class="food">
+		<Header section="food" />
+		<main>
+			<div class="about prose">
+				<p>Equipment and ingredients I actually use. This site contains no affiliate links. If that changes, I'll disclose it here.</p>
+			</div>
+			{gearItems.length > 0 ? (
+				<ul>
+					{gearItems.map((item) => (
+						<li>
+							<a href={`/food/gear/${item.id}/`}>
+								<div class="gear-item">
+									<p class="title">{item.data.title}</p>
+									<span class="type">{item.data.type}</span>
+									<div class="divider" />
+									<p class="date"><FormattedDate date={item.data.date} /></p>
+								</div>
+							</a>
+						</li>
+					))}
+				</ul>
+			) : (
+				<p class="empty">No gear notes yet.</p>
+			)}
+		</main>
+		<Footer section="food" />
+	</body>
+</html>
+<style>
+	.about {
+		margin-bottom: 1.25rem;
+	}
+	ul {
+		padding: 0;
+		margin: 0;
+		list-style-type: none;
+		display: flex;
+		flex-direction: column;
+	}
+	ul a {
+		color: var(--text-primary);
+		display: block;
+		text-decoration: none;
+		transition: opacity 0.15s ease-out;
+	}
+	ul:hover a {
+		opacity: 0.4;
+	}
+	ul:hover a:hover {
+		opacity: 1;
+	}
+	.gear-item {
+		height: 2.75rem;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 0.75rem;
+	}
+	.title {
+		margin: 0;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.type {
+		font-size: var(--font-size-s);
+		color: var(--text-tertiary);
+		text-transform: capitalize;
+		flex-shrink: 0;
+	}
+	.divider {
+		flex: 1 1 auto;
+		min-width: 3rem;
+		margin: 0 0.25rem;
+		height: 0.5px;
+		background-color: var(--border);
+	}
+	.date {
+		margin: 0;
+		font-weight: var(--font-weight-light);
+		color: var(--text-secondary);
+		opacity: 0.75;
+		letter-spacing: var(--spacing-s);
+		font-variant-numeric: tabular-nums;
+		flex-shrink: 0;
+	}
+	.empty {
+		color: var(--text-tertiary);
+	}
+</style>

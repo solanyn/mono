@@ -1,5 +1,6 @@
 @import './fonts.css';
 @import './post.css';
+@import './food.css';
 
 :root {
   --content-width: 35rem;

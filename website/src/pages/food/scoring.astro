@@ -1,0 +1,49 @@
+---
+import BaseHead from '../../components/BaseHead.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+import { FOOD_TITLE } from '../../consts';
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead title={`How I Score — ${FOOD_TITLE}`} description="Scoring criteria for recipes and reviews" />
+	</head>
+	<body class="food">
+		<Header section="food" />
+		<main>
+			<article class="prose">
+				<div class="title">
+					<h1>How I Score Recipes</h1>
+				</div>
+				<div class="content">
+					<h2>Rating Scale (1–5)</h2>
+					<table>
+						<thead>
+							<tr><th>Score</th><th>Meaning</th></tr>
+						</thead>
+						<tbody>
+							<tr><td>5</td><td>Absolutely. Already planning when to make it next.</td></tr>
+							<tr><td>4</td><td>Yes, with the tweaks noted.</td></tr>
+							<tr><td>3</td><td>Maybe. If nothing else sounds good.</td></tr>
+							<tr><td>2</td><td>Unlikely. Too much effort or not enough payoff.</td></tr>
+							<tr><td>1</td><td>No.</td></tr>
+						</tbody>
+					</table>
+
+					<h2>Criteria</h2>
+					<ul>
+						<li><strong>Flavor</strong> — How good is the end result?</li>
+						<li><strong>Effort</strong> — Time and complexity relative to the payoff.</li>
+						<li><strong>Accessibility</strong> — Can I make this with what's already in my kitchen? Considers both pantry staples and equipment. A recipe needing a spice I don't stock or a sous vide setup scores lower than one using a dutch oven and common ingredients.</li>
+					</ul>
+
+					<h2>Would Make Again</h2>
+					<p>The overall score. Not an average — it's the gut feeling after eating it, informed by the three criteria above. A 5-flavor dish that takes all day and needs specialty ingredients might still be a 3.</p>
+				</div>
+			</article>
+		</main>
+		<Footer section="food" />
+	</body>
+</html>
