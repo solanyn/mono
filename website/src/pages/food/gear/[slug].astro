@@ -15,6 +15,6 @@ const item = Astro.props;
 const { Content } = await render(item);
 ---
 
-<GearLayout {...item.data}>
+<GearLayout {...item.data} slug={item.id}>
 	<Content />
 </GearLayout>

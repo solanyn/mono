@@ -15,6 +15,6 @@ const review = Astro.props;
 const { Content } = await render(review);
 ---
 
-<ReviewLayout {...review.data}>
+<ReviewLayout {...review.data} slug={review.id}>
 	<Content />
 </ReviewLayout>

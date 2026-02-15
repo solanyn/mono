@@ -15,6 +15,6 @@ const recipe = Astro.props;
 const { Content } = await render(recipe);
 ---
 
-<RecipeLayout {...recipe.data}>
+<RecipeLayout {...recipe.data} slug={recipe.id}>
 	<Content />
 </RecipeLayout>

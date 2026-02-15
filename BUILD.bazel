@@ -1,5 +1,11 @@
 load("@npm//:defs.bzl", "npm_link_all_packages")
+load("@npm//:wrangler/package_json.bzl", wrangler_bin = "bin")
 
 package(default_visibility = ["//visibility:public"])
 
 npm_link_all_packages(name = "node_modules")
+
+wrangler_bin.wrangler_binary(
+    name = "wrangler",
+    data = [":node_modules/wrangler"],
+)

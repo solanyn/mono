@@ -5,10 +5,13 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import FormattedDate from '../components/FormattedDate.astro';
 import RatingDisplay from '../components/recipe/RatingDisplay.astro';
+import { contentImage } from '../lib/images';
 
-type Props = CollectionEntry<'recipes'>['data'];
+type Props = CollectionEntry<'recipes'>['data'] & { slug: string };
 
-const { title, date, type, sourceUrl, sourceAuthor, sourcePlatform, rating, tags } = Astro.props;
+const { title, date, type, sourceUrl, sourceAuthor, sourcePlatform, rating, tags, image, processImage, slug } = Astro.props;
+const heroUrl = image ? contentImage('recipes', slug, image) : undefined;
+const processUrl = processImage ? contentImage('recipes', slug, processImage) : undefined;
 ---
 
 <html lang="en">
@@ -39,9 +42,11 @@ const { title, date, type, sourceUrl, sourceAuthor, sourcePlatform, rating, tags
 					</div>
 				</div>
 				<RatingDisplay {...rating} />
+				{heroUrl && <img src={heroUrl} alt={title} class="hero" />}
 				<div class="content">
 					<slot />
 				</div>
+				{processUrl && <img src={processUrl} alt={`${title} — process`} class="process" />}
 			</article>
 		</main>
 		<Footer section="food" />
