@@ -4,12 +4,12 @@ import BaseHead from '../components/BaseHead.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import FormattedDate from '../components/FormattedDate.astro';
-import { contentImage } from '../lib/images';
+import { assetUrl } from '../lib/images';
 
 type Props = CollectionEntry<'gear'>['data'] & { slug: string };
 
 const { title, date, type, tags, image, slug } = Astro.props;
-const heroUrl = image ? contentImage('gear', slug, image) : undefined;
+const heroUrl = image ? assetUrl(`food/gear/${slug}`, image) : undefined;
 ---
 
 <html lang="en">

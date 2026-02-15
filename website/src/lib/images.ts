@@ -1,5 +1,5 @@
-const R2_BASE = import.meta.env.PUBLIC_R2_URL || '/content-images';
+const R2_BASE = import.meta.env.PUBLIC_R2_URL || '/assets';
 
-export function contentImage(collection: string, slug: string, filename: string) {
-	return `${R2_BASE}/${collection}/${slug}/${filename}`;
+export function assetUrl(path: string, filename: string) {
+	return `${R2_BASE}/${path}/${filename}`;
 }

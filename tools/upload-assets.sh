@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BUCKET="${R2_BUCKET:-blog-assets}"
-SOURCE_DIR="${1:-website/content-images}"
+BUCKET="${R2_BUCKET:-assets}"
+SOURCE_DIR="${1:-website/assets}"
 
 if ! command -v wrangler &> /dev/null; then
-  echo "error: wrangler not found. Install with: npm i -g wrangler" >&2
+  echo "error: wrangler not found. Run: bazelisk run //:wrangler" >&2
   exit 1
 fi
 

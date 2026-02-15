@@ -28,7 +28,7 @@ coverage
 .env.test
 
 # Content images (stored in R2, not git)
-website/content-images/
+website/assets/
 
 # OS-specific
 .DS_Store
