@@ -1,5 +1,6 @@
 load("@aspect_rules_js//js:defs.bzl", "js_run_binary")
 load("@npm//website:astro/package_json.bzl", astro_bin = "bin")
+load("@npm//:wrangler/package_json.bzl", wrangler_bin = "bin")
 load("@npm//:defs.bzl", "npm_link_all_packages")
 
 npm_link_all_packages()
@@ -33,6 +34,9 @@ js_run_binary(
     name = "build",
     srcs = SRCS + BUILD_DEPS,
     args = ["build"],
+    env = {
+        "PUBLIC_R2_URL": "https://assets.goyangi.io",
+    },
     mnemonic = "AstroBuild",
     out_dirs = ["dist"],
     tool = ":astro",
@@ -46,4 +50,20 @@ astro_bin.astro_binary(
         "ASTRO_TELEMETRY_DISABLED": "1",
     },
     data = SRCS + BUILD_DEPS,
+)
+
+wrangler_bin.wrangler_binary(
+    name = "deploy",
+    chdir = package_name(),
+    args = [
+        "pages",
+        "deploy",
+        "dist",
+        "--project-name=website",
+    ],
+    data = [
+        ":build",
+        "//:node_modules/wrangler",
+        "wrangler.toml",
+    ] + glob(["functions/**"]),
 )

@@ -1,0 +1,5 @@
+name = "website"
+compatibility_date = "2024-01-01"
+
+[vars]
+PUBLIC_R2_URL = "https://assets.goyangi.io"
