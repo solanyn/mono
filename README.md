@@ -7,4 +7,4 @@ Software projects built with Bazel.
 | Project                   | Description                          | Language   |
 | ------------------------- | ------------------------------------ | ---------- |
 | [cronprint](./cronprint/) | Scheduled printing service using IPP | Go         |
-| [website](./website/)     | Personal blog built with Astro + MDX | TypeScript |
+| [website](./website/)     | Personal blog and food journal built with Astro | TypeScript |
