@@ -73,9 +73,12 @@ jobs:
       - name: Build website
         run: bazel build //website:build --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }}
       - name: Deploy to Cloudflare Pages
-        run: npx wrangler pages deploy bazel-bin/website/dist --project-name=website
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: website
+          directory: bazel-bin/website/dist
 
   deploy-preview:
     runs-on: ubuntu-latest
@@ -94,18 +97,18 @@ jobs:
         run: bazel build //website:build --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }}
       - name: Deploy preview to Cloudflare Pages
         id: deploy
-        run: |
-          DEPLOY_OUTPUT=$(npx wrangler pages deploy bazel-bin/website/dist --project-name=website --branch="${{ github.head_ref }}" 2>&1)
-          echo "$DEPLOY_OUTPUT"
-          PREVIEW_URL=$(echo "$DEPLOY_OUTPUT" | grep -oE 'https://[a-z0-9-]+\.website\.pages\.dev' | head -1)
-          echo "preview_url=$PREVIEW_URL" >> "$GITHUB_OUTPUT"
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: website
+          directory: bazel-bin/website/dist
+          branch: ${{ github.head_ref }}
       - name: Comment preview URL on PR
         uses: actions/github-script@v7
         with:
           script: |
-            const previewUrl = '${{ steps.deploy.outputs.preview_url }}';
+            const previewUrl = '${{ steps.deploy.outputs.url }}';
             if (!previewUrl) return;
             const body = `🚀 Preview deployed to: ${previewUrl}`;
             const { data: comments } = await github.rest.issues.listComments({
