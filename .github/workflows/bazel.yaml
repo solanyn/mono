@@ -70,8 +70,10 @@ jobs:
         uses: bazel-contrib/setup-bazel@0.18.0
         with:
           bazelisk-cache: true
+      - name: Build website
+        run: bazel build //website:build --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }}
       - name: Deploy to Cloudflare Pages
-        run: bazel run //website:deploy --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }} --action_env=CLOUDFLARE_API_TOKEN
+        run: npx wrangler pages deploy bazel-bin/website/dist --project-name=website
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
