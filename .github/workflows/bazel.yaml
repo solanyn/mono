@@ -77,7 +77,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: website
+          projectName: goyangi
           directory: bazel-bin/website/dist
 
   deploy-preview:
@@ -101,7 +101,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: website
+          projectName: goyangi
           directory: bazel-bin/website/dist
           branch: ${{ github.head_ref }}
       - name: Comment preview URL on PR
