@@ -1,3 +1,4 @@
+load("@aspect_bazel_lib//lib:copy_file.bzl", "copy_file")
 load("@aspect_rules_js//js:defs.bzl", "js_run_binary")
 load("@npm//website:astro/package_json.bzl", astro_bin = "bin")
 load("@npm//:wrangler/package_json.bzl", wrangler_bin = "bin")
@@ -5,10 +6,17 @@ load("@npm//:defs.bzl", "npm_link_all_packages")
 
 npm_link_all_packages()
 
+copy_file(
+    name = "resume_json",
+    src = "//resume:resume_json",
+    out = "resume/resume.json",
+)
+
 SRCS = [
     "package.json",
     "tsconfig.json",
     "astro.config.mjs",
+    ":resume_json",
 ] + glob([
     "src/**",
     "public/**",

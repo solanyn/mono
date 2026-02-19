@@ -1,0 +1,117 @@
+{
+  "$ref": "#/definitions/recipes",
+  "definitions": {
+    "recipes": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "date": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "string",
+              "format": "date"
+            },
+            {
+              "type": "integer",
+              "format": "unix-time"
+            }
+          ]
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "adaptation",
+            "original",
+            "video"
+          ]
+        },
+        "sourceUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "sourceAuthor": {
+          "type": "string"
+        },
+        "sourcePlatform": {
+          "type": "string",
+          "enum": [
+            "youtube",
+            "tiktok",
+            "website",
+            "book"
+          ]
+        },
+        "baseServings": {
+          "type": "number"
+        },
+        "myServings": {
+          "type": "number"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "image": {
+          "type": "string"
+        },
+        "processImage": {
+          "type": "string"
+        },
+        "rating": {
+          "type": "object",
+          "properties": {
+            "flavor": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5
+            },
+            "effort": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5
+            },
+            "accessibility": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5
+            },
+            "overall": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "flavor",
+            "effort",
+            "accessibility",
+            "overall"
+          ],
+          "additionalProperties": false
+        },
+        "description": {
+          "type": "string"
+        },
+        "$schema": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "date",
+        "type",
+        "rating"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

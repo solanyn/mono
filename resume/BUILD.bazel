@@ -1,0 +1,14 @@
+filegroup(
+    name = "resume_json",
+    srcs = ["resume.json"],
+    visibility = ["//website:__pkg__"],
+)
+
+filegroup(
+    name = "resume_typ",
+    srcs = [
+        "resume.json",
+        "resume.typ",
+    ],
+    visibility = ["//visibility:public"],
+)

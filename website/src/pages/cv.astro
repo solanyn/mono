@@ -1,0 +1,237 @@
+---
+import BaseHead from '../components/BaseHead.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import resume from '../../resume/resume.json';
+
+const formatDate = (dateStr: string) => {
+	const date = new Date(dateStr);
+	return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+};
+
+const formatDateRange = (start: string, end?: string) => {
+	return end ? `${formatDate(start)} – ${formatDate(end)}` : `${formatDate(start)} – Present`;
+};
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead title={`${resume.basics.name} - CV`} description={resume.basics.summary} />
+	</head>
+	<body>
+		<Header section="main" />
+		<main class="cv">
+			<header class="cv-header">
+				<h1>{resume.basics.name}</h1>
+				<p class="label">{resume.basics.label}</p>
+				<p class="meta">
+					{resume.basics.location.city}, {resume.basics.location.countryCode} ·
+					<a href={`mailto:${resume.basics.email}`}>{resume.basics.email}</a> ·
+					<a href={resume.basics.url}>{resume.basics.url.replace('https://', '')}</a>
+				</p>
+				<div class="profiles">
+					{resume.basics.profiles.map((p) => (
+						<a href={p.url}>{p.network}</a>
+					))}
+				</div>
+				<p class="summary">{resume.basics.summary}</p>
+				<a href="https://assets.goyangi.io/cv.pdf" class="pdf-link">Download PDF</a>
+			</header>
+
+			<section>
+				<h2>Experience</h2>
+				{resume.work.map((job) => (
+					<div class="entry">
+						<div class="entry-header">
+							<h3>{job.position}</h3>
+							<span class="date">{formatDateRange(job.startDate, job.endDate)}</span>
+						</div>
+						<p class="org">
+							{job.url ? <a href={job.url}>{job.name}</a> : job.name}
+							{job.summary && <span class="summary"> · {job.summary}</span>}
+						</p>
+						<ul>
+							{job.highlights.map((h) => <li>{h}</li>)}
+						</ul>
+					</div>
+				))}
+			</section>
+
+			<section>
+				<h2>Education</h2>
+				{resume.education.map((edu) => (
+					<div class="entry">
+						<div class="entry-header">
+							<h3>{edu.studyType} of {edu.area}</h3>
+							<span class="date">{formatDateRange(edu.startDate, edu.endDate)}</span>
+						</div>
+						<p class="org">
+							{edu.institution}
+							{edu.score && <span class="summary"> · {edu.score}</span>}
+						</p>
+					</div>
+				))}
+			</section>
+
+			<section>
+				<h2>Skills</h2>
+				<div class="skills">
+					{resume.skills.map((skill) => (
+						<div class="skill-group">
+							<span class="skill-name">{skill.name}:</span>
+							<span class="skill-keywords">{skill.keywords.join(', ')}</span>
+						</div>
+					))}
+				</div>
+			</section>
+
+			<section>
+				<h2>Projects</h2>
+				{resume.projects.map((proj) => (
+					<div class="entry project">
+						<h3>{proj.url ? <a href={proj.url}>{proj.name}</a> : proj.name}</h3>
+						<p>{proj.description}</p>
+					</div>
+				))}
+			</section>
+
+			<section>
+				<h2>Certifications</h2>
+				{resume.certificates.map((cert) => (
+					<div class="entry cert">
+						<span class="cert-name">{cert.name}</span>
+						<span class="cert-issuer">{cert.issuer}, {new Date(cert.date).getFullYear()}</span>
+					</div>
+				))}
+			</section>
+		</main>
+		<Footer />
+	</body>
+</html>
+<style>
+	.cv {
+		max-width: var(--content-width);
+	}
+	.cv-header {
+		margin-bottom: 2rem;
+	}
+	.cv-header h1 {
+		margin: 0 0 0.25rem;
+		font-size: 1.5rem;
+		font-weight: var(--font-weight-bold);
+	}
+	.cv-header .label {
+		margin: 0 0 0.5rem;
+		color: var(--text-secondary);
+		font-size: var(--font-size-l);
+	}
+	.cv-header .meta {
+		margin: 0 0 0.5rem;
+		font-size: var(--font-size-s);
+		color: var(--text-secondary);
+	}
+	.cv-header .profiles {
+		display: flex;
+		gap: 1rem;
+		margin-bottom: 1rem;
+		font-size: var(--font-size-s);
+	}
+	.cv-header .summary {
+		margin: 0;
+	}
+	.pdf-link {
+		display: inline-block;
+		margin-top: 1rem;
+		font-size: var(--font-size-s);
+		color: var(--text-secondary);
+	}
+	section {
+		margin-bottom: 1.5rem;
+	}
+	h2 {
+		font-size: var(--font-size-m);
+		font-weight: var(--font-weight-bold);
+		margin: 0 0 0.75rem;
+		padding-bottom: 0.25rem;
+		border-bottom: 1px solid var(--border);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: var(--text-secondary);
+	}
+	.entry {
+		margin-bottom: 1.25rem;
+	}
+	.entry-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+	}
+	.entry h3 {
+		margin: 0;
+		font-size: var(--font-size-m);
+		font-weight: var(--font-weight-bold);
+	}
+	.entry .date {
+		font-size: var(--font-size-s);
+		color: var(--text-secondary);
+		white-space: nowrap;
+	}
+	.entry .org {
+		margin: 0.125rem 0 0.5rem;
+		font-size: var(--font-size-s);
+		color: var(--text-secondary);
+	}
+	.entry .summary {
+		color: var(--text-tertiary);
+	}
+	.entry ul {
+		margin: 0;
+		padding-left: 1.25rem;
+	}
+	.entry li {
+		margin-bottom: 0.25rem;
+		font-size: var(--font-size-s);
+	}
+	.skills {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+	.skill-group {
+		font-size: var(--font-size-s);
+	}
+	.skill-name {
+		font-weight: var(--font-weight-bold);
+	}
+	.skill-keywords {
+		color: var(--text-secondary);
+	}
+	.project {
+		margin-bottom: 0.75rem;
+	}
+	.project h3 {
+		display: inline;
+	}
+	.project p {
+		display: inline;
+		margin: 0;
+		color: var(--text-secondary);
+		font-size: var(--font-size-s);
+	}
+	.project p::before {
+		content: ' — ';
+		color: var(--text-tertiary);
+	}
+	.cert {
+		display: flex;
+		justify-content: space-between;
+		margin-bottom: 0.25rem;
+		font-size: var(--font-size-s);
+	}
+	.cert-issuer {
+		color: var(--text-secondary);
+	}
+</style>

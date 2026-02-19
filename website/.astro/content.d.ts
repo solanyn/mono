@@ -181,6 +181,30 @@ declare module 'astro:content' {
   rendered?: RenderedContent;
   filePath?: string;
 }>;
+"gear": Record<string, {
+  id: string;
+  body?: string;
+  collection: "gear";
+  data: InferEntrySchema<"gear">;
+  rendered?: RenderedContent;
+  filePath?: string;
+}>;
+"recipes": Record<string, {
+  id: string;
+  body?: string;
+  collection: "recipes";
+  data: InferEntrySchema<"recipes">;
+  rendered?: RenderedContent;
+  filePath?: string;
+}>;
+"reviews": Record<string, {
+  id: string;
+  body?: string;
+  collection: "reviews";
+  data: InferEntrySchema<"reviews">;
+  rendered?: RenderedContent;
+  filePath?: string;
+}>;
 
 	};
 

@@ -1,0 +1,60 @@
+{
+  "basics": {
+    "name": "Andrew Chen",
+    "label": "Machine Learning Engineer",
+    "email": "andrew@goyangi.io",
+    "url": "https://goyangi.io",
+    "summary": "Building AI agents and ML platforms. Currently focused on LLM orchestration, agentic systems, and voice interfaces. Open-source contributor to Kubeflow.",
+    "location": { "city": "Sydney", "countryCode": "AU" },
+    "profiles": [
+      {"network": "GitHub", "username": "solanyn", "url": "https://github.com/solanyn"},
+      {"network": "LinkedIn", "username": "solanyn", "url": "https://linkedin.com/in/solanyn"}
+    ]
+  },
+  "work": [
+    {
+      "name": "Ericsson",
+      "position": "Machine Learning Engineer",
+      "url": "https://ericsson.com",
+      "startDate": "2021-02-01",
+      "summary": "AI Agent Development & ML Platform",
+      "highlights": [
+        "Built AI-powered NOC agent for network operations — LLM orchestration with tool use, streaming responses, AG-UI frontend",
+        "Designed speech-to-text and text-to-speech pipelines for voice-first operator interface",
+        "Architected multi-tier memory system for cross-conversation context retention",
+        "Designed enterprise ML Platform on Google Cloud Vertex AI and GKE",
+        "Led team of 3 building MLOps pipelines for model development, evaluation, and deployment",
+        "Trained object detection models (PyTorch, TensorFlow) for document automation"
+      ]
+    },
+    {
+      "name": "Agtuary",
+      "position": "Data Scientist",
+      "startDate": "2020-07-01",
+      "endDate": "2021-02-01",
+      "summary": "Satellite imagery and agricultural ML",
+      "highlights": [
+        "End-to-end data pipelines for satellite imagery analysis at scale",
+        "ML models to predict agricultural yield from geospatial data"
+      ]
+    }
+  ],
+  "education": [
+    {"institution": "RMIT University", "area": "Data Science", "studyType": "Master", "startDate": "2019-01-01", "endDate": "2020-12-01", "score": "3.9/4.0 (Distinction)"},
+    {"institution": "RMIT University", "area": "Electronics & Electrical Engineering", "studyType": "Bachelor", "startDate": "2013-01-01", "endDate": "2018-12-01"}
+  ],
+  "skills": [
+    {"name": "Languages", "keywords": ["Python", "Go", "TypeScript", "SQL"]},
+    {"name": "ML/AI", "keywords": ["LLM Agents", "RAG", "PyTorch", "TensorFlow", "Kubeflow", "KServe", "Vertex AI"]},
+    {"name": "Infrastructure", "keywords": ["Kubernetes", "Flux", "Helm", "Talos", "Cilium", "Envoy Gateway", "GKE"]}
+  ],
+  "projects": [
+    {"name": "Kubeflow", "description": "Added QA fine-tuning example to trainer, maintain events/docs", "url": "https://github.com/kubeflow"},
+    {"name": "home-ops", "description": "Production k8s homelab with Kubeflow, KServe, Ray, MLflow, Cilium, Flux", "url": "https://github.com/solanyn/home-ops"},
+    {"name": "tgp-operator", "description": "K8s operator for ephemeral Talos GPU nodes (Go)"}
+  ],
+  "certificates": [
+    {"name": "MLOps Specialization", "issuer": "DeepLearning.AI", "date": "2023-01-01"},
+    {"name": "TensorFlow: Advanced Techniques", "issuer": "DeepLearning.AI", "date": "2024-01-01"}
+  ]
+}
