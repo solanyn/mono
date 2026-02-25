@@ -8,7 +8,9 @@ interface Props {
 
 const { section = 'main' } = Astro.props;
 
-const blogPosts = await getCollection('blog');
+const blogPosts = await getCollection('blog', ({ data }) =>
+	import.meta.env.PROD ? data.draft !== true : true
+);
 const recipes = await getCollection('recipes');
 const reviews = await getCollection('reviews');
 const gearItems = await getCollection('gear');
