@@ -6,31 +6,30 @@ draft: true
 tags: [kubernetes, gpu, liqo, gke, home-lab]
 ---
 
-import Mermaid from '../../components/Mermaid.astro'
+import Mermaid from "../../components/Mermaid.astro";
 
-I run a small Kubernetes cluster at home — three low-power Talos nodes, enough for most things. But when I want to train models or run GPU workloads, I am stuck. No GPUs, no budget for a dedicated card that sits idle 99% of the time.
+I run a Kubernetes cluster at home with three low-power Talos nodes, enough for most things, but when I want to train models or run GPU workloads, I don't have a good solution. I'm not interested in dropping money on a dedicated GPU for subpar performance.
 
-The dream: burst to cloud GPUs when needed, scale to zero when not, keep everything GitOps-friendly. Here is what I tried.
+What if we could just build something to burst to cloud GPUs when we need to?
 
-## The Detours
+## Sidequests
 
-### Tensor Processing Group Operator
+### Talos GPU Provider Operator
 
-First attempt was tgp-operator — seemed perfect for multi-cloud GPU access. Hit walls fast: had to build network fabric from scratch, Talos added complexity (no standard kubelet paths), provider API fragmentation meant lots of glue code, prepaid credits model — did not want to front cash for capacity I might not use.
-
-Parked it.
+My first attempt was `tgp-operator`, what if we could just create a control plane for cloud providers? It went great! At first. Then we ran into problems. Provider API fragmentation meant lots of glue code and many of them didn't have API docs. I didn't want to front cash for capacity I might not use, some providers want you to load up a minimum number of credits before they'll let you even provision a GPU node. The biggest problem I had was, if my cluster is in a private network, how are we gonna make secure connections from the cloud to my cluster at home? I'm not putting my cluster endpoint publicly (neither would most on-prem cluster setups). Wireguard and Tailscale are awesome, but I really didn't want to build in networking fabric _just_ to use a cloud node. In the bin it goes.
 
 ### Modal
 
-Pivoted to Modal for specific services — LLM inference, immich-ml, that kind of thing. Actually works great for those use cases. But it is not general-purpose Kubernetes. Cannot just schedule arbitrary pods there.
+I've been keeping an eye on Modal since they launched, their infrastructure as SDK model is really cool. For my case, it's a bit too limiting, I can't schedule any pod I want and keeping everything in the Kubernetes ecosystem for monitoring reasons, turns out was pretty important to me. I did build (`modal-operator`)[!github.com/solanyn/modal-operator] with a CRD for a `ModalApp` that gets the Modal URL and slaps it in a Kubernetes service. But that only works for things like LLM endpoints and maybe other scale-to-zero suitable API services.
 
-Good tool, wrong shape for what I wanted.
+Kinda neat, but didn't entirely fit the bill.
 
-## Liqo + GKE: The Win
+## Liqo
 
-Liqo does cluster federation — your home cluster peers with a remote cluster, and workloads can be scheduled across both transparently. The remote nodes show up as virtual nodes in your cluster.
+I found Liqo when looking at CNCF projects. Maybe I needed cloud federation. Liqo peers clusters together to make them _relatively_ seamlessly. Kubernetes will happily scheudle onto Liqo nodes in a second cluster as "virtual nodes".
 
-<Mermaid code={`graph LR
+<Mermaid
+  code={`graph LR
   subgraph Home["Home Cluster (Talos)"]
     API[API Server]
     N1[Node 1]
@@ -45,17 +44,20 @@ Liqo does cluster federation — your home cluster peers with a remote cluster, 
   API --> VN
   VN -.->|Liqo Tunnel| GPU1
   VN -.->|Liqo Tunnel| GPU2
-`} />
+`}
+/>
 
 Paired it with GKE using spot instances:
+
 - Home cluster: always on, control plane, lightweight workloads
-- GKE: GPU node pool with spot T4s, scales to zero when idle
+- GKE: small base node pool for Liqo pods, GPU node pool with spot T4s + general compute nodes, scales to zero when idle
 
-### How Offloading Works
+### Offloading
 
-When I submit a GPU workload, Liqo handles the magic:
+When I submit a GPU workload, Liqo:
 
-<Mermaid code={`sequenceDiagram
+<Mermaid
+  code={`sequenceDiagram
   participant User
   participant Home as Home API Server
   participant Liqo as Liqo Controller
@@ -70,22 +72,18 @@ When I submit a GPU workload, Liqo handles the magic:
   GKE-->>VN: Pod running
   VN-->>Home: Status update
   Home-->>User: Pod ready
-`} />
+`}
+/>
 
-The pod runs on GKE hardware but appears in my home cluster. Logs, exec, port-forward — all work transparently.
+The pod runs on GKE hardware but appears in my home cluster and monitoring, ingress/egress work transparently.
 
-### Cost Model
+### $$$
 
-- Home cluster: already paying for it
-- GKE control plane: ~$70/mo (autopilot would be cheaper but less control)
+- Home cluster: I already dumped money here
+- GKE control plane: 2x e2-small nodes, ~$70/mo, always on
 - GPU nodes: spot T4 ~$0.35/hr, only when running
+- General compute nodes: spot e2-medium ~X$/hr, only when running
 
-The key insight: GKE spot instances are actually pay-as-you-go with real scale-to-zero. No prepaid credits, no minimum commitment. That is the win over smaller GPU cloud providers.
+## What's next
 
-## What is Next
-
-Still setting up the Terraform/OpenTofu for the GKE side. Once that is solid, I will add Kubeflow pipelines that transparently burst GPU training jobs to cloud. The home cluster stays the brain, cloud is just muscle when needed.
-
----
-
-Repo: github.com/solanyn/home-ops
+Now to pray cloud bills don't ruin my life. Maybe a Grafana dashboard to track how much money I pour into this in my [cluster](github.com/solanyn/home-ops). Thanks for reading!
