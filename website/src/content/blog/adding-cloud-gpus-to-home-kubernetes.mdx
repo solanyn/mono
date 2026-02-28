@@ -1,7 +1,7 @@
 ---
 title: Adding Cloud GPUs to My Home Kubernetes Cluster
 description: How I added GPU burst computing to my home lab using Liqo and GKE spot instances
-date: 2026-02-26
+date: 2026-02-28
 draft: false
 tags: [kubernetes, gpu, liqo, gke, home-lab]
 ---
@@ -79,12 +79,14 @@ The pod runs on GKE hardware but appears in my home cluster and monitoring, ingr
 
 ### $$$
 
-| Resource       | Type           | $/hr  | Max nodes | Max $/mo | Notes                          |
-| -------------- | -------------- | ----- | --------- | -------- | ------------------------------ |
-| GKE management | —              | $0.10 | 1         | $0       | free tier covers first cluster |
-| Liqo base      | e2-small spot  | $0.01 | 2         | ~$15     | always on                      |
-| GPU            | T4 spot        | $0.35 | 8         | ~$2,044  | scales to 0                    |
-| Compute        | e2-medium spot | $0.01 | 4         | ~$29     | scales to 0                    |
+- **GKE management**
+  - $0.10/hr → $0/mo (free tier covers first cluster)
+- **Liqo base** (e2-small spot, always on)
+  - $0.01/hr × 2 nodes → ~$15/mo
+- **GPU** (T4 spot, scales to 0)
+  - $0.35/hr × 8 nodes max → ~$2,044/mo
+- **Compute** (e2-medium spot, scales to 0)
+  - $0.01/hr × 4 nodes max → ~$29/mo
 
 Theoretical max: ~$2,088/mo if everything ran 24/7. Node pools scale to zero when idle, I only pay for what I use. Something to note is that the node counts are easily configurable since the GKE cluster is GitOps managed with [crossplane](https://github.com/crossplane/crossplane) and the caps are by design so we can't scale to infinity (it's not supposed to). Adding or extending node pools is just one manifest away.
 
