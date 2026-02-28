@@ -20,13 +20,13 @@ My first attempt was `tgp-operator`, what if we could just create a control plan
 
 ### Modal
 
-I've been keeping an eye on Modal since they launched, their infrastructure as SDK model is really cool. For my case, it's a bit too limiting, I can't schedule any pod I want and keeping everything in the Kubernetes ecosystem for monitoring reasons, turns out was pretty important to me. I did build (`modal-operator`)[!github.com/solanyn/modal-operator] with a CRD for a `ModalApp` that gets the Modal URL and slaps it in a Kubernetes service. But that only works for things like LLM endpoints and maybe other scale-to-zero suitable API services.
+I've been keeping an eye on Modal since they launched, their infrastructure as SDK model is really cool. For my case, it's a bit too limiting, I can't schedule any pod I want and keeping everything in the Kubernetes ecosystem for monitoring reasons, turns out was pretty important to me. I did build [modal-operator](https://github.com/solanyn/modal-operator) with a CRD for a `ModalApp` that gets the Modal URL and slaps it in a Kubernetes service. But that only works for things like LLM endpoints and maybe other scale-to-zero suitable API services.
 
 Kinda neat, but didn't entirely fit the bill.
 
 ## Liqo
 
-I found Liqo when looking at CNCF projects. Maybe I needed cloud federation. Liqo peers clusters together to make them _relatively_ seamlessly. Kubernetes will happily scheudle onto Liqo nodes in a second cluster as "virtual nodes".
+I found Liqo when looking at CNCF projects. Maybe I needed cloud federation. Liqo peers clusters together to make them _relatively_ seamlessly. Kubernetes will happily schedule onto Liqo nodes in a second cluster as "virtual nodes".
 
 <Mermaid
   code={`graph LR
@@ -79,11 +79,15 @@ The pod runs on GKE hardware but appears in my home cluster and monitoring, ingr
 
 ### $$$
 
-- Home cluster: I already dumped money here
-- GKE control plane: 2x e2-small nodes, ~$70/mo, always on
-- GPU nodes: spot T4 ~$0.35/hr, only when running
-- General compute nodes: spot e2-medium ~X$/hr, only when running
+| Resource | Type | $/hr | Max nodes | Max $/mo | Notes |
+|----------|------|------|-----------|----------|-------|
+| GKE management | — | $0.10 | 1 | $0 | free tier covers first cluster |
+| Liqo base | e2-small spot | $0.01 | 2 | ~$15 | always on |
+| GPU | T4 spot | $0.35 | 8 | ~$2,044 | scales to 0 |
+| Compute | e2-medium spot | $0.01 | 4 | ~$29 | scales to 0 |
+
+Theoretical max: ~$2,088/mo if everything ran 24/7 (it won't). Node pools scale to zero when idle — I only pay for what I use. Adding more pool types (different GPUs, bigger compute) is just another Crossplane manifest away.
 
 ## What's next
 
-Now to pray cloud bills don't ruin my life. Maybe a Grafana dashboard to track how much money I pour into this in my [cluster](github.com/solanyn/home-ops). Thanks for reading!
+Now to pray cloud bills don't ruin my life. Maybe a Grafana dashboard to track how much money I pour into this in my [cluster](https://github.com/solanyn/home-ops). Thanks for reading!
