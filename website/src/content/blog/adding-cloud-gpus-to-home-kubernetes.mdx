@@ -86,7 +86,7 @@ The pod runs on GKE hardware but appears in my home cluster and monitoring, ingr
 | GPU            | T4 spot        | $0.35 | 8         | ~$2,044  | scales to 0                    |
 | Compute        | e2-medium spot | $0.01 | 4         | ~$29     | scales to 0                    |
 
-Theoretical max: ~$2,088/mo if everything ran 24/7. Node pools scale to zero when idle, I only pay for what I use. Something to note is that the node counts are easily configurable since the GKE cluster is GitOps managed with [crossplane](https://github.com/crossplane/crossplane) and the caps are by design so we can't scale to infinity (it's not supposed it's for cosplaying as a professional). Adding or extedning node pools is just one manifest away.
+Theoretical max: ~$2,088/mo if everything ran 24/7. Node pools scale to zero when idle, I only pay for what I use. Something to note is that the node counts are easily configurable since the GKE cluster is GitOps managed with [crossplane](https://github.com/crossplane/crossplane) and the caps are by design so we can't scale to infinity (it's not supposed to). Adding or extedning node pools is just one manifest away.
 
 ## What's next
 
