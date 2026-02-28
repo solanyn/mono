@@ -16,7 +16,7 @@ What if we could just build something to burst to cloud GPUs when we need to?
 
 ### Talos GPU Provider Operator
 
-My first attempt was (`tgp-operator`)[https://github.com/solanyn/tgp-operator], what if we could just create a control plane for cloud providers? It went great! At first. Then we ran into problems. Provider API fragmentation meant lots of glue code and many of them didn't have API docs. I didn't want to front cash for capacity I might not use, some providers want you to load up a minimum number of credits before they'll let you even provision a GPU node. The biggest problem I had was, if my cluster is in a private network, how are we gonna make secure connections from the cloud to my cluster at home? I'm not putting my cluster endpoint publicly (neither would most on-prem cluster setups). Wireguard and Tailscale are awesome, but I really didn't want to build in networking fabric _just_ to use a cloud node. In the bin it goes.
+My first attempt was [`tgp-operator`](https://github.com/solanyn/tgp-operator), what if we could just create a control plane for cloud providers? It went great! At first. Then we ran into problems. Provider API fragmentation meant lots of glue code and many of them didn't have API docs. I didn't want to front cash for capacity I might not use, some providers want you to load up a minimum number of credits before they'll let you even provision a GPU node. The biggest problem I had was, if my cluster is in a private network, how are we gonna make secure connections from the cloud to my cluster at home? I'm not putting my cluster endpoint publicly (neither would most on-prem cluster setups). Wireguard and Tailscale are awesome, but I really didn't want to build in networking fabric _just_ to use a cloud node. In the bin it goes.
 
 ### Modal
 
@@ -86,7 +86,7 @@ The pod runs on GKE hardware but appears in my home cluster and monitoring, ingr
 | GPU            | T4 spot        | $0.35 | 8         | ~$2,044  | scales to 0                    |
 | Compute        | e2-medium spot | $0.01 | 4         | ~$29     | scales to 0                    |
 
-Theoretical max: ~$2,088/mo if everything ran 24/7. Node pools scale to zero when idle, I only pay for what I use. Something to note is that the node counts are easily configurable since the GKE cluster is GitOps managed with [crossplane](https://github.com/crossplane/crossplane) and the caps are by design so we can't scale to infinity (it's not supposed to). Adding or extedning node pools is just one manifest away.
+Theoretical max: ~$2,088/mo if everything ran 24/7. Node pools scale to zero when idle, I only pay for what I use. Something to note is that the node counts are easily configurable since the GKE cluster is GitOps managed with [crossplane](https://github.com/crossplane/crossplane) and the caps are by design so we can't scale to infinity (it's not supposed to). Adding or extending node pools is just one manifest away.
 
 ## What's next
 
