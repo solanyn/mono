@@ -30,6 +30,9 @@ coverage
 # Content images (stored in R2, not git)
 website/assets/
 
+# Astro generated files
+website/.astro/
+
 # OS-specific
 .DS_Store
 

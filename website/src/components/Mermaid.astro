@@ -1,0 +1,27 @@
+---
+import { renderMermaidSVG } from 'beautiful-mermaid'
+
+interface Props {
+	code: string
+}
+
+const { code } = Astro.props
+const svg = renderMermaidSVG(code, {
+	bg: 'var(--bg)',
+	fg: 'var(--text-primary)',
+	transparent: true,
+})
+---
+
+<div class="mermaid" set:html={svg} />
+<style>
+	.mermaid {
+		margin: 1.5rem 0;
+		display: flex;
+		justify-content: center;
+	}
+	.mermaid :global(svg) {
+		max-width: 100%;
+		height: auto;
+	}
+</style>

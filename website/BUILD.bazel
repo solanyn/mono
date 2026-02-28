@@ -27,6 +27,7 @@ BUILD_DEPS = [":node_modules/" + d for d in [
     "@astrojs/mdx",
     "@astrojs/rss",
     "@astrojs/sitemap",
+    "beautiful-mermaid",
     "sharp",
 ]]
 

@@ -6,6 +6,8 @@ draft: true
 tags: [kubernetes, gpu, liqo, gke, home-lab]
 ---
 
+import Mermaid from '../../components/Mermaid.astro'
+
 I run a small Kubernetes cluster at home — three low-power Talos nodes, enough for most things. But when I want to train models or run GPU workloads, I am stuck. No GPUs, no budget for a dedicated card that sits idle 99% of the time.
 
 The dream: burst to cloud GPUs when needed, scale to zero when not, keep everything GitOps-friendly. Here is what I tried.
@@ -28,9 +30,49 @@ Good tool, wrong shape for what I wanted.
 
 Liqo does cluster federation — your home cluster peers with a remote cluster, and workloads can be scheduled across both transparently. The remote nodes show up as virtual nodes in your cluster.
 
+<Mermaid code={`graph LR
+  subgraph Home["Home Cluster (Talos)"]
+    API[API Server]
+    N1[Node 1]
+    N2[Node 2]
+    N3[Node 3]
+    VN[Virtual Node]
+  end
+  subgraph GKE["GKE (Remote)"]
+    GPU1[T4 Spot Node]
+    GPU2[T4 Spot Node]
+  end
+  API --> VN
+  VN -.->|Liqo Tunnel| GPU1
+  VN -.->|Liqo Tunnel| GPU2
+`} />
+
 Paired it with GKE using spot instances:
 - Home cluster: always on, control plane, lightweight workloads
 - GKE: GPU node pool with spot T4s, scales to zero when idle
+
+### How Offloading Works
+
+When I submit a GPU workload, Liqo handles the magic:
+
+<Mermaid code={`sequenceDiagram
+  participant User
+  participant Home as Home API Server
+  participant Liqo as Liqo Controller
+  participant VN as Virtual Node
+  participant GKE as GKE Cluster
+  
+  User->>Home: kubectl apply (GPU pod)
+  Home->>Liqo: Pod needs nvidia.com/gpu
+  Liqo->>VN: Schedule to virtual node
+  VN->>GKE: Create pod via peering
+  GKE->>GKE: Scale up T4 spot node
+  GKE-->>VN: Pod running
+  VN-->>Home: Status update
+  Home-->>User: Pod ready
+`} />
+
+The pod runs on GKE hardware but appears in my home cluster. Logs, exec, port-forward — all work transparently.
 
 ### Cost Model
 
