@@ -7,8 +7,6 @@ interface Props {
 
 const { code } = Astro.props
 const svg = renderMermaidSVG(code, {
-	bg: 'var(--bg)',
-	fg: 'var(--text-primary)',
 	transparent: true,
 })
 ---
@@ -21,6 +19,8 @@ const svg = renderMermaidSVG(code, {
 		justify-content: center;
 	}
 	.mermaid :global(svg) {
+		--bg: var(--bg);
+		--fg: var(--text-primary);
 		max-width: 100%;
 		height: auto;
 	}
