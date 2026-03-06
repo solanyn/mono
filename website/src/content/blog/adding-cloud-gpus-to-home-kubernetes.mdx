@@ -38,8 +38,8 @@ I found Liqo when looking at CNCF projects. Maybe I needed cloud federation. Liq
     VN[Virtual Node]
   end
   subgraph GKE["GKE (Remote)"]
-    GPU1[T4 Spot Node]
-    GPU2[T4 Spot Node]
+    GPU1[L4 Spot Node]
+    GPU2[L4 Spot Node]
   end
   API --> VN
   VN -.->|Liqo Tunnel| GPU1
@@ -50,7 +50,7 @@ I found Liqo when looking at CNCF projects. Maybe I needed cloud federation. Liq
 Paired it with GKE using spot instances:
 
 - Home cluster: always on, control plane, lightweight workloads
-- GKE: small base node pool for Liqo pods, GPU node pool with spot T4s + general compute nodes, scales to zero when idle
+- GKE: small base node pool for Liqo pods, GPU node pool with spot L4s + general compute nodes, scales to zero when idle
 
 ### Offloading
 
@@ -68,7 +68,7 @@ When I submit a GPU workload, Liqo:
   Home->>Liqo: Pod needs nvidia.com/gpu
   Liqo->>VN: Schedule to virtual node
   VN->>GKE: Create pod via peering
-  GKE->>GKE: Scale up T4 spot node
+  GKE->>GKE: Scale up L4 spot node
   GKE-->>VN: Pod running
   VN-->>Home: Status update
   Home-->>User: Pod ready
@@ -81,14 +81,14 @@ The pod runs on GKE hardware but appears in my home cluster and monitoring, ingr
 
 - **GKE management**
   - $0.10/hr → $0/mo (free tier covers first cluster)
-- **Liqo base** (e2-small spot, always on)
-  - $0.01/hr × 2 nodes → ~$15/mo
-- **GPU** (T4 spot, scales to 0)
-  - $0.35/hr × 8 nodes max → ~$2,044/mo
+- **Liqo base** (e2-micro, always on)
+  - $0.01/hr × 1 node → ~$5/mo
+- **GPU** (L4 spot, scales to 0)
+  - $0.21/hr × 8 nodes max → ~$1,226/mo
 - **Compute** (e2-medium spot, scales to 0)
   - $0.01/hr × 4 nodes max → ~$29/mo
 
-Theoretical max: ~$2,088/mo if everything ran 24/7. Node pools scale to zero when idle, I only pay for what I use. Something to note is that the node counts are easily configurable since the GKE cluster is GitOps managed with [crossplane](https://github.com/crossplane/crossplane) and the caps are by design so we can't scale to infinity (it's not supposed to). Adding or extending node pools is just one manifest away.
+Theoretical max: ~$1,260/mo if everything ran 24/7. Node pools scale to zero when idle, I only pay for what I use. Something to note is that the node counts are easily configurable since the GKE cluster is GitOps managed with [crossplane](https://github.com/crossplane/crossplane) and the caps are by design so we can't scale to infinity (it's not supposed to). Adding or extending node pools is just one manifest away.
 
 ## What's next
 
