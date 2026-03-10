@@ -4,7 +4,10 @@
     "onlyBuiltDependencies": [
       "esbuild",
       "sharp"
-    ]
+    ],
+    "patchedDependencies": {
+      "vite@7.3.1": "patches/vite@7.3.1.patch"
+    }
   },
   "devDependencies": {
     "wrangler": "^4.65.0"
