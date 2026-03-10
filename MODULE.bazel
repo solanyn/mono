@@ -5,6 +5,7 @@ module(
 
 bazel_dep(name = "aspect_bazel_lib", version = "2.22.5")
 bazel_dep(name = "aspect_rules_js", version = "2.9.2")
+bazel_dep(name = "aspect_rules_lint", version = "2.3.0")
 bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "buildifier_prebuilt", version = "8.2.1.2")
 bazel_dep(name = "gazelle", version = "0.47.0")
@@ -19,10 +20,112 @@ go_sdk.download(version = "1.23.6")
 
 go_deps = use_extension("@gazelle//:extensions.bzl", "go_deps")
 go_deps.from_file(go_mod = "//cronprint:go.mod")
+go_deps.module(
+    path = "github.com/go-chi/chi/v5",
+    sum = "h1:KOIHODQj58PmL80G2Eak4WdvUzjSJSm0vG72crDCqb8=",
+    version = "v5.2.1",
+)
+go_deps.module(
+    path = "github.com/jackc/pgx/v5",
+    sum = "h1:9wKznZrhWa2QiHL+NjTSPP6yjl3451BX3imWDnokYlg=",
+    version = "v5.7.4",
+)
+go_deps.module(
+    path = "github.com/jackc/puddle/v2",
+    sum = "h1:PR8nw+E/1w0GLuRFSmiioY6UooMp6KJv0/61nB7icHo=",
+    version = "v2.2.2",
+)
+go_deps.module(
+    path = "github.com/jackc/pgpassfile",
+    sum = "h1:/6Hmqy13Ss2zCq62VdNG8tM1wchn8zjSGOBJ6icpsIM=",
+    version = "v1.0.0",
+)
+go_deps.module(
+    path = "github.com/jackc/pgservicefile",
+    sum = "h1:iCEnooe7UlwOQYpKFhBabPMi4aNAfoODPEFNiAnClxo=",
+    version = "v0.0.0-20240606120523-5a60cdf6a761",
+)
+go_deps.module(
+    path = "golang.org/x/crypto",
+    sum = "h1:euUpcYgM8WcP71gNpTqQCn6rC2t6ULUPiOzfWaXVVfc=",
+    version = "v0.32.0",
+)
+go_deps.module(
+    path = "golang.org/x/sync",
+    sum = "h1:3NQrjDixjgGwUOCaF8w2+VYHv0Ve/vGYSbdkTa98gmQ=",
+    version = "v0.10.0",
+)
+go_deps.module(
+    path = "golang.org/x/text",
+    sum = "h1:zyQAAkrwaneQ066sspRyJaG9VNi/YJ1NfzcGB3hZ/qo=",
+    version = "v0.21.0",
+)
+go_deps.module(
+    path = "github.com/redis/go-redis/v9",
+    sum = "h1:pMkxYPkEbMPwRdenAzUNyFNrDgHx9U+DrBabWNfSRQs=",
+    version = "v9.18.0",
+)
+go_deps.module(
+    path = "github.com/cespare/xxhash/v2",
+    sum = "h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=",
+    version = "v2.3.0",
+)
+go_deps.module(
+    path = "github.com/dgryski/go-rendezvous",
+    sum = "h1:lO4WD4F/rVNCu3HqELle0jiPLLBs70cWOduZpkS1E78=",
+    version = "v0.0.0-20200823014737-9f7001d12a5f",
+)
+go_deps.module(
+    path = "github.com/jonas-p/go-shp",
+    sum = "h1:LY81nN67DBCz6VNFn2kS64CjmnDo9IP8rmSkTvhO9jE=",
+    version = "v0.1.1",
+)
+go_deps.module(
+    path = "github.com/pressly/goose/v3",
+    sum = "h1:bZmxRco2uy5uu5Ng1MMVEfYsFlrMJI+e/VMXHQ3C4LY=",
+    version = "v3.24.1",
+)
+go_deps.module(
+    path = "github.com/mfridman/interpolate",
+    sum = "h1:pnuTK7MQIxxFz1Gr+rjSIx9u7qVjf5VOoM/u6BbAxPY=",
+    version = "v0.0.2",
+)
+go_deps.module(
+    path = "github.com/sethvargo/go-retry",
+    sum = "h1:EEt31A35QhrcRZtrYFDTBg91cqZVnFL2navjDrah2SE=",
+    version = "v0.3.0",
+)
+go_deps.module(
+    path = "go.uber.org/multierr",
+    sum = "h1:blXXJkSxSSfBVBlC76pxqeO+LN3aDfLQo+309xJstO0=",
+    version = "v1.11.0",
+)
+go_deps.module(
+    path = "go.uber.org/atomic",
+    sum = "h1:ZvwS0R+56ePWxUNi+Atn9dWONBPp/AUETXlHW0DxSjE=",
+    version = "v1.11.0",
+)
 use_repo(
     go_deps,
+    "com_github_cespare_xxhash_v2",
+    "com_github_dgryski_go_rendezvous",
+    "com_github_go_chi_chi_v5",
+    "com_github_jackc_pgpassfile",
+    "com_github_jackc_pgservicefile",
+    "com_github_jackc_pgx_v5",
+    "com_github_jackc_puddle_v2",
+    "com_github_jonas_p_go_shp",
+    "com_github_mfridman_interpolate",
     "com_github_openprinting_goipp",
+    "com_github_pressly_goose_v3",
+    "com_github_redis_go_redis_v9",
     "com_github_robfig_cron_v3",
+    "com_github_sethvargo_go_retry",
+    "org_golang_x_crypto",
+    "org_golang_x_sync",
+    "org_golang_x_text",
+    "org_uber_go_atomic",
+    "org_uber_go_multierr",
 )
 
 # js
