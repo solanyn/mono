@@ -67,7 +67,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Typst
-        uses: typst-community/setup-typst@v4
+        uses: typst-community/setup-typst@v5
       - name: Build PDF
         run: typst compile resume/resume.typ cv.pdf
       - name: Upload to R2
