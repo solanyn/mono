@@ -21,7 +21,7 @@ importers:
     dependencies:
       '@astrojs/mdx':
         specifier: ^5.0.0
-        version: 5.0.0(astro@6.0.4(@types/node@24.12.0)(jiti@1.21.7)(rollup@4.59.0)(typescript@5.9.3))
+        version: 5.0.1(astro@6.0.5(@types/node@24.12.0)(jiti@1.21.7)(rollup@4.59.0)(typescript@5.9.3))
       '@astrojs/rss':
         specifier: ^4.0.11
         version: 4.0.17
@@ -30,7 +30,7 @@ importers:
         version: 3.7.1
       astro:
         specifier: ^6.0.0
-        version: 6.0.4(@types/node@24.12.0)(jiti@1.21.7)(rollup@4.59.0)(typescript@5.9.3)
+        version: 6.0.5(@types/node@24.12.0)(jiti@1.21.7)(rollup@4.59.0)(typescript@5.9.3)
       beautiful-mermaid:
         specifier: ^1.0.2
         version: 1.1.3
@@ -121,11 +121,11 @@ packages:
   '@astrojs/markdown-remark@7.0.0':
     resolution: {integrity: sha512-jTAXHPy45L7o1ljH4jYV+ShtOHtyQUa1mGp3a5fJp1soX8lInuTJQ6ihmldHzVM4Q7QptU4SzIDIcKbBJO7sXQ==}
 
-  '@astrojs/mdx@5.0.0':
-    resolution: {integrity: sha512-J4rW6eT+qgVw7+RXdBYO4vYyWGeXXQp8wop9dXsOlLzIsVSxyttMCgkGCWvIR2ogBqKqeYgI6YDW93PaDHkCaA==}
+  '@astrojs/mdx@5.0.1':
+    resolution: {integrity: sha512-xfvc9MuV/5Kl6JaiYYEFi7ilbGYyaaOboH+gH8f2jHAZ2pmmHtnSrewS03vNeruBsa8rtS3X8NHJrqeZt+0wLg==}
     engines: {node: ^20.19.1 || >=22.12.0}
     peerDependencies:
-      astro: ^6.0.0-alpha.0
+      astro: ^6.0.0
 
   '@astrojs/prism@4.0.0':
     resolution: {integrity: sha512-NndtNPpxaGinRpRytljGBvYHpTOwHycSZ/c+lQi5cHvkqqrHKWdkPEhImlODBNmbuB+vyQUNUDXyjzt66CihJg==}
@@ -1724,8 +1724,8 @@ packages:
     resolution: {integrity: sha512-LElXdjswlqjWrPpJFg1Fx4wpkOCxj1TDHlSV4PlaRxHGWko024xICaa97ZkMfs6DRKlCguiAI+rbXv5GWwXIkg==}
     hasBin: true
 
-  astro@6.0.4:
-    resolution: {integrity: sha512-1piLJCPTL/x7AMO2cjVFSTFyRqKuC3W8sSEySCt1aJio+p/wGs5H3K+Xr/rE9ftKtknLUtjxCqCE7/0NsXfGpQ==}
+  astro@6.0.5:
+    resolution: {integrity: sha512-JnLCwaoCaRXIHuIB8yNztJrd7M3hXrHUMAoQmeXtEBKxRu/738REhaCZ1lapjrS9HlpHsWTu3JUXTERB/0PA7g==}
     engines: {node: ^20.19.1 || >=22.12.0, npm: '>=9.6.5', pnpm: '>=7.1.0'}
     hasBin: true
 
@@ -2496,8 +2496,8 @@ packages:
   lowlight@1.20.0:
     resolution: {integrity: sha512-8Ktj+prEb1RoCPkEOrPMYUN/nCggB7qAWe3a7OpMjWQkh3l2RD5wKRQ+o8Q8YuI9RG/xs95waaI/E6ym/7NsTw==}
 
-  lru-cache@11.2.6:
-    resolution: {integrity: sha512-ESL2CrkS/2wTPfuend7Zhkzo2u0daGJ/A2VucJOgQ/C48S/zB8MMeMHSGKYpXhIjbPxfuezITkaBH1wqv00DDQ==}
+  lru-cache@11.2.7:
+    resolution: {integrity: sha512-aY/R+aEsRelme17KGQa/1ZSIpLpNYYrhcrepKTZgE+W3WM16YMCaPwOHLHsmopZHELU0Ojin1lPVxKR0MihncA==}
     engines: {node: 20 || >=22}
 
   lru-cache@5.1.1:
@@ -2554,9 +2554,6 @@ packages:
 
   mdast-util-from-markdown@1.3.1:
     resolution: {integrity: sha512-4xTO/M8c82qBcnQc1tgpNtubGUW/Y1tBQ1B0i5CtSoelOLKFYlElIr3bvgREYYO5iRqbMY1YuqZng0GVOI8Qww==}
-
-  mdast-util-from-markdown@2.0.2:
-    resolution: {integrity: sha512-uZhTV/8NBuw0WHkPTrCqDOl0zVe1BIng5ZtHoDk49ME1qqcjYmmLmOf0gELgcRMxN4w2iuIeVso5/6QymSrgmA==}
 
   mdast-util-from-markdown@2.0.3:
     resolution: {integrity: sha512-W4mAWTvSlKvf8L6J+VN9yLSqQ9AOAAvHuoDAmPkz4dHf553m5gVj2ejadHJhoJmcmxEnOv6Pa8XJhpxE93kb8Q==}
@@ -2896,8 +2893,8 @@ packages:
   oniguruma-parser@0.12.1:
     resolution: {integrity: sha512-8Unqkvk1RYc6yq2WBYRj4hdnsAxVze8i7iPfQr8e4uSP3tRv0rpZcbGUDvxfQQcdwHt/e9PrMvGCsa8OqG9X3w==}
 
-  oniguruma-to-es@4.3.4:
-    resolution: {integrity: sha512-3VhUGN3w2eYxnTzHn+ikMI+fp/96KoRSVK9/kMTcFqj1NRDh2IhQCKvYxDnWePKRXY/AqH+Fuiyb7VHSzBjHfA==}
+  oniguruma-to-es@4.3.5:
+    resolution: {integrity: sha512-Zjygswjpsewa0NLTsiizVuMQZbp0MDyM6lIt66OxsF21npUDlzpHi1Mgb/qhQdkb+dWFTzJmFbEWdvZgRho8eQ==}
 
   p-limit@7.3.0:
     resolution: {integrity: sha512-7cIXg/Z0M5WZRblrsOla88S4wAK+zOQQWeBYfV3qJuJXMr+LnbYjaadrFaS0JILfEDPVqHyKnZ1Z/1d6J9VVUw==}
@@ -3338,8 +3335,8 @@ packages:
     resolution: {integrity: sha512-Ae3OVUqifDw0wBriIBS7yVaW44Dp6eSHQcyq4Igc7eN2TJH/2YsicswaW+J/OuMvhpDPOKEgpAZCjkb4hpoyeA==}
     engines: {node: ^16.14.0 || >= 17.3.0}
 
-  tinyexec@1.0.2:
-    resolution: {integrity: sha512-W/KYk+NFhkmsYpuHq5JykngiOCnxeVL8v8dFnqxSD8qEEdRfXk1SDM6JzNqcERbcGYj9tMrDQBYV9cjgnunFIg==}
+  tinyexec@1.0.4:
+    resolution: {integrity: sha512-u9r3uZC0bdpGOXtlxUIdwf9pkmvhqJdrVCH9fapQtgy/OeTTMZ1nqH7agtvEfmGui6e1XxjcdrlxvxJvc3sMqw==}
     engines: {node: '>=18'}
 
   tinyglobby@0.2.15:
@@ -3800,7 +3797,7 @@ snapshots:
   '@antfu/install-pkg@1.1.0':
     dependencies:
       package-manager-detector: 1.6.0
-      tinyexec: 1.0.2
+      tinyexec: 1.0.4
 
   '@astrojs/compiler@3.0.0': {}
 
@@ -3833,12 +3830,12 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@astrojs/mdx@5.0.0(astro@6.0.4(@types/node@24.12.0)(jiti@1.21.7)(rollup@4.59.0)(typescript@5.9.3))':
+  '@astrojs/mdx@5.0.1(astro@6.0.5(@types/node@24.12.0)(jiti@1.21.7)(rollup@4.59.0)(typescript@5.9.3))':
     dependencies:
       '@astrojs/markdown-remark': 7.0.0
       '@mdx-js/mdx': 3.1.1
       acorn: 8.16.0
-      astro: 6.0.4(@types/node@24.12.0)(jiti@1.21.7)(rollup@4.59.0)(typescript@5.9.3)
+      astro: 6.0.5(@types/node@24.12.0)(jiti@1.21.7)(rollup@4.59.0)(typescript@5.9.3)
       es-module-lexer: 2.0.0
       estree-util-visit: 2.0.0
       hast-util-to-html: 9.0.5
@@ -5069,13 +5066,13 @@ snapshots:
     dependencies:
       '@shikijs/types': 3.23.0
       '@shikijs/vscode-textmate': 10.0.2
-      oniguruma-to-es: 4.3.4
+      oniguruma-to-es: 4.3.5
 
   '@shikijs/engine-javascript@4.0.2':
     dependencies:
       '@shikijs/types': 4.0.2
       '@shikijs/vscode-textmate': 10.0.2
-      oniguruma-to-es: 4.3.4
+      oniguruma-to-es: 4.3.5
 
   '@shikijs/engine-oniguruma@3.23.0':
     dependencies:
@@ -5396,7 +5393,7 @@ snapshots:
 
   astring@1.9.0: {}
 
-  astro@6.0.4(@types/node@24.12.0)(jiti@1.21.7)(rollup@4.59.0)(typescript@5.9.3):
+  astro@6.0.5(@types/node@24.12.0)(jiti@1.21.7)(rollup@4.59.0)(typescript@5.9.3):
     dependencies:
       '@astrojs/compiler': 3.0.0
       '@astrojs/internal-helpers': 0.8.0
@@ -5440,7 +5437,7 @@ snapshots:
       smol-toml: 1.6.0
       svgo: 4.0.1
       tinyclip: 0.1.12
-      tinyexec: 1.0.2
+      tinyexec: 1.0.4
       tinyglobby: 0.2.15
       tsconfck: 3.1.6(typescript@5.9.3)
       ultrahtml: 1.6.0
@@ -6374,7 +6371,7 @@ snapshots:
       fault: 1.0.4
       highlight.js: 10.7.3
 
-  lru-cache@11.2.6: {}
+  lru-cache@11.2.7: {}
 
   lru-cache@5.1.1:
     dependencies:
@@ -6453,23 +6450,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  mdast-util-from-markdown@2.0.2:
-    dependencies:
-      '@types/mdast': 4.0.4
-      '@types/unist': 3.0.3
-      decode-named-character-reference: 1.3.0
-      devlop: 1.1.0
-      mdast-util-to-string: 4.0.0
-      micromark: 4.0.2
-      micromark-util-decode-numeric-character-reference: 2.0.2
-      micromark-util-decode-string: 2.0.1
-      micromark-util-normalize-identifier: 2.0.1
-      micromark-util-symbol: 2.0.1
-      micromark-util-types: 2.0.2
-      unist-util-stringify-position: 4.0.0
-    transitivePeerDependencies:
-      - supports-color
-
   mdast-util-from-markdown@2.0.3:
     dependencies:
       '@types/mdast': 4.0.4
@@ -6499,7 +6479,7 @@ snapshots:
     dependencies:
       '@types/mdast': 4.0.4
       devlop: 1.1.0
-      mdast-util-from-markdown: 2.0.2
+      mdast-util-from-markdown: 2.0.3
       mdast-util-to-markdown: 2.1.2
       micromark-util-normalize-identifier: 2.0.1
     transitivePeerDependencies:
@@ -6508,7 +6488,7 @@ snapshots:
   mdast-util-gfm-strikethrough@2.0.0:
     dependencies:
       '@types/mdast': 4.0.4
-      mdast-util-from-markdown: 2.0.2
+      mdast-util-from-markdown: 2.0.3
       mdast-util-to-markdown: 2.1.2
     transitivePeerDependencies:
       - supports-color
@@ -6518,7 +6498,7 @@ snapshots:
       '@types/mdast': 4.0.4
       devlop: 1.1.0
       markdown-table: 3.0.4
-      mdast-util-from-markdown: 2.0.2
+      mdast-util-from-markdown: 2.0.3
       mdast-util-to-markdown: 2.1.2
     transitivePeerDependencies:
       - supports-color
@@ -6527,14 +6507,14 @@ snapshots:
     dependencies:
       '@types/mdast': 4.0.4
       devlop: 1.1.0
-      mdast-util-from-markdown: 2.0.2
+      mdast-util-from-markdown: 2.0.3
       mdast-util-to-markdown: 2.1.2
     transitivePeerDependencies:
       - supports-color
 
   mdast-util-gfm@3.1.0:
     dependencies:
-      mdast-util-from-markdown: 2.0.2
+      mdast-util-from-markdown: 2.0.3
       mdast-util-gfm-autolink-literal: 2.0.1
       mdast-util-gfm-footnote: 2.1.0
       mdast-util-gfm-strikethrough: 2.0.0
@@ -7185,7 +7165,7 @@ snapshots:
 
   oniguruma-parser@0.12.1: {}
 
-  oniguruma-to-es@4.3.4:
+  oniguruma-to-es@4.3.5:
     dependencies:
       oniguruma-parser: 0.12.1
       regex: 6.1.0
@@ -7836,7 +7816,7 @@ snapshots:
 
   tinyclip@0.1.12: {}
 
-  tinyexec@1.0.2: {}
+  tinyexec@1.0.4: {}
 
   tinyglobby@0.2.15:
     dependencies:
@@ -7982,7 +7962,7 @@ snapshots:
       chokidar: 5.0.0
       destr: 2.0.5
       h3: 1.15.6
-      lru-cache: 11.2.6
+      lru-cache: 11.2.7
       node-fetch-native: 1.6.7
       ofetch: 1.5.1
       ufo: 1.6.3
