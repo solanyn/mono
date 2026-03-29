@@ -8,11 +8,11 @@ py_library(
     visibility = ["//visibility:public"],
     deps = [
         "//libs/datalake",
-        "@pypi//httpx",
-        "@pypi//pyarrow",
-        "@pypi//fastmcp",
-        "@pypi//feedparser",
-        "@pypi//pydantic_ai",
+        "@macro_pypi//httpx",
+        "@macro_pypi//pyarrow",
+        "@macro_pypi//fastmcp",
+        "@macro_pypi//feedparser",
+        "@macro_pypi//pydantic_ai",
     ],
 )
 

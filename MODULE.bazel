@@ -13,6 +13,7 @@ bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "rules_go", version = "0.60.0")
 bazel_dep(name = "rules_nodejs", version = "6.7.3")
 bazel_dep(name = "rules_oci", version = "2.3.0")
+bazel_dep(name = "rules_python", version = "1.4.1")
 
 # go
 go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
@@ -127,6 +128,23 @@ use_repo(
     "org_uber_go_atomic",
     "org_uber_go_multierr",
 )
+
+# python
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(python_version = "3.12")
+
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+pip.parse(
+    hub_name = "pypi",
+    python_version = "3.12",
+    requirements_lock = "//yield/agent:requirements_lock.txt",
+)
+pip.parse(
+    hub_name = "macro_pypi",
+    python_version = "3.12",
+    requirements_lock = "//macro:requirements_lock.txt",
+)
+use_repo(pip, "pypi", "macro_pypi")
 
 # js
 node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node", dev_dependency = True)
