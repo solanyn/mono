@@ -369,7 +369,7 @@ def get_agent_state() -> str:
 
 @mcp.tool()
 def set_cycle_position(phase: str, confidence: float, rationale: str) -> str:
-    """Update the agent's assessment of where Australia is in the rate cycle.
+    """Update the agent's assessment of where we are in the rate cycle.
 
     phase: one of early_easing, mid_easing, late_easing, neutral, early_tightening, mid_tightening, late_tightening, peak_hold
     confidence: 0.0 to 1.0

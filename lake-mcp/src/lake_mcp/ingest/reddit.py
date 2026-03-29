@@ -13,7 +13,7 @@ SUBREDDIT_URLS = {
 }
 
 HEADERS = {
-    "User-Agent": "macro-agent/0.1 (Australian macro-financial reasoning agent)",
+    "User-Agent": "lake-agent/0.1 (macro-financial data lake)",
 }
 
 
