@@ -1,0 +1,46 @@
+[
+  {
+    "type": "PropertyListing",
+    "listing": {
+      "id": 99001,
+      "listingType": "Sale",
+      "propertyDetails": {
+        "suburb": "Sydney",
+        "state": "NSW",
+        "postcode": "2000",
+        "propertyType": "Apartment",
+        "bedrooms": 2,
+        "bathrooms": 1,
+        "latitude": -33.8688,
+        "longitude": 151.2093
+      },
+      "priceDetails": {
+        "displayPrice": "$950,000 - $1,000,000"
+      },
+      "auctionSchedule": {},
+      "dateListed": "2026-03-15"
+    }
+  },
+  {
+    "type": "PropertyListing",
+    "listing": {
+      "id": 99002,
+      "listingType": "Sale",
+      "propertyDetails": {
+        "suburb": "Sydney",
+        "state": "NSW",
+        "postcode": "2000",
+        "propertyType": "House",
+        "bedrooms": 3,
+        "bathrooms": 2,
+        "latitude": -33.8700,
+        "longitude": 151.2100
+      },
+      "priceDetails": {
+        "displayPrice": "$2,200,000"
+      },
+      "auctionSchedule": {"auctionSchedule": "2026-04-05"},
+      "dateListed": "2026-03-10"
+    }
+  }
+]

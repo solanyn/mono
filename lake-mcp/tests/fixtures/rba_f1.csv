@@ -1,0 +1,16 @@
+Title,Cash Rate Target,Change in the Cash Rate Target,Interbank Overnight Cash Rate,Highest Interbank Overnight Cash Rate,Lowest Interbank Overnight Cash Rate,Volume of Cash Market Transactions,Number of Cash Market Transactions,Cash Rate Total Return Index
+Description,Cash Rate Target on date,Change in the Cash Rate Target (in percentage points),Interbank Overnight Cash Rate on date,Highest Interbank Overnight Cash Rate on date,Lowest Interbank Overnight Cash Rate on date,Volume of Cash Market Transactions on date,Number of Cash Market Transactions on date,Cash Rate Total Return Index
+Frequency,Daily,as announced,Daily,Daily,Daily,Daily,Daily,Daily
+Type,Original,Original,Original,Original,Original,Original,Original,Original
+Units,Per cent,Per cent,Per cent,Per cent,Per cent,$m,Number,Index 04-Jan-2011=100
+
+
+Source,RBA,RBA,RBA,RBA,RBA,RBA,RBA,RBA
+Publication date,27-Mar-2026,27-Mar-2026,27-Mar-2026,27-Mar-2026,27-Mar-2026,27-Mar-2026,27-Mar-2026,27-Mar-2026
+Series ID,FIRMMCRTD,FIRMMCCRT,FIRMMCRID,FIRMMCRIH,FIRMMCRIL,FIRMMCRIV,FIRMMCRIN,FIRMMCTRI
+04-Jan-2011,4.75,,4.75,,,,,100.000000
+05-Jan-2011,4.75,,4.75,,,,,100.013014
+06-Jan-2011,4.75,,4.75,,,,,100.026029
+01-Feb-2022,0.10,,0.04,0.06,0.03,3449,23,143.123456
+04-May-2022,0.35,0.25,0.10,0.35,0.06,5678,34,143.200000
+08-Jun-2022,0.85,0.50,0.83,0.85,0.80,4567,28,143.500000

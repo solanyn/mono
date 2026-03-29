@@ -142,7 +142,7 @@ pip.parse(
 pip.parse(
     hub_name = "lake_pypi",
     python_version = "3.12",
-    requirements_lock = "//lake:requirements_lock.txt",
+    requirements_lock = "//lake-mcp:requirements_lock.txt",
 )
 use_repo(pip, "pypi", "lake_pypi")
 
