@@ -30,7 +30,7 @@ var sourceConfig = map[string]string{
 func PromoteSource(ctx context.Context, s3 *storage.Client, source, bronzeKey string) (Result, error) {
 	start := time.Now()
 
-	data, err := s3.GetObject(ctx, bronzeKey)
+	data, err := s3.GetObject(ctx, "bronze", bronzeKey)
 	if err != nil {
 		return Result{}, fmt.Errorf("read bronze %s: %w", bronzeKey, err)
 	}

@@ -16,51 +16,45 @@ type S3Config struct {
 	AccessKey string
 	SecretKey string
 	Region    string
-	Bucket    string
 }
 
 type Client struct {
-	s3     *s3.Client
-	bucket string
+	s3 *s3.Client
 }
 
 func NewClient(cfg S3Config) *Client {
-	resolver := s3.NewDefaultEndpointResolverV2()
-	_ = resolver
-
 	client := s3.New(s3.Options{
 		Region:       cfg.Region,
 		BaseEndpoint: aws.String(cfg.Endpoint),
 		Credentials:  credentials.NewStaticCredentialsProvider(cfg.AccessKey, cfg.SecretKey, ""),
 		UsePathStyle: true,
 	})
-
-	return &Client{s3: client, bucket: cfg.Bucket}
+	return &Client{s3: client}
 }
 
-func (c *Client) PutParquet(ctx context.Context, layer, dataset, filename string, data []byte) (string, error) {
+func (c *Client) PutParquet(ctx context.Context, bucket, dataset, filename string, data []byte) (string, error) {
 	now := time.Now().UTC()
-	key := fmt.Sprintf("%s/%s/%04d/%02d/%02d/%s", layer, dataset, now.Year(), now.Month(), now.Day(), filename)
+	key := fmt.Sprintf("%s/%04d/%02d/%02d/%s", dataset, now.Year(), now.Month(), now.Day(), filename)
 
 	_, err := c.s3.PutObject(ctx, &s3.PutObjectInput{
-		Bucket:      aws.String(c.bucket),
+		Bucket:      aws.String(bucket),
 		Key:         aws.String(key),
 		Body:        bytes.NewReader(data),
 		ContentType: aws.String("application/octet-stream"),
 	})
 	if err != nil {
-		return "", fmt.Errorf("s3 put %s: %w", key, err)
+		return "", fmt.Errorf("s3 put %s/%s: %w", bucket, key, err)
 	}
 	return key, nil
 }
 
-func (c *Client) GetObject(ctx context.Context, key string) ([]byte, error) {
+func (c *Client) GetObject(ctx context.Context, bucket, key string) ([]byte, error) {
 	resp, err := c.s3.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(c.bucket),
+		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("s3 get %s: %w", key, err)
+		return nil, fmt.Errorf("s3 get %s/%s: %w", bucket, key, err)
 	}
 	defer resp.Body.Close()
 
@@ -69,22 +63,22 @@ func (c *Client) GetObject(ctx context.Context, key string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (c *Client) GetLatest(ctx context.Context, layer, dataset, filename string) ([]byte, error) {
+func (c *Client) GetLatest(ctx context.Context, bucket, dataset, filename string) ([]byte, error) {
 	now := time.Now().UTC()
 	for i := 0; i < 7; i++ {
 		d := now.AddDate(0, 0, -i)
-		key := fmt.Sprintf("%s/%s/%04d/%02d/%02d/%s", layer, dataset, d.Year(), d.Month(), d.Day(), filename)
-		data, err := c.GetObject(ctx, key)
+		key := fmt.Sprintf("%s/%04d/%02d/%02d/%s", dataset, d.Year(), d.Month(), d.Day(), filename)
+		data, err := c.GetObject(ctx, bucket, key)
 		if err == nil {
 			return data, nil
 		}
 	}
-	return nil, fmt.Errorf("no %s/%s data found in last 7 days", layer, dataset)
+	return nil, fmt.Errorf("no %s/%s data found in last 7 days", bucket, dataset)
 }
 
 func (c *Client) Healthy(ctx context.Context) bool {
 	_, err := c.s3.HeadBucket(ctx, &s3.HeadBucketInput{
-		Bucket: aws.String(c.bucket),
+		Bucket: aws.String("bronze"),
 	})
 	return err == nil
 }

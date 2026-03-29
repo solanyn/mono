@@ -11,7 +11,7 @@ import (
 )
 
 func SilverToGold(ctx context.Context, s3 *storage.Client, source, silverKey string) error {
-	data, err := s3.GetObject(ctx, silverKey)
+	data, err := s3.GetObject(ctx, "silver", silverKey)
 	if err != nil {
 		return fmt.Errorf("read silver %s: %w", silverKey, err)
 	}

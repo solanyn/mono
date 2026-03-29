@@ -22,7 +22,6 @@ func main() {
 		AccessKey: os.Getenv("S3_ACCESS_KEY"),
 		SecretKey: os.Getenv("S3_SECRET_KEY"),
 		Region:    envOr("S3_REGION", "us-east-1"),
-		Bucket:    envOr("S3_BUCKET", "datalake"),
 	}
 
 	s3 := storage.NewClient(cfg)
