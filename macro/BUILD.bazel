@@ -1,0 +1,35 @@
+load("@rules_python//python:py_binary.bzl", "py_binary")
+load("@rules_python//python:py_library.bzl", "py_library")
+
+py_library(
+    name = "macro_lib",
+    srcs = glob(["src/macro/**/*.py"]),
+    imports = ["src"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//libs/datalake",
+        "@pypi//httpx",
+        "@pypi//pyarrow",
+        "@pypi//fastmcp",
+        "@pypi//feedparser",
+        "@pypi//pydantic_ai",
+    ],
+)
+
+py_binary(
+    name = "ingest",
+    srcs = ["src/macro/ingest/cli.py"],
+    imports = ["src"],
+    main = "src/macro/ingest/cli.py",
+    visibility = ["//visibility:public"],
+    deps = [":macro_lib"],
+)
+
+py_binary(
+    name = "agent",
+    srcs = ["src/macro/__main__.py"],
+    imports = ["src"],
+    main = "src/macro/__main__.py",
+    visibility = ["//visibility:public"],
+    deps = [":macro_lib"],
+)
