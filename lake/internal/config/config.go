@@ -29,6 +29,8 @@ type Config struct {
 	CronReddit string
 	CronDomain string
 	CronNSWVG  string
+
+	IcebergCatalogURI string
 }
 
 func Load() Config {
@@ -59,6 +61,8 @@ func Load() Config {
 		CronReddit: envOr("CRON_REDDIT", "*/30 * * * *"),
 		CronDomain: envOr("CRON_DOMAIN", "0 23 * * *"),
 		CronNSWVG:  envOr("CRON_NSW_VG", "0 0 * * 0"),
+
+		IcebergCatalogURI: envOr("ICEBERG_CATALOG_URI", "http://lakekeeper.storage.svc.cluster.local:8181/catalog"),
 	}
 }
 

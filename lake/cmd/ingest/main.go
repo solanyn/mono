@@ -12,6 +12,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/solanyn/mono/lake/internal/config"
+	icebergw "github.com/solanyn/mono/lake/internal/iceberg"
 	"github.com/solanyn/mono/lake/internal/kafka"
 	"github.com/solanyn/mono/lake/internal/scheduler"
 	"github.com/solanyn/mono/lake/internal/storage"
@@ -31,7 +32,19 @@ func main() {
 		defer producer.Close()
 	}
 
-	sched := scheduler.New(cfg, s3, producer)
+	var iceWriter *icebergw.Writer
+	if cfg.IcebergCatalogURI != "" {
+		iceWriter = icebergw.NewWriter(icebergw.Config{
+			CatalogURI:  cfg.IcebergCatalogURI,
+			S3Endpoint:  cfg.S3Endpoint,
+			S3AccessKey: cfg.S3AccessKey,
+			S3SecretKey: cfg.S3SecretKey,
+			S3Region:    cfg.S3Region,
+		})
+		log.Printf("iceberg writer enabled: %s", cfg.IcebergCatalogURI)
+	}
+
+	sched := scheduler.New(cfg, s3, iceWriter, producer)
 	sched.Start()
 	defer sched.Stop()
 
