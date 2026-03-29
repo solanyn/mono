@@ -3,7 +3,7 @@ module github.com/solanyn/mono/lake
 go 1.25.0
 
 require (
-	github.com/apache/arrow-go/v18 v18.5.2-0.20260220015023-a886a5722b87
+	github.com/apache/arrow-go/v18 v18.5.2
 	github.com/apache/iceberg-go v0.5.0
 	github.com/aws/aws-sdk-go-v2 v1.41.5
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.13
