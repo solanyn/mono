@@ -4,13 +4,11 @@ on:
     branches: [main]
     paths:
       - "lake/**"
-      - "lake-mcp/**"
       - "libs/datalake/**"
   pull_request:
     branches: [main]
     paths:
       - "lake/**"
-      - "lake-mcp/**"
       - "libs/datalake/**"
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -68,9 +66,7 @@ jobs:
           DOCKER_CONFIG: /home/runner/.docker
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          BAZEL="bazel --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }}"
-
-          for target in //lake:push_ingest //lake:push_promote //lake:push_aggregate //lake-mcp:push; do
+          for target in //lake:push_ingest //lake:push_promote //lake:push_aggregate; do
             bazel run "$target" --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }} -- --tag "$VERSION"
             bazel run "$target" --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }} -- --tag latest
           done
