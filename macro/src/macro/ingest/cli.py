@@ -6,16 +6,39 @@ from macro.promote.abs_to_silver import promote_abs
 from macro.promote.aemo_to_silver import promote_aemo
 from macro.promote.rss_to_silver import promote_rss
 
-COMMANDS = {
-    "rba": rba_csv.ingest,
-    "abs": abs_sdmx.ingest,
-    "aemo": aemo.ingest,
-    "rss": rss.ingest,
-    "promote-rba": promote_rba,
-    "promote-abs": promote_abs,
-    "promote-aemo": promote_aemo,
-    "promote-rss": promote_rss,
-}
+INGESTS = [
+    ("rba", rba_csv.ingest),
+    ("abs", abs_sdmx.ingest),
+    ("aemo", aemo.ingest),
+    ("rss", rss.ingest),
+]
+
+PROMOTIONS = [
+    ("promote-rba", promote_rba),
+    ("promote-abs", promote_abs),
+    ("promote-aemo", promote_aemo),
+    ("promote-rss", promote_rss),
+]
+
+COMMANDS = {name: fn for name, fn in INGESTS + PROMOTIONS}
+
+
+def run_all():
+    for name, fn in INGESTS:
+        print(f"--- ingest: {name} ---")
+        try:
+            fn()
+        except Exception as e:
+            print(f"Warning: {name} failed: {e}")
+    for name, fn in PROMOTIONS:
+        print(f"--- {name} ---")
+        try:
+            fn()
+        except Exception as e:
+            print(f"Warning: {name} failed: {e}")
+
+
+COMMANDS["all"] = run_all
 
 
 def main():
