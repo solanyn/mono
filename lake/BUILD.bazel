@@ -1,1 +1,168 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_push")
+load("@aspect_bazel_lib//lib:tar.bzl", "tar")
 
+go_library(
+    name = "storage_lib",
+    srcs = glob(["internal/storage/*.go"]),
+    importpath = "github.com/solanyn/mono/lake/internal/storage",
+    deps = [
+        "@com_github_aws_aws_sdk_go_v2//aws",
+        "@com_github_aws_aws_sdk_go_v2_credentials//:credentials",
+        "@com_github_aws_aws_sdk_go_v2_service_s3//:s3",
+        "@com_github_parquet_go_parquet_go//:parquet-go",
+    ],
+)
+
+go_library(
+    name = "metrics_lib",
+    srcs = glob(["internal/metrics/*.go"]),
+    importpath = "github.com/solanyn/mono/lake/internal/metrics",
+    deps = [
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_prometheus_client_golang//prometheus/promauto",
+    ],
+)
+
+go_library(
+    name = "kafka_lib",
+    srcs = glob(["internal/kafka/*.go"]),
+    importpath = "github.com/solanyn/mono/lake/internal/kafka",
+    deps = [
+        "@com_github_twmb_franz_go//pkg/kgo",
+    ],
+)
+
+go_library(
+    name = "ingest_lib",
+    srcs = glob(["internal/ingest/*.go"]),
+    importpath = "github.com/solanyn/mono/lake/internal/ingest",
+    deps = [
+        ":metrics_lib",
+        ":storage_lib",
+        "@com_github_google_uuid//:uuid",
+        "@com_github_mmcdole_gofeed//:gofeed",
+    ],
+)
+
+go_library(
+    name = "promote_lib",
+    srcs = glob(["internal/promote/*.go"]),
+    importpath = "github.com/solanyn/mono/lake/internal/promote",
+    deps = [
+        ":metrics_lib",
+        ":storage_lib",
+    ],
+)
+
+go_library(
+    name = "aggregate_lib",
+    srcs = glob(["internal/aggregate/*.go"]),
+    importpath = "github.com/solanyn/mono/lake/internal/aggregate",
+    deps = [
+        ":metrics_lib",
+        ":storage_lib",
+    ],
+)
+
+go_library(
+    name = "scheduler_lib",
+    srcs = glob(["internal/scheduler/*.go"]),
+    importpath = "github.com/solanyn/mono/lake/internal/scheduler",
+    deps = [
+        ":ingest_lib",
+        ":kafka_lib",
+        ":storage_lib",
+        "@com_github_robfig_cron_v3//:cron",
+    ],
+)
+
+go_binary(
+    name = "ingest",
+    srcs = ["cmd/ingest/main.go"],
+    deps = [
+        ":kafka_lib",
+        ":scheduler_lib",
+        ":storage_lib",
+        "@com_github_prometheus_client_golang//prometheus/promhttp",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+go_binary(
+    name = "promote",
+    srcs = ["cmd/promote/main.go"],
+    deps = [
+        ":kafka_lib",
+        ":promote_lib",
+        ":storage_lib",
+        "@com_github_prometheus_client_golang//prometheus/promhttp",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+go_binary(
+    name = "aggregate",
+    srcs = ["cmd/aggregate/main.go"],
+    deps = [
+        ":aggregate_lib",
+        ":kafka_lib",
+        ":storage_lib",
+        "@com_github_prometheus_client_golang//prometheus/promhttp",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+tar(
+    name = "ingest_layer",
+    srcs = [":ingest"],
+)
+
+tar(
+    name = "promote_layer",
+    srcs = [":promote"],
+)
+
+tar(
+    name = "aggregate_layer",
+    srcs = [":aggregate"],
+)
+
+oci_image(
+    name = "ingest_image",
+    base = "@distroless_static_linux_amd64",
+    entrypoint = ["/ingest"],
+    tars = [":ingest_layer"],
+)
+
+oci_image(
+    name = "promote_image",
+    base = "@distroless_static_linux_amd64",
+    entrypoint = ["/promote"],
+    tars = [":promote_layer"],
+)
+
+oci_image(
+    name = "aggregate_image",
+    base = "@distroless_static_linux_amd64",
+    entrypoint = ["/aggregate"],
+    tars = [":aggregate_layer"],
+)
+
+oci_push(
+    name = "push_ingest",
+    image = ":ingest_image",
+    repository = "ghcr.io/solanyn/lake-ingest",
+)
+
+oci_push(
+    name = "push_promote",
+    image = ":promote_image",
+    repository = "ghcr.io/solanyn/lake-promote",
+)
+
+oci_push(
+    name = "push_aggregate",
+    image = ":aggregate_image",
+    repository = "ghcr.io/solanyn/lake-aggregate",
+)
