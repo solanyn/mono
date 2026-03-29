@@ -37,6 +37,18 @@ func (s *Scheduler) Start() {
 		return ingest.IngestAEMO(ctx, s.s3)
 	}))
 
+	s.cron.AddFunc("*/15 * * * *", s.wrap("rss", func(ctx context.Context) error {
+		return ingest.IngestRSS(ctx, s.s3)
+	}))
+
+	s.cron.AddFunc("*/30 * * * *", s.wrap("reddit", func(ctx context.Context) error {
+		return ingest.IngestReddit(ctx, s.s3)
+	}))
+
+	s.cron.AddFunc("0 10 * * *", s.wrap("domain", func(ctx context.Context) error {
+		return ingest.IngestDomain(ctx, s.s3)
+	}))
+
 	s.cron.Start()
 	log.Println("scheduler: started")
 }
