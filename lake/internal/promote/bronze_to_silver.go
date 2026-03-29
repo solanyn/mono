@@ -11,52 +11,82 @@ import (
 	"github.com/solanyn/mono/lake/internal/storage"
 )
 
-func PromoteBronzeToSilver(ctx context.Context, s3 *storage.Client) error {
-	sources := []struct {
-		dataset  string
-		filename string
-		promote  func([]storage.BronzeRow) ([]byte, error)
-	}{
-		{"rba", "f1-data.parquet", promoteRBA},
-		{"abs", "cpi_monthly.parquet", promoteABS},
-		{"aemo", "nem_summary.parquet", promoteAEMO},
-		{"rss", "news.parquet", promoteRSS},
-		{"reddit", "ausfinance.parquet", promoteReddit},
-		{"domain", "listings.parquet", promoteDomain},
+type Result struct {
+	Source   string
+	Key      string
+	RowCount int
+}
+
+var sourceConfig = map[string]string{
+	"rba":    "f1-data.parquet",
+	"abs":    "cpi_monthly.parquet",
+	"aemo":   "nem_summary.parquet",
+	"rss":    "news.parquet",
+	"reddit": "ausfinance.parquet",
+	"domain": "listings.parquet",
+}
+
+func PromoteSource(ctx context.Context, s3 *storage.Client, source, bronzeKey string) (Result, error) {
+	start := time.Now()
+
+	data, err := s3.GetObject(ctx, bronzeKey)
+	if err != nil {
+		return Result{}, fmt.Errorf("read bronze %s: %w", bronzeKey, err)
 	}
 
-	for _, src := range sources {
-		start := time.Now()
-		data, err := s3.GetLatest(ctx, "bronze", src.dataset, src.filename)
+	rows, err := storage.ReadBronze(data)
+	if err != nil {
+		metrics.IngestErrors.WithLabelValues("promote_" + source).Inc()
+		return Result{}, fmt.Errorf("parse bronze %s: %w", source, err)
+	}
+
+	silver, err := promoteGeneric(rows)
+	if err != nil {
+		metrics.IngestErrors.WithLabelValues("promote_" + source).Inc()
+		return Result{}, fmt.Errorf("transform %s: %w", source, err)
+	}
+
+	dataset := silverName(source)
+	key, err := s3.PutParquet(ctx, "silver", dataset, dataset+".parquet", silver)
+	if err != nil {
+		metrics.IngestErrors.WithLabelValues("promote_" + source).Inc()
+		return Result{}, fmt.Errorf("write silver %s: %w", source, err)
+	}
+
+	metrics.PromoteTotal.WithLabelValues("silver").Inc()
+	log.Printf("promote %s: %d rows → %s (%.1fs)", source, len(rows), key, time.Since(start).Seconds())
+	return Result{Source: source, Key: key, RowCount: len(rows)}, nil
+}
+
+func PromoteBronzeToSilver(ctx context.Context, s3 *storage.Client) error {
+	for dataset, filename := range sourceConfig {
+		data, err := s3.GetLatest(ctx, "bronze", dataset, filename)
 		if err != nil {
-			log.Printf("promote %s: no bronze data: %v", src.dataset, err)
+			log.Printf("promote %s: no bronze data: %v", dataset, err)
 			continue
 		}
 
 		rows, err := storage.ReadBronze(data)
 		if err != nil {
-			log.Printf("promote %s: read bronze: %v", src.dataset, err)
-			metrics.IngestErrors.WithLabelValues("promote_" + src.dataset).Inc()
+			log.Printf("promote %s: read bronze: %v", dataset, err)
 			continue
 		}
 
-		silver, err := src.promote(rows)
+		silver, err := promoteGeneric(rows)
 		if err != nil {
-			log.Printf("promote %s: transform: %v", src.dataset, err)
-			metrics.IngestErrors.WithLabelValues("promote_" + src.dataset).Inc()
+			log.Printf("promote %s: transform: %v", dataset, err)
 			continue
 		}
 
-		silverDataset := silverName(src.dataset)
-		key, err := s3.PutParquet(ctx, "silver", silverDataset, silverDataset+".parquet", silver)
+		sd := silverName(dataset)
+		key, err := s3.PutParquet(ctx, "silver", sd, sd+".parquet", silver)
 		if err != nil {
-			log.Printf("promote %s: write silver: %v", src.dataset, err)
-			metrics.IngestErrors.WithLabelValues("promote_" + src.dataset).Inc()
+			log.Printf("promote %s: write silver: %v", dataset, err)
 			continue
 		}
 
 		metrics.PromoteTotal.WithLabelValues("silver").Inc()
-		log.Printf("promote %s: %d rows → %s (%.1fs)", src.dataset, len(rows), key, time.Since(start).Seconds())
+		log.Printf("promote %s: %d rows → %s", dataset, len(rows), key)
 	}
 	return nil
 }

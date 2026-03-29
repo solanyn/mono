@@ -17,34 +17,34 @@ import (
 
 const absURL = "https://data.api.abs.gov.au/data/CPI/1+2.10001+10002+10003+20001+20002+20003+20004+30001+30002+30003+40001+40002+40003+50001+50002+50003+60001+60002+60003+70001+70002+70003+80001+80002+80003+90001+90002+90003+100001+100002+100003+110001+110002+110003+120001+120002+120003+131179.10+20.M?format=jsondata&detail=dataonly&startPeriod=2020-01"
 
-func IngestABS(ctx context.Context, s3 *storage.Client) error {
+func IngestABS(ctx context.Context, s3 *storage.Client) (Result, error) {
 	start := time.Now()
 	source := "abs"
 
 	rows, err := fetchABS(ctx)
 	if err != nil {
 		metrics.IngestErrors.WithLabelValues(source).Inc()
-		return fmt.Errorf("fetch abs: %w", err)
+		return Result{}, fmt.Errorf("fetch abs: %w", err)
 	}
 
 	batchID := uuid.New().String()
 	data, err := storage.WriteBronze(rows, "abs.cpi", batchID)
 	if err != nil {
 		metrics.IngestErrors.WithLabelValues(source).Inc()
-		return fmt.Errorf("write bronze: %w", err)
+		return Result{}, fmt.Errorf("write bronze: %w", err)
 	}
 
 	key, err := s3.PutParquet(ctx, "bronze", "abs", "cpi_monthly.parquet", data)
 	if err != nil {
 		metrics.IngestErrors.WithLabelValues(source).Inc()
-		return fmt.Errorf("put s3: %w", err)
+		return Result{}, fmt.Errorf("put s3: %w", err)
 	}
 
 	metrics.IngestTotal.WithLabelValues(source).Inc()
 	metrics.IngestDuration.WithLabelValues(source).Observe(time.Since(start).Seconds())
 	metrics.LastIngestTimestamp.WithLabelValues(source).SetToCurrentTime()
 	log.Printf("abs: wrote %d rows to %s", len(rows), key)
-	return nil
+	return Result{Source: source, Key: key, RowCount: len(rows)}, nil
 }
 
 func fetchABS(ctx context.Context) ([]map[string]interface{}, error) {

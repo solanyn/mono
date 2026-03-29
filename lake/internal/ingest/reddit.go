@@ -21,7 +21,7 @@ var redditFeeds = map[string]string{
 
 const redditUserAgent = "lake-ingest/0.1 (Australian macro-financial data lake)"
 
-func IngestReddit(ctx context.Context, s3 *storage.Client) error {
+func IngestReddit(ctx context.Context, s3 *storage.Client) (Result, error) {
 	start := time.Now()
 	source := "reddit"
 
@@ -46,27 +46,27 @@ func IngestReddit(ctx context.Context, s3 *storage.Client) error {
 
 	if len(rows) == 0 {
 		log.Println("reddit: no posts fetched")
-		return nil
+		return Result{}, nil
 	}
 
 	batchID := uuid.New().String()
 	data, err := storage.WriteBronze(rows, "reddit.ausfinance", batchID)
 	if err != nil {
 		metrics.IngestErrors.WithLabelValues(source).Inc()
-		return fmt.Errorf("write bronze: %w", err)
+		return Result{}, fmt.Errorf("write bronze: %w", err)
 	}
 
 	key, err := s3.PutParquet(ctx, "bronze", "reddit", "ausfinance.parquet", data)
 	if err != nil {
 		metrics.IngestErrors.WithLabelValues(source).Inc()
-		return fmt.Errorf("put s3: %w", err)
+		return Result{}, fmt.Errorf("put s3: %w", err)
 	}
 
 	metrics.IngestTotal.WithLabelValues(source).Inc()
 	metrics.IngestDuration.WithLabelValues(source).Observe(time.Since(start).Seconds())
 	metrics.LastIngestTimestamp.WithLabelValues(source).SetToCurrentTime()
 	log.Printf("reddit: wrote %d posts to %s", len(rows), key)
-	return nil
+	return Result{Source: source, Key: key, RowCount: len(rows)}, nil
 }
 
 func fetchReddit(ctx context.Context, url string) ([]map[string]interface{}, error) {

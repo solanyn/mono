@@ -16,34 +16,34 @@ import (
 
 const aemoURL = "https://visualisations.aemo.com.au/aemo/apps/api/report/ELEC_NEM_SUMMARY"
 
-func IngestAEMO(ctx context.Context, s3 *storage.Client) error {
+func IngestAEMO(ctx context.Context, s3 *storage.Client) (Result, error) {
 	start := time.Now()
 	source := "aemo"
 
 	rows, err := fetchAEMO(ctx)
 	if err != nil {
 		metrics.IngestErrors.WithLabelValues(source).Inc()
-		return fmt.Errorf("fetch aemo: %w", err)
+		return Result{}, fmt.Errorf("fetch aemo: %w", err)
 	}
 
 	batchID := uuid.New().String()
 	data, err := storage.WriteBronze(rows, "aemo.nem_summary", batchID)
 	if err != nil {
 		metrics.IngestErrors.WithLabelValues(source).Inc()
-		return fmt.Errorf("write bronze: %w", err)
+		return Result{}, fmt.Errorf("write bronze: %w", err)
 	}
 
 	key, err := s3.PutParquet(ctx, "bronze", "aemo", "nem_summary.parquet", data)
 	if err != nil {
 		metrics.IngestErrors.WithLabelValues(source).Inc()
-		return fmt.Errorf("put s3: %w", err)
+		return Result{}, fmt.Errorf("put s3: %w", err)
 	}
 
 	metrics.IngestTotal.WithLabelValues(source).Inc()
 	metrics.IngestDuration.WithLabelValues(source).Observe(time.Since(start).Seconds())
 	metrics.LastIngestTimestamp.WithLabelValues(source).SetToCurrentTime()
 	log.Printf("aemo: wrote %d rows to %s", len(rows), key)
-	return nil
+	return Result{Source: source, Key: key, RowCount: len(rows)}, nil
 }
 
 func fetchAEMO(ctx context.Context) ([]map[string]interface{}, error) {

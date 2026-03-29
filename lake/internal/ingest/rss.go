@@ -21,7 +21,7 @@ var rssFeeds = map[string]string{
 	"rba_speeches":         "https://www.rba.gov.au/rss/rss-cb-speeches.xml",
 }
 
-func IngestRSS(ctx context.Context, s3 *storage.Client) error {
+func IngestRSS(ctx context.Context, s3 *storage.Client) (Result, error) {
 	start := time.Now()
 	source := "rss"
 
@@ -70,27 +70,27 @@ func IngestRSS(ctx context.Context, s3 *storage.Client) error {
 
 	if len(rows) == 0 {
 		log.Println("rss: no articles fetched")
-		return nil
+		return Result{}, nil
 	}
 
 	batchID := uuid.New().String()
 	data, err := storage.WriteBronze(rows, "rss", batchID)
 	if err != nil {
 		metrics.IngestErrors.WithLabelValues(source).Inc()
-		return fmt.Errorf("write bronze: %w", err)
+		return Result{}, fmt.Errorf("write bronze: %w", err)
 	}
 
 	key, err := s3.PutParquet(ctx, "bronze", "rss", "news.parquet", data)
 	if err != nil {
 		metrics.IngestErrors.WithLabelValues(source).Inc()
-		return fmt.Errorf("put s3: %w", err)
+		return Result{}, fmt.Errorf("put s3: %w", err)
 	}
 
 	metrics.IngestTotal.WithLabelValues(source).Inc()
 	metrics.IngestDuration.WithLabelValues(source).Observe(time.Since(start).Seconds())
 	metrics.LastIngestTimestamp.WithLabelValues(source).SetToCurrentTime()
 	log.Printf("rss: wrote %d articles to %s", len(rows), key)
-	return nil
+	return Result{Source: source, Key: key, RowCount: len(rows)}, nil
 }
 
 func init() {

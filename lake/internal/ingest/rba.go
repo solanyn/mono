@@ -17,34 +17,34 @@ import (
 
 const rbaURL = "https://rba.gov.au/statistics/tables/csv/f1-data.csv"
 
-func IngestRBA(ctx context.Context, s3 *storage.Client) error {
+func IngestRBA(ctx context.Context, s3 *storage.Client) (Result, error) {
 	start := time.Now()
 	source := "rba"
 
 	rows, err := fetchRBA(ctx)
 	if err != nil {
 		metrics.IngestErrors.WithLabelValues(source).Inc()
-		return fmt.Errorf("fetch rba: %w", err)
+		return Result{}, fmt.Errorf("fetch rba: %w", err)
 	}
 
 	batchID := uuid.New().String()
 	data, err := storage.WriteBronze(rows, "rba.f1", batchID)
 	if err != nil {
 		metrics.IngestErrors.WithLabelValues(source).Inc()
-		return fmt.Errorf("write bronze: %w", err)
+		return Result{}, fmt.Errorf("write bronze: %w", err)
 	}
 
 	key, err := s3.PutParquet(ctx, "bronze", "rba", "f1-data.parquet", data)
 	if err != nil {
 		metrics.IngestErrors.WithLabelValues(source).Inc()
-		return fmt.Errorf("put s3: %w", err)
+		return Result{}, fmt.Errorf("put s3: %w", err)
 	}
 
 	metrics.IngestTotal.WithLabelValues(source).Inc()
 	metrics.IngestDuration.WithLabelValues(source).Observe(time.Since(start).Seconds())
 	metrics.LastIngestTimestamp.WithLabelValues(source).SetToCurrentTime()
 	log.Printf("rba: wrote %d rows to %s", len(rows), key)
-	return nil
+	return Result{Source: source, Key: key, RowCount: len(rows)}, nil
 }
 
 func fetchRBA(ctx context.Context) ([]map[string]interface{}, error) {

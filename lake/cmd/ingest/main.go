@@ -6,10 +6,12 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/solanyn/mono/lake/internal/kafka"
 	"github.com/solanyn/mono/lake/internal/scheduler"
 	"github.com/solanyn/mono/lake/internal/storage"
 )
@@ -24,7 +26,18 @@ func main() {
 	}
 
 	s3 := storage.NewClient(cfg)
-	sched := scheduler.New(s3)
+
+	var producer *kafka.Producer
+	if brokers := os.Getenv("KAFKA_BROKERS"); brokers != "" {
+		var err error
+		producer, err = kafka.NewProducer(strings.Split(brokers, ","))
+		if err != nil {
+			log.Fatalf("kafka producer: %v", err)
+		}
+		defer producer.Close()
+	}
+
+	sched := scheduler.New(s3, producer)
 	sched.Start()
 	defer sched.Stop()
 

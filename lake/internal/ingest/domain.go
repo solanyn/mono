@@ -20,7 +20,7 @@ import (
 const domainAuthURL = "https://auth.domain.com.au/v1/connect/token"
 const domainAPIBase = "https://api.domain.com.au/v1"
 
-func IngestDomain(ctx context.Context, s3 *storage.Client) error {
+func IngestDomain(ctx context.Context, s3 *storage.Client) (Result, error) {
 	start := time.Now()
 	source := "domain"
 
@@ -28,13 +28,13 @@ func IngestDomain(ctx context.Context, s3 *storage.Client) error {
 	clientSecret := os.Getenv("DOMAIN_CLIENT_SECRET")
 	if clientID == "" || clientSecret == "" {
 		log.Println("domain: DOMAIN_CLIENT_ID/DOMAIN_CLIENT_SECRET not set, skipping")
-		return nil
+		return Result{}, nil
 	}
 
 	token, err := getDomainToken(ctx, clientID, clientSecret)
 	if err != nil {
 		metrics.IngestErrors.WithLabelValues(source).Inc()
-		return fmt.Errorf("domain auth: %w", err)
+		return Result{}, fmt.Errorf("domain auth: %w", err)
 	}
 
 	var rows []map[string]interface{}
@@ -62,27 +62,27 @@ func IngestDomain(ctx context.Context, s3 *storage.Client) error {
 
 	if len(rows) == 0 {
 		log.Println("domain: no data fetched")
-		return nil
+		return Result{}, nil
 	}
 
 	batchID := uuid.New().String()
 	data, err := storage.WriteBronze(rows, "domain", batchID)
 	if err != nil {
 		metrics.IngestErrors.WithLabelValues(source).Inc()
-		return fmt.Errorf("write bronze: %w", err)
+		return Result{}, fmt.Errorf("write bronze: %w", err)
 	}
 
 	key, err := s3.PutParquet(ctx, "bronze", "domain", "listings.parquet", data)
 	if err != nil {
 		metrics.IngestErrors.WithLabelValues(source).Inc()
-		return fmt.Errorf("put s3: %w", err)
+		return Result{}, fmt.Errorf("put s3: %w", err)
 	}
 
 	metrics.IngestTotal.WithLabelValues(source).Inc()
 	metrics.IngestDuration.WithLabelValues(source).Observe(time.Since(start).Seconds())
 	metrics.LastIngestTimestamp.WithLabelValues(source).SetToCurrentTime()
 	log.Printf("domain: wrote %d rows to %s", len(rows), key)
-	return nil
+	return Result{Source: source, Key: key, RowCount: len(rows)}, nil
 }
 
 func getDomainToken(ctx context.Context, clientID, clientSecret string) (string, error) {
