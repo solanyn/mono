@@ -38,7 +38,7 @@ func main() {
 	})
 	r.Get("/metrics", metrics.Handler())
 
-	sched := scheduler.New(cfg)
+	sched := scheduler.New(cfg, nil, nil)
 	sched.Start()
 	defer sched.Stop()
 

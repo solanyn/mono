@@ -4,18 +4,24 @@ import (
 	"log"
 
 	"github.com/robfig/cron/v3"
+	"github.com/solanyn/mono/yield/api/internal/client"
 	"github.com/solanyn/mono/yield/api/internal/config"
+	"github.com/solanyn/mono/yield/api/internal/store"
 )
 
 type Scheduler struct {
-	cron *cron.Cron
-	cfg  config.Config
+	cron    *cron.Cron
+	cfg     config.Config
+	queries *store.Queries
+	domain  *client.CachedDomainClient
 }
 
-func New(cfg config.Config) *Scheduler {
+func New(cfg config.Config, queries *store.Queries, domain *client.CachedDomainClient) *Scheduler {
 	return &Scheduler{
-		cron: cron.New(),
-		cfg:  cfg,
+		cron:    cron.New(),
+		cfg:     cfg,
+		queries: queries,
+		domain:  domain,
 	}
 }
 

@@ -1,5 +1,6 @@
 load("@rules_python//python:py_binary.bzl", "py_binary")
 load("@rules_python//python:py_library.bzl", "py_library")
+load("@rules_python//python:py_test.bzl", "py_test")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
 load("@aspect_bazel_lib//lib:tar.bzl", "tar")
 
@@ -28,6 +29,15 @@ py_binary(
 )
 
 py_binary(
+    name = "mcp_server",
+    srcs = ["src/macro/mcp_server.py"],
+    imports = ["src"],
+    main = "src/macro/mcp_server.py",
+    visibility = ["//visibility:public"],
+    deps = [":macro_lib"],
+)
+
+py_binary(
     name = "agent",
     srcs = ["src/macro/__main__.py"],
     imports = ["src"],
@@ -36,16 +46,62 @@ py_binary(
     deps = [":macro_lib"],
 )
 
+py_test(
+    name = "test_ingest",
+    srcs = [
+        "tests/conftest.py",
+        "tests/test_ingest.py",
+    ],
+    data = glob(["tests/fixtures/**"]),
+    deps = [
+        ":macro_lib",
+        "@macro_pypi//pytest",
+    ],
+    args = ["-v"],
+)
+
+py_test(
+    name = "test_promote",
+    srcs = [
+        "tests/conftest.py",
+        "tests/test_promote.py",
+    ],
+    data = glob(["tests/fixtures/**"]),
+    deps = [
+        ":macro_lib",
+        "@macro_pypi//pytest",
+    ],
+    args = ["-v"],
+)
+
+py_test(
+    name = "test_state",
+    srcs = ["tests/test_state.py"],
+    deps = [
+        ":macro_lib",
+        "@macro_pypi//pytest",
+    ],
+    args = ["-v"],
+)
+
 tar(
     name = "ingest_layer",
     srcs = [":ingest"],
+)
+
+tar(
+    name = "mcp_server_layer",
+    srcs = [":mcp_server"],
 )
 
 oci_image(
     name = "image",
     base = "@python_slim_linux_amd64",
     entrypoint = ["/ingest"],
-    tars = [":ingest_layer"],
+    tars = [
+        ":ingest_layer",
+        ":mcp_server_layer",
+    ],
 )
 
 oci_load(
