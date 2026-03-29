@@ -9,6 +9,7 @@ dependencies = [
     "pyarrow>=18.0.0",
     "fastmcp>=2.0.0",
     "py-key-value-aio[memory]",
+    "cachetools>=5.0.0",
     "pydantic-ai>=0.1.0",
     "feedparser>=6.0.0",
 ]

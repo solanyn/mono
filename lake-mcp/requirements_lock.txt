@@ -58,7 +58,9 @@ botocore==1.42.70
     #   boto3
     #   s3transfer
 cachetools==7.0.5
-    # via py-key-value-aio
+    # via
+    #   lake-mcp (lake-mcp/pyproject.toml)
+    #   py-key-value-aio
 caio==0.9.25
     # via aiofile
 certifi==2026.2.25
