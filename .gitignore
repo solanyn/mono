@@ -228,3 +228,4 @@ cython_debug/
 -e 
 # Astro build cache
 .astro/
+lake/ingest
