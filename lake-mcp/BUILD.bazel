@@ -16,6 +16,8 @@ py_library(
         "@lake_pypi//fastmcp",
         "@lake_pypi//feedparser",
         "@lake_pypi//pydantic_ai",
+        "@lake_pypi//cachetools",
+        "@lake_pypi//py_key_value_aio",
     ],
 )
 
