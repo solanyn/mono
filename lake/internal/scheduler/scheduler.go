@@ -52,6 +52,10 @@ func (s *Scheduler) Start() {
 		return ingest.IngestDomain(ctx, s.s3)
 	}))
 
+	s.cron.AddFunc("0 6 * * 0", s.wrapIngest("nsw_vg", func(ctx context.Context) (ingest.Result, error) {
+		return ingest.IngestNSWVG(ctx, s.s3)
+	}))
+
 	s.cron.Start()
 	log.Println("scheduler: started")
 }

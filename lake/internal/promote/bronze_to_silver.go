@@ -24,6 +24,7 @@ var sourceConfig = map[string]string{
 	"rss":    "news.parquet",
 	"reddit": "ausfinance.parquet",
 	"domain": "listings.parquet",
+	"nsw_vg": "bulk_sales.parquet",
 }
 
 func PromoteSource(ctx context.Context, s3 *storage.Client, source, bronzeKey string) (Result, error) {
@@ -105,6 +106,8 @@ func silverName(dataset string) string {
 		return "reddit_sentiment"
 	case "domain":
 		return "domain_listings"
+	case "nsw_vg":
+		return "nsw_vg_sales"
 	default:
 		return dataset
 	}
