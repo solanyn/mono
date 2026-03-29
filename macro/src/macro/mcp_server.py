@@ -49,6 +49,10 @@ def _find_latest_silver_news(config: DatalakeConfig | None = None) -> pa.Table |
     return _find_latest("news_articles", "news_articles.parquet", config=config)
 
 
+def _find_latest_silver_reddit(config: DatalakeConfig | None = None) -> pa.Table | None:
+    return _find_latest("reddit_sentiment", "reddit_sentiment.parquet", config=config)
+
+
 @mcp.tool()
 def get_rate_history(months: int = 12) -> str:
     """Query silver RBA rates for cash rate target series, returning the last N months of data."""
@@ -296,6 +300,54 @@ def get_narrative_signals() -> str:
             "active_narratives": active,
             "recent_headlines": recent_headlines,
             "cycle_position": asdict(state.cycle_position),
+        }
+    )
+
+
+@mcp.tool()
+def get_sentiment(topic: str = "") -> str:
+    """Get r/AusFinance sentiment data from silver layer, optionally filtered by topic keyword in title.
+
+    topic: keyword to filter post titles (case-insensitive). Empty for all posts.
+    """
+    table = _find_latest_silver_reddit()
+    if table is None:
+        return json.dumps(
+            {
+                "error": "No silver reddit data found. Run reddit ingest and promote-reddit first."
+            }
+        )
+
+    if topic:
+        titles = table.column("title").to_pylist()
+        mask = pa.array([topic.lower() in (t or "").lower() for t in titles])
+        table = table.filter(mask)
+
+    table = table.sort_by([("score", "descending")])
+
+    rows = []
+    for i in range(min(table.num_rows, 25)):
+        rows.append(
+            {
+                "post_id": table.column("post_id")[i].as_py(),
+                "title": table.column("title")[i].as_py(),
+                "score": table.column("score")[i].as_py(),
+                "num_comments": table.column("num_comments")[i].as_py(),
+                "upvote_ratio": table.column("upvote_ratio")[i].as_py(),
+                "flair": table.column("flair")[i].as_py(),
+            }
+        )
+
+    avg_score = sum(r["score"] for r in rows) / len(rows) if rows else 0
+    avg_comments = sum(r["num_comments"] for r in rows) / len(rows) if rows else 0
+
+    return json.dumps(
+        {
+            "topic": topic or "all",
+            "count": len(rows),
+            "avg_score": round(avg_score, 1),
+            "avg_comments": round(avg_comments, 1),
+            "posts": rows,
         }
     )
 
