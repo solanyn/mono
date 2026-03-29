@@ -80,6 +80,9 @@ go_library(
 go_binary(
     name = "ingest",
     srcs = ["cmd/ingest/main.go"],
+    goos = "linux",
+    goarch = "amd64",
+    pure = "on",
     deps = [
         ":kafka_lib",
         ":scheduler_lib",
@@ -92,6 +95,9 @@ go_binary(
 go_binary(
     name = "promote",
     srcs = ["cmd/promote/main.go"],
+    goos = "linux",
+    goarch = "amd64",
+    pure = "on",
     deps = [
         ":kafka_lib",
         ":promote_lib",
@@ -104,6 +110,9 @@ go_binary(
 go_binary(
     name = "aggregate",
     srcs = ["cmd/aggregate/main.go"],
+    goos = "linux",
+    goarch = "amd64",
+    pure = "on",
     deps = [
         ":aggregate_lib",
         ":kafka_lib",

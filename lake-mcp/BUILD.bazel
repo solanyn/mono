@@ -92,13 +92,12 @@ py_test(
 pkg_tar(
     name = "mcp_server_layer",
     srcs = [":mcp_server"],
-    strip_prefix = ".",
 )
 
 oci_image(
     name = "image",
     base = "@python_slim_linux_amd64",
-    entrypoint = ["/mcp_server"],
+    entrypoint = ["/lake-mcp/mcp_server"],
     tars = [":mcp_server_layer"],
 )
 
