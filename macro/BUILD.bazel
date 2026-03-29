@@ -1,5 +1,7 @@
 load("@rules_python//python:py_binary.bzl", "py_binary")
 load("@rules_python//python:py_library.bzl", "py_library")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
+load("@aspect_bazel_lib//lib:tar.bzl", "tar")
 
 py_library(
     name = "macro_lib",
@@ -32,4 +34,28 @@ py_binary(
     main = "src/macro/__main__.py",
     visibility = ["//visibility:public"],
     deps = [":macro_lib"],
+)
+
+tar(
+    name = "ingest_layer",
+    srcs = [":ingest"],
+)
+
+oci_image(
+    name = "image",
+    base = "@python_slim_linux_amd64",
+    entrypoint = ["/ingest"],
+    tars = [":ingest_layer"],
+)
+
+oci_load(
+    name = "load",
+    image = ":image",
+    repo_tags = ["macro:latest"],
+)
+
+oci_push(
+    name = "push",
+    image = ":image",
+    repository = "ghcr.io/solanyn/macro",
 )
