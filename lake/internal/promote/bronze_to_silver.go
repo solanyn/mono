@@ -27,10 +27,10 @@ var sourceConfig = map[string]string{
 	"nsw_vg": "bulk_sales.parquet",
 }
 
-func PromoteSource(ctx context.Context, s3 *storage.Client, source, bronzeKey string) (Result, error) {
+func PromoteSource(ctx context.Context, s3 *storage.Client, bronzeBucket, silverBucket, source, bronzeKey string) (Result, error) {
 	start := time.Now()
 
-	data, err := s3.GetObject(ctx, "bronze", bronzeKey)
+	data, err := s3.GetObject(ctx, bronzeBucket, bronzeKey)
 	if err != nil {
 		return Result{}, fmt.Errorf("read bronze %s: %w", bronzeKey, err)
 	}
@@ -48,7 +48,7 @@ func PromoteSource(ctx context.Context, s3 *storage.Client, source, bronzeKey st
 	}
 
 	dataset := silverName(source)
-	key, err := s3.PutParquet(ctx, "silver", dataset, dataset+".parquet", silver)
+	key, err := s3.PutParquet(ctx, silverBucket, dataset, dataset+".parquet", silver)
 	if err != nil {
 		metrics.IngestErrors.WithLabelValues("promote_" + source).Inc()
 		return Result{}, fmt.Errorf("write silver %s: %w", source, err)
@@ -59,9 +59,9 @@ func PromoteSource(ctx context.Context, s3 *storage.Client, source, bronzeKey st
 	return Result{Source: source, Key: key, RowCount: len(rows)}, nil
 }
 
-func PromoteBronzeToSilver(ctx context.Context, s3 *storage.Client) error {
+func PromoteBronzeToSilver(ctx context.Context, s3 *storage.Client, bronzeBucket, silverBucket string) error {
 	for dataset, filename := range sourceConfig {
-		data, err := s3.GetLatest(ctx, "bronze", dataset, filename)
+		data, err := s3.GetLatest(ctx, bronzeBucket, dataset, filename)
 		if err != nil {
 			log.Printf("promote %s: no bronze data: %v", dataset, err)
 			continue
@@ -80,7 +80,7 @@ func PromoteBronzeToSilver(ctx context.Context, s3 *storage.Client) error {
 		}
 
 		sd := silverName(dataset)
-		key, err := s3.PutParquet(ctx, "silver", sd, sd+".parquet", silver)
+		key, err := s3.PutParquet(ctx, silverBucket, sd, sd+".parquet", silver)
 		if err != nil {
 			log.Printf("promote %s: write silver: %v", dataset, err)
 			continue

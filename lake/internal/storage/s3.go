@@ -11,22 +11,15 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-type S3Config struct {
-	Endpoint  string
-	AccessKey string
-	SecretKey string
-	Region    string
-}
-
 type Client struct {
 	s3 *s3.Client
 }
 
-func NewClient(cfg S3Config) *Client {
+func NewClient(endpoint, accessKey, secretKey, region string) *Client {
 	client := s3.New(s3.Options{
-		Region:       cfg.Region,
-		BaseEndpoint: aws.String(cfg.Endpoint),
-		Credentials:  credentials.NewStaticCredentialsProvider(cfg.AccessKey, cfg.SecretKey, ""),
+		Region:       region,
+		BaseEndpoint: aws.String(endpoint),
+		Credentials:  credentials.NewStaticCredentialsProvider(accessKey, secretKey, ""),
 		UsePathStyle: true,
 	})
 	return &Client{s3: client}

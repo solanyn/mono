@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/robfig/cron/v3"
+	"github.com/solanyn/mono/lake/internal/config"
 	"github.com/solanyn/mono/lake/internal/ingest"
 	"github.com/solanyn/mono/lake/internal/kafka"
 	"github.com/solanyn/mono/lake/internal/storage"
@@ -14,46 +15,48 @@ import (
 type Scheduler struct {
 	cron       *cron.Cron
 	s3         *storage.Client
+	cfg        config.Config
 	producer   *kafka.Producer
 	lastIngest time.Time
 }
 
-func New(s3 *storage.Client, producer *kafka.Producer) *Scheduler {
+func New(cfg config.Config, s3 *storage.Client, producer *kafka.Producer) *Scheduler {
 	loc, _ := time.LoadLocation("Australia/Sydney")
 	return &Scheduler{
 		cron:     cron.New(cron.WithLocation(loc)),
 		s3:       s3,
+		cfg:      cfg,
 		producer: producer,
 	}
 }
 
 func (s *Scheduler) Start() {
-	s.cron.AddFunc("0 7 * * *", s.wrapIngest("rba", func(ctx context.Context) (ingest.Result, error) {
-		return ingest.IngestRBA(ctx, s.s3)
+	s.cron.AddFunc(s.cfg.CronRBA, s.wrapIngest("rba", func(ctx context.Context) (ingest.Result, error) {
+		return ingest.IngestRBA(ctx, s.s3, s.cfg.BronzeBucket)
 	}))
 
-	s.cron.AddFunc("0 8 * * *", s.wrapIngest("abs", func(ctx context.Context) (ingest.Result, error) {
-		return ingest.IngestABS(ctx, s.s3)
+	s.cron.AddFunc(s.cfg.CronABS, s.wrapIngest("abs", func(ctx context.Context) (ingest.Result, error) {
+		return ingest.IngestABS(ctx, s.s3, s.cfg.BronzeBucket)
 	}))
 
-	s.cron.AddFunc("*/5 * * * *", s.wrapIngest("aemo", func(ctx context.Context) (ingest.Result, error) {
-		return ingest.IngestAEMO(ctx, s.s3)
+	s.cron.AddFunc(s.cfg.CronAEMO, s.wrapIngest("aemo", func(ctx context.Context) (ingest.Result, error) {
+		return ingest.IngestAEMO(ctx, s.s3, s.cfg.BronzeBucket)
 	}))
 
-	s.cron.AddFunc("*/15 * * * *", s.wrapIngest("rss", func(ctx context.Context) (ingest.Result, error) {
-		return ingest.IngestRSS(ctx, s.s3)
+	s.cron.AddFunc(s.cfg.CronRSS, s.wrapIngest("rss", func(ctx context.Context) (ingest.Result, error) {
+		return ingest.IngestRSS(ctx, s.s3, s.cfg.BronzeBucket)
 	}))
 
-	s.cron.AddFunc("*/30 * * * *", s.wrapIngest("reddit", func(ctx context.Context) (ingest.Result, error) {
-		return ingest.IngestReddit(ctx, s.s3)
+	s.cron.AddFunc(s.cfg.CronReddit, s.wrapIngest("reddit", func(ctx context.Context) (ingest.Result, error) {
+		return ingest.IngestReddit(ctx, s.s3, s.cfg.BronzeBucket)
 	}))
 
-	s.cron.AddFunc("0 10 * * *", s.wrapIngest("domain", func(ctx context.Context) (ingest.Result, error) {
-		return ingest.IngestDomain(ctx, s.s3)
+	s.cron.AddFunc(s.cfg.CronDomain, s.wrapIngest("domain", func(ctx context.Context) (ingest.Result, error) {
+		return ingest.IngestDomain(ctx, s.s3, s.cfg.BronzeBucket)
 	}))
 
-	s.cron.AddFunc("0 6 * * 0", s.wrapIngest("nsw_vg", func(ctx context.Context) (ingest.Result, error) {
-		return ingest.IngestNSWVG(ctx, s.s3)
+	s.cron.AddFunc(s.cfg.CronNSWVG, s.wrapIngest("nsw_vg", func(ctx context.Context) (ingest.Result, error) {
+		return ingest.IngestNSWVG(ctx, s.s3, s.cfg.BronzeBucket)
 	}))
 
 	s.cron.Start()
@@ -84,7 +87,7 @@ func (s *Scheduler) wrapIngest(name string, fn func(context.Context) (ingest.Res
 		if s.producer != nil && result.Key != "" {
 			event := kafka.BronzeWritten{
 				Source:    result.Source,
-				Bucket:    "bronze",
+				Bucket:    s.cfg.BronzeBucket,
 				Key:       result.Key,
 				Timestamp: time.Now().UTC(),
 				RowCount:  result.RowCount,

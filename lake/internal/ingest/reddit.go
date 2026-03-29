@@ -21,7 +21,7 @@ var redditFeeds = map[string]string{
 
 const redditUserAgent = "lake-ingest/0.1 (Australian macro-financial data lake)"
 
-func IngestReddit(ctx context.Context, s3 *storage.Client) (Result, error) {
+func IngestReddit(ctx context.Context, s3 *storage.Client, bucket string) (Result, error) {
 	start := time.Now()
 	source := "reddit"
 
@@ -56,7 +56,7 @@ func IngestReddit(ctx context.Context, s3 *storage.Client) (Result, error) {
 		return Result{}, fmt.Errorf("write bronze: %w", err)
 	}
 
-	key, err := s3.PutParquet(ctx, "bronze", "reddit", "ausfinance.parquet", data)
+	key, err := s3.PutParquet(ctx, bucket, "reddit", "ausfinance.parquet", data)
 	if err != nil {
 		metrics.IngestErrors.WithLabelValues(source).Inc()
 		return Result{}, fmt.Errorf("put s3: %w", err)

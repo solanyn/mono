@@ -12,22 +12,18 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/solanyn/mono/lake/internal/aggregate"
+	"github.com/solanyn/mono/lake/internal/config"
 	"github.com/solanyn/mono/lake/internal/kafka"
 	"github.com/solanyn/mono/lake/internal/storage"
 )
 
 func main() {
-	cfg := storage.S3Config{
-		Endpoint:  envOr("S3_ENDPOINT", "http://localhost:3900"),
-		AccessKey: os.Getenv("S3_ACCESS_KEY"),
-		SecretKey: os.Getenv("S3_SECRET_KEY"),
-		Region:    envOr("S3_REGION", "us-east-1"),
-	}
-	s3 := storage.NewClient(cfg)
+	cfg := config.Load()
+	s3 := storage.NewClient(cfg.S3Endpoint, cfg.S3AccessKey, cfg.S3SecretKey, cfg.S3Region)
 
-	brokers := strings.Split(envOr("KAFKA_BROKERS", "localhost:9092"), ",")
+	brokers := strings.Split(cfg.KafkaBrokers, ",")
 
-	consumer, err := kafka.NewConsumer(brokers, "lake-aggregate", "lake.silver.written")
+	consumer, err := kafka.NewConsumer(brokers, "lake-aggregate", cfg.KafkaTopicSilver)
 	if err != nil {
 		log.Fatalf("kafka consumer: %v", err)
 	}
@@ -40,10 +36,9 @@ func main() {
 	})
 	mux.Handle("/metrics", promhttp.Handler())
 
-	port := envOr("PORT", "8083")
-	srv := &http.Server{Addr: ":" + port, Handler: mux}
+	srv := &http.Server{Addr: ":" + cfg.HealthPort, Handler: mux}
 	go func() {
-		log.Printf("lake-aggregate listening on :%s", port)
+		log.Printf("lake-aggregate listening on :%s", cfg.HealthPort)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("server: %v", err)
 		}
@@ -52,10 +47,10 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {
-		log.Println("lake-aggregate: consuming lake.silver.written")
+		log.Println("lake-aggregate: consuming", cfg.KafkaTopicSilver)
 		if err := consumer.ConsumeSilverWritten(ctx, func(ctx context.Context, event kafka.SilverWritten) error {
 			log.Printf("aggregate: received silver event source=%s key=%s", event.Source, event.Key)
-			return aggregate.SilverToGold(ctx, s3, event.Source, event.Key)
+			return aggregate.SilverToGold(ctx, s3, cfg.SilverBucket, cfg.GoldBucket, event.Source, event.Key)
 		}); err != nil && ctx.Err() == nil {
 			log.Fatalf("consumer: %v", err)
 		}
@@ -69,11 +64,4 @@ func main() {
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
 	srv.Shutdown(shutdownCtx)
-}
-
-func envOr(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
 }

@@ -10,8 +10,8 @@ import (
 	"github.com/solanyn/mono/lake/internal/storage"
 )
 
-func SilverToGold(ctx context.Context, s3 *storage.Client, source, silverKey string) error {
-	data, err := s3.GetObject(ctx, "silver", silverKey)
+func SilverToGold(ctx context.Context, s3 *storage.Client, silverBucket, goldBucket, source, silverKey string) error {
+	data, err := s3.GetObject(ctx, silverBucket, silverKey)
 	if err != nil {
 		return fmt.Errorf("read silver %s: %w", silverKey, err)
 	}
@@ -41,7 +41,7 @@ func SilverToGold(ctx context.Context, s3 *storage.Client, source, silverKey str
 	}
 
 	dataset := goldName(source)
-	key, err := s3.PutParquet(ctx, "gold", dataset, dataset+".parquet", gold)
+	key, err := s3.PutParquet(ctx, goldBucket, dataset, dataset+".parquet", gold)
 	if err != nil {
 		return fmt.Errorf("put gold %s: %w", source, err)
 	}

@@ -29,7 +29,7 @@ var nswVGHeaders = []string{
 	"percent_interest", "dealing_number",
 }
 
-func IngestNSWVG(ctx context.Context, s3 *storage.Client) (Result, error) {
+func IngestNSWVG(ctx context.Context, s3 *storage.Client, bucket string) (Result, error) {
 	start := time.Now()
 	source := "nsw_vg"
 
@@ -58,7 +58,7 @@ func IngestNSWVG(ctx context.Context, s3 *storage.Client) (Result, error) {
 		return Result{}, fmt.Errorf("write bronze: %w", err)
 	}
 
-	key, err := s3.PutParquet(ctx, "bronze", "nsw_vg", "bulk_sales.parquet", data)
+	key, err := s3.PutParquet(ctx, bucket, "nsw_vg", "bulk_sales.parquet", data)
 	if err != nil {
 		metrics.IngestErrors.WithLabelValues(source).Inc()
 		return Result{}, fmt.Errorf("put s3: %w", err)

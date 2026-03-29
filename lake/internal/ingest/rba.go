@@ -17,7 +17,7 @@ import (
 
 const rbaURL = "https://rba.gov.au/statistics/tables/csv/f1-data.csv"
 
-func IngestRBA(ctx context.Context, s3 *storage.Client) (Result, error) {
+func IngestRBA(ctx context.Context, s3 *storage.Client, bucket string) (Result, error) {
 	start := time.Now()
 	source := "rba"
 
@@ -34,7 +34,7 @@ func IngestRBA(ctx context.Context, s3 *storage.Client) (Result, error) {
 		return Result{}, fmt.Errorf("write bronze: %w", err)
 	}
 
-	key, err := s3.PutParquet(ctx, "bronze", "rba", "f1-data.parquet", data)
+	key, err := s3.PutParquet(ctx, bucket, "rba", "f1-data.parquet", data)
 	if err != nil {
 		metrics.IngestErrors.WithLabelValues(source).Inc()
 		return Result{}, fmt.Errorf("put s3: %w", err)

@@ -16,7 +16,7 @@ import (
 
 const aemoURL = "https://visualisations.aemo.com.au/aemo/apps/api/report/ELEC_NEM_SUMMARY"
 
-func IngestAEMO(ctx context.Context, s3 *storage.Client) (Result, error) {
+func IngestAEMO(ctx context.Context, s3 *storage.Client, bucket string) (Result, error) {
 	start := time.Now()
 	source := "aemo"
 
@@ -33,7 +33,7 @@ func IngestAEMO(ctx context.Context, s3 *storage.Client) (Result, error) {
 		return Result{}, fmt.Errorf("write bronze: %w", err)
 	}
 
-	key, err := s3.PutParquet(ctx, "bronze", "aemo", "nem_summary.parquet", data)
+	key, err := s3.PutParquet(ctx, bucket, "aemo", "nem_summary.parquet", data)
 	if err != nil {
 		metrics.IngestErrors.WithLabelValues(source).Inc()
 		return Result{}, fmt.Errorf("put s3: %w", err)

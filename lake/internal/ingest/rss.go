@@ -21,7 +21,7 @@ var rssFeeds = map[string]string{
 	"rba_speeches":         "https://www.rba.gov.au/rss/rss-cb-speeches.xml",
 }
 
-func IngestRSS(ctx context.Context, s3 *storage.Client) (Result, error) {
+func IngestRSS(ctx context.Context, s3 *storage.Client, bucket string) (Result, error) {
 	start := time.Now()
 	source := "rss"
 
@@ -80,7 +80,7 @@ func IngestRSS(ctx context.Context, s3 *storage.Client) (Result, error) {
 		return Result{}, fmt.Errorf("write bronze: %w", err)
 	}
 
-	key, err := s3.PutParquet(ctx, "bronze", "rss", "news.parquet", data)
+	key, err := s3.PutParquet(ctx, bucket, "rss", "news.parquet", data)
 	if err != nil {
 		metrics.IngestErrors.WithLabelValues(source).Inc()
 		return Result{}, fmt.Errorf("put s3: %w", err)

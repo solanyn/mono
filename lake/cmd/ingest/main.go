@@ -11,32 +11,27 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/solanyn/mono/lake/internal/config"
 	"github.com/solanyn/mono/lake/internal/kafka"
 	"github.com/solanyn/mono/lake/internal/scheduler"
 	"github.com/solanyn/mono/lake/internal/storage"
 )
 
 func main() {
-	cfg := storage.S3Config{
-		Endpoint:  envOr("S3_ENDPOINT", "http://localhost:3900"),
-		AccessKey: os.Getenv("S3_ACCESS_KEY"),
-		SecretKey: os.Getenv("S3_SECRET_KEY"),
-		Region:    envOr("S3_REGION", "us-east-1"),
-	}
-
-	s3 := storage.NewClient(cfg)
+	cfg := config.Load()
+	s3 := storage.NewClient(cfg.S3Endpoint, cfg.S3AccessKey, cfg.S3SecretKey, cfg.S3Region)
 
 	var producer *kafka.Producer
-	if brokers := os.Getenv("KAFKA_BROKERS"); brokers != "" {
+	if cfg.KafkaBrokers != "" {
 		var err error
-		producer, err = kafka.NewProducer(strings.Split(brokers, ","))
+		producer, err = kafka.NewProducer(strings.Split(cfg.KafkaBrokers, ","))
 		if err != nil {
 			log.Fatalf("kafka producer: %v", err)
 		}
 		defer producer.Close()
 	}
 
-	sched := scheduler.New(s3, producer)
+	sched := scheduler.New(cfg, s3, producer)
 	sched.Start()
 	defer sched.Stop()
 
@@ -60,16 +55,15 @@ func main() {
 	})
 	mux.Handle("/metrics", promhttp.Handler())
 
-	port := envOr("PORT", "8081")
 	srv := &http.Server{
-		Addr:         ":" + port,
+		Addr:         ":" + cfg.HealthPort,
 		Handler:      mux,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}
 
 	go func() {
-		log.Printf("lake-ingest listening on :%s", port)
+		log.Printf("lake-ingest listening on :%s", cfg.HealthPort)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("server: %v", err)
 		}
@@ -82,11 +76,4 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	srv.Shutdown(ctx)
-}
-
-func envOr(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
 }
