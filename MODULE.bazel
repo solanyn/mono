@@ -177,9 +177,9 @@ oci.pull(
 )
 oci.pull(
     name = "python_slim",
-    digest = "sha256:739e7213785e88c0f702dcdc12c0973afcbd606dbf021a589cab77d6b00b579d",
+    digest = "sha256:fb83750094b46fd6b8adaa80f66e2302ecbe45d513f6cece637a841e1025b4ca",
     image = "docker.io/library/python",
-    tag = "3.13-slim",
+    tag = "3.14-slim",
     platforms = ["linux/amd64"],
 )
 use_repo(oci, "distroless_static", "distroless_static_linux_amd64", "distroless_static_linux_arm64_v8", "python_slim", "python_slim_linux_amd64")
