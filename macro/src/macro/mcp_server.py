@@ -417,4 +417,14 @@ def resolve_narrative(narrative_id: str, status: str, evidence: str = "") -> str
 
 
 if __name__ == "__main__":
-    mcp.run(transport="stdio")
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--transport", choices=["stdio", "sse"], default="stdio")
+    args = parser.parse_args()
+
+    kwargs: dict = {}
+    if args.transport == "sse":
+        kwargs.update(host="0.0.0.0", port=8080)
+
+    mcp.run(transport=args.transport, **kwargs)
