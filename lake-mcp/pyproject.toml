@@ -8,6 +8,7 @@ dependencies = [
     "httpx>=0.27.0",
     "pyarrow>=18.0.0",
     "fastmcp>=2.0.0",
+    "py-key-value-aio[memory]",
     "pydantic-ai>=0.1.0",
     "feedparser>=6.0.0",
 ]
