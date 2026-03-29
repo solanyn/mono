@@ -7,6 +7,7 @@ import (
 
 	"github.com/robfig/cron/v3"
 	"github.com/solanyn/mono/lake/internal/ingest"
+	"github.com/solanyn/mono/lake/internal/promote"
 	"github.com/solanyn/mono/lake/internal/storage"
 )
 
@@ -47,6 +48,10 @@ func (s *Scheduler) Start() {
 
 	s.cron.AddFunc("0 10 * * *", s.wrap("domain", func(ctx context.Context) error {
 		return ingest.IngestDomain(ctx, s.s3)
+	}))
+
+	s.cron.AddFunc("0 * * * *", s.wrap("promote_silver", func(ctx context.Context) error {
+		return promote.PromoteBronzeToSilver(ctx, s.s3)
 	}))
 
 	s.cron.Start()
