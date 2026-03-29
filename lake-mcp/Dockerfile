@@ -1,4 +1,4 @@
-FROM python:3.13-slim AS builder
+FROM python:3.14-slim AS builder
 
 WORKDIR /build
 
@@ -13,7 +13,7 @@ RUN uv pip install --system --no-cache \
     ./libs/datalake \
     ./lake
 
-FROM python:3.13-slim
+FROM python:3.14-slim
 
 RUN groupadd -r lake && useradd -r -g lake -d /app lake
 
