@@ -3,17 +3,17 @@ from datetime import datetime, timezone
 
 import pyarrow as pa
 
-from macro.ingest.rba_csv import parse_rba_csv, build_bronze_table as build_rba_bronze
-from macro.ingest.abs_sdmx import (
+from lake.ingest.rba_csv import parse_rba_csv, build_bronze_table as build_rba_bronze
+from lake.ingest.abs_sdmx import (
     parse_observations as parse_abs,
     build_bronze_table as build_abs_bronze,
 )
-from macro.ingest.aemo import build_bronze_table as build_aemo_bronze
-from macro.ingest.reddit import build_bronze_table as build_reddit_bronze
-from macro.promote.bronze_to_silver import SILVER_RBA_SCHEMA, SERIES_NAMES, promote_rba
-from macro.promote.abs_to_silver import SILVER_ABS_SCHEMA
-from macro.promote.aemo_to_silver import SILVER_AEMO_SCHEMA
-from macro.promote.reddit_to_silver import SILVER_REDDIT_SCHEMA
+from lake.ingest.aemo import build_bronze_table as build_aemo_bronze
+from lake.ingest.reddit import build_bronze_table as build_reddit_bronze
+from lake.promote.bronze_to_silver import SILVER_RBA_SCHEMA, SERIES_NAMES, promote_rba
+from lake.promote.abs_to_silver import SILVER_ABS_SCHEMA
+from lake.promote.aemo_to_silver import SILVER_AEMO_SCHEMA
+from lake.promote.reddit_to_silver import SILVER_REDDIT_SCHEMA
 from datalake.schemas import BRONZE_SCHEMA
 
 

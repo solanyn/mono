@@ -1,13 +1,13 @@
 import json
 from unittest.mock import patch, MagicMock
 
-from macro.ingest.domain import (
+from lake.ingest.domain import (
     _get_token,
     fetch_auction_results,
     fetch_listings,
     build_bronze_table,
 )
-from macro.promote.domain_to_silver import SILVER_DOMAIN_SCHEMA
+from lake.promote.domain_to_silver import SILVER_DOMAIN_SCHEMA
 from datalake.schemas import BRONZE_SCHEMA
 
 
@@ -21,7 +21,7 @@ def _mock_response(text=None, json_data=None, status_code=200):
 
 
 class TestDomainAuth:
-    @patch("macro.ingest.domain.httpx.post")
+    @patch("lake.ingest.domain.httpx.post")
     def test_get_token(self, mock_post):
         mock_post.return_value = _mock_response(
             json_data={"access_token": "test-token", "expires_in": 3600}
@@ -42,7 +42,7 @@ class TestDomainAuctionIngest:
             else None
         )
         if results is None:
-            with patch("macro.ingest.domain._api_get") as mock_get:
+            with patch("lake.ingest.domain._api_get") as mock_get:
                 mock_get.return_value = domain_auctions_json
                 results = fetch_auction_results("fake-token")
         assert len(results) == 3
@@ -51,7 +51,7 @@ class TestDomainAuctionIngest:
         assert results[0]["sold_price"] == 2500000
 
     def test_auction_fields(self, domain_auctions_json):
-        with patch("macro.ingest.domain._api_get") as mock_get:
+        with patch("lake.ingest.domain._api_get") as mock_get:
             mock_get.return_value = domain_auctions_json
             results = fetch_auction_results("fake-token")
         first = results[0]
@@ -64,7 +64,7 @@ class TestDomainAuctionIngest:
         assert first["longitude"] == 151.1832
 
     def test_bronze_table_schema(self, domain_auctions_json):
-        with patch("macro.ingest.domain._api_get") as mock_get:
+        with patch("lake.ingest.domain._api_get") as mock_get:
             mock_get.return_value = domain_auctions_json
             results = fetch_auction_results("fake-token")
         table = build_bronze_table(results)
@@ -72,7 +72,7 @@ class TestDomainAuctionIngest:
         assert table.num_rows == 3
 
     def test_bronze_payloads_are_valid_json(self, domain_auctions_json):
-        with patch("macro.ingest.domain._api_get") as mock_get:
+        with patch("lake.ingest.domain._api_get") as mock_get:
             mock_get.return_value = domain_auctions_json
             results = fetch_auction_results("fake-token")
         table = build_bronze_table(results)
@@ -84,7 +84,7 @@ class TestDomainAuctionIngest:
 
 class TestDomainListingsIngest:
     def test_parse_listings(self, domain_listings_json):
-        with patch("macro.ingest.domain.httpx.post") as mock_post:
+        with patch("lake.ingest.domain.httpx.post") as mock_post:
             mock_post.return_value = _mock_response(json_data=domain_listings_json)
             results = fetch_listings("fake-token", suburbs=["Sydney"])
         assert len(results) == 2
@@ -93,7 +93,7 @@ class TestDomainListingsIngest:
         assert results[0]["property_type"] == "Apartment"
 
     def test_listing_fields(self, domain_listings_json):
-        with patch("macro.ingest.domain.httpx.post") as mock_post:
+        with patch("lake.ingest.domain.httpx.post") as mock_post:
             mock_post.return_value = _mock_response(json_data=domain_listings_json)
             results = fetch_listings("fake-token", suburbs=["Sydney"])
         second = results[1]
@@ -103,7 +103,7 @@ class TestDomainListingsIngest:
         assert second["latitude"] == -33.87
 
     def test_bronze_table_schema(self, domain_listings_json):
-        with patch("macro.ingest.domain.httpx.post") as mock_post:
+        with patch("lake.ingest.domain.httpx.post") as mock_post:
             mock_post.return_value = _mock_response(json_data=domain_listings_json)
             results = fetch_listings("fake-token", suburbs=["Sydney"])
         table = build_bronze_table(results)
@@ -131,7 +131,7 @@ class TestDomainPromote:
         assert set(SILVER_DOMAIN_SCHEMA.names) == expected
 
     def test_bronze_to_silver(self, domain_auctions_json):
-        with patch("macro.ingest.domain._api_get") as mock_get:
+        with patch("lake.ingest.domain._api_get") as mock_get:
             mock_get.return_value = domain_auctions_json
             results = fetch_auction_results("fake-token")
         bronze = build_bronze_table(results)

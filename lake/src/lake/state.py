@@ -4,7 +4,7 @@ import uuid
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 
-DEFAULT_STATE_PATH = os.environ.get("MACRO_STATE_PATH", "macro-state.json")
+DEFAULT_STATE_PATH = os.environ.get("LAKE_STATE_PATH", "lake-state.json")
 
 
 @dataclass

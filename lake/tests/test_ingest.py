@@ -3,18 +3,18 @@ from unittest.mock import patch, MagicMock
 
 import pyarrow as pa
 
-from macro.ingest.rba_csv import fetch_rba_csv, parse_rba_csv, build_bronze_table
-from macro.ingest.abs_sdmx import (
+from lake.ingest.rba_csv import fetch_rba_csv, parse_rba_csv, build_bronze_table
+from lake.ingest.abs_sdmx import (
     fetch_abs_cpi,
     parse_observations as parse_abs,
     build_bronze_table as build_abs_bronze,
 )
-from macro.ingest.aemo import (
+from lake.ingest.aemo import (
     fetch_nem_summary,
     build_bronze_table as build_aemo_bronze,
 )
-from macro.ingest.reddit import fetch_reddit, build_bronze_table as build_reddit_bronze
-from macro.ingest.rss import fetch_feeds, build_bronze_table as build_rss_bronze
+from lake.ingest.reddit import fetch_reddit, build_bronze_table as build_reddit_bronze
+from lake.ingest.rss import fetch_feeds, build_bronze_table as build_rss_bronze
 from datalake.schemas import BRONZE_SCHEMA
 
 
@@ -55,7 +55,7 @@ class TestRbaIngest:
             assert isinstance(parsed, dict)
             assert "Series ID" in parsed
 
-    @patch("macro.ingest.rba_csv.httpx.get")
+    @patch("lake.ingest.rba_csv.httpx.get")
     def test_fetch_uses_correct_url(self, mock_get, rba_csv_text):
         mock_get.return_value = _mock_response(text=rba_csv_text)
         result = fetch_rba_csv()
@@ -85,7 +85,7 @@ class TestAbsIngest:
         assert table.schema == BRONZE_SCHEMA
         assert table.num_rows == 5
 
-    @patch("macro.ingest.abs_sdmx.httpx.get")
+    @patch("lake.ingest.abs_sdmx.httpx.get")
     def test_fetch_returns_json(self, mock_get, abs_cpi_json):
         mock_get.return_value = _mock_response(json_data=abs_cpi_json)
         result = fetch_abs_cpi()
@@ -94,7 +94,7 @@ class TestAbsIngest:
 
 class TestAemoIngest:
     def test_parse_nem_summary(self, aemo_nem_json):
-        with patch("macro.ingest.aemo.httpx.get") as mock_get:
+        with patch("lake.ingest.aemo.httpx.get") as mock_get:
             mock_get.return_value = _mock_response(json_data=aemo_nem_json)
             rows = fetch_nem_summary()
         assert len(rows) == 5
@@ -116,7 +116,7 @@ class TestAemoIngest:
 
 class TestRedditIngest:
     def test_parse_posts(self, reddit_hot_json):
-        with patch("macro.ingest.reddit.httpx.get") as mock_get:
+        with patch("lake.ingest.reddit.httpx.get") as mock_get:
             mock_get.return_value = _mock_response(json_data=reddit_hot_json)
             posts = fetch_reddit({"hot": "http://fake"})
         assert len(posts) == 3
@@ -133,14 +133,14 @@ class TestRedditIngest:
                 return _mock_response(json_data=reddit_hot_json)
             return _mock_response(json_data=reddit_new_json)
 
-        with patch("macro.ingest.reddit.httpx.get", side_effect=side_effect):
+        with patch("lake.ingest.reddit.httpx.get", side_effect=side_effect):
             posts = fetch_reddit({"hot": "http://fake/hot", "new": "http://fake/new"})
         post_ids = [p["post_id"] for p in posts]
         assert len(post_ids) == len(set(post_ids))
         assert len(posts) == 4
 
     def test_bronze_table_schema(self, reddit_hot_json):
-        with patch("macro.ingest.reddit.httpx.get") as mock_get:
+        with patch("lake.ingest.reddit.httpx.get") as mock_get:
             mock_get.return_value = _mock_response(json_data=reddit_hot_json)
             posts = fetch_reddit({"hot": "http://fake"})
         table = build_reddit_bronze(posts)
@@ -148,7 +148,7 @@ class TestRedditIngest:
         assert table.num_rows == 3
 
     def test_null_flair_becomes_empty(self, reddit_hot_json):
-        with patch("macro.ingest.reddit.httpx.get") as mock_get:
+        with patch("lake.ingest.reddit.httpx.get") as mock_get:
             mock_get.return_value = _mock_response(json_data=reddit_hot_json)
             posts = fetch_reddit({"hot": "http://fake"})
         energy_post = [p for p in posts if p["post_id"] == "ghi789"][0]
@@ -157,7 +157,7 @@ class TestRedditIngest:
 
 class TestRssIngest:
     def test_parse_feeds(self, rss_guardian_xml):
-        with patch("macro.ingest.rss.httpx.get") as mock_get:
+        with patch("lake.ingest.rss.httpx.get") as mock_get:
             resp = _mock_response(text=rss_guardian_xml)
             mock_get.return_value = resp
             articles = fetch_feeds({"guardian": "http://fake"})
@@ -166,7 +166,7 @@ class TestRssIngest:
         assert "RBA" in articles[0]["title"]
 
     def test_bronze_table_schema(self, rss_guardian_xml):
-        with patch("macro.ingest.rss.httpx.get") as mock_get:
+        with patch("lake.ingest.rss.httpx.get") as mock_get:
             mock_get.return_value = _mock_response(text=rss_guardian_xml)
             articles = fetch_feeds({"guardian": "http://fake"})
         table = build_rss_bronze(articles)

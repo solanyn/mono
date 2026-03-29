@@ -140,11 +140,11 @@ pip.parse(
     requirements_lock = "//yield/agent:requirements_lock.txt",
 )
 pip.parse(
-    hub_name = "macro_pypi",
+    hub_name = "lake_pypi",
     python_version = "3.12",
-    requirements_lock = "//macro:requirements_lock.txt",
+    requirements_lock = "//lake:requirements_lock.txt",
 )
-use_repo(pip, "pypi", "macro_pypi")
+use_repo(pip, "pypi", "lake_pypi")
 
 # js
 node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node", dev_dependency = True)

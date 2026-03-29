@@ -6,8 +6,8 @@ py_library(
     imports = ["src"],
     visibility = ["//visibility:public"],
     deps = [
-        "@macro_pypi//pyarrow",
-        "@macro_pypi//boto3",
-        "@macro_pypi//s3fs",
+        "@lake_pypi//pyarrow",
+        "@lake_pypi//boto3",
+        "@lake_pypi//s3fs",
     ],
 )

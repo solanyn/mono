@@ -5,45 +5,45 @@ load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
 load("@aspect_bazel_lib//lib:tar.bzl", "tar")
 
 py_library(
-    name = "macro_lib",
-    srcs = glob(["src/macro/**/*.py"]),
+    name = "lake_lib",
+    srcs = glob(["src/lake/**/*.py"]),
     imports = ["src"],
     visibility = ["//visibility:public"],
     deps = [
         "//libs/datalake",
-        "@macro_pypi//httpx",
-        "@macro_pypi//pyarrow",
-        "@macro_pypi//fastmcp",
-        "@macro_pypi//feedparser",
-        "@macro_pypi//pydantic_ai",
+        "@lake_pypi//httpx",
+        "@lake_pypi//pyarrow",
+        "@lake_pypi//fastmcp",
+        "@lake_pypi//feedparser",
+        "@lake_pypi//pydantic_ai",
     ],
 )
 
 py_binary(
     name = "ingest",
-    srcs = ["src/macro/ingest/cli.py"],
+    srcs = ["src/lake/ingest/cli.py"],
     imports = ["src"],
-    main = "src/macro/ingest/cli.py",
+    main = "src/lake/ingest/cli.py",
     visibility = ["//visibility:public"],
-    deps = [":macro_lib"],
+    deps = [":lake_lib"],
 )
 
 py_binary(
     name = "mcp_server",
-    srcs = ["src/macro/mcp_server.py"],
+    srcs = ["src/lake/mcp_server.py"],
     imports = ["src"],
-    main = "src/macro/mcp_server.py",
+    main = "src/lake/mcp_server.py",
     visibility = ["//visibility:public"],
-    deps = [":macro_lib"],
+    deps = [":lake_lib"],
 )
 
 py_binary(
     name = "agent",
-    srcs = ["src/macro/__main__.py"],
+    srcs = ["src/lake/__main__.py"],
     imports = ["src"],
-    main = "src/macro/__main__.py",
+    main = "src/lake/__main__.py",
     visibility = ["//visibility:public"],
-    deps = [":macro_lib"],
+    deps = [":lake_lib"],
 )
 
 py_test(
@@ -54,8 +54,8 @@ py_test(
     ],
     data = glob(["tests/fixtures/**"]),
     deps = [
-        ":macro_lib",
-        "@macro_pypi//pytest",
+        ":lake_lib",
+        "@lake_pypi//pytest",
     ],
     args = ["-v"],
 )
@@ -68,8 +68,8 @@ py_test(
     ],
     data = glob(["tests/fixtures/**"]),
     deps = [
-        ":macro_lib",
-        "@macro_pypi//pytest",
+        ":lake_lib",
+        "@lake_pypi//pytest",
     ],
     args = ["-v"],
 )
@@ -78,8 +78,8 @@ py_test(
     name = "test_state",
     srcs = ["tests/test_state.py"],
     deps = [
-        ":macro_lib",
-        "@macro_pypi//pytest",
+        ":lake_lib",
+        "@lake_pypi//pytest",
     ],
     args = ["-v"],
 )
@@ -92,8 +92,8 @@ py_test(
     ],
     data = glob(["tests/fixtures/**"]),
     deps = [
-        ":macro_lib",
-        "@macro_pypi//pytest",
+        ":lake_lib",
+        "@lake_pypi//pytest",
     ],
     args = ["-v"],
 )
@@ -121,11 +121,11 @@ oci_image(
 oci_load(
     name = "load",
     image = ":image",
-    repo_tags = ["macro:latest"],
+    repo_tags = ["lake:latest"],
 )
 
 oci_push(
     name = "push",
     image = ":image",
-    repository = "ghcr.io/solanyn/macro",
+    repository = "ghcr.io/solanyn/lake",
 )

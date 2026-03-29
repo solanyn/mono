@@ -1,14 +1,14 @@
-name: Macro
+name: Lake
 on:
   push:
     branches: [main]
     paths:
-      - "macro/**"
+      - "lake/**"
       - "libs/datalake/**"
   pull_request:
     branches: [main]
     paths:
-      - "macro/**"
+      - "lake/**"
       - "libs/datalake/**"
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -28,9 +28,9 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v6
       - name: Install dependencies
-        run: uv pip install --system -e libs/datalake -e "macro[dev]"
+        run: uv pip install --system -e libs/datalake -e "lake[dev]"
       - name: Run tests
-        run: python -m pytest libs/datalake/tests/ macro/tests/ -v
+        run: python -m pytest libs/datalake/tests/ lake/tests/ -v
 
   build-and-push:
     runs-on: ubuntu-latest
@@ -52,10 +52,10 @@ jobs:
         with:
           bazelisk-cache: true
       - name: Build image
-        run: bazel build //macro:image --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }}
+        run: bazel build //lake:image --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }}
       - name: Push image
         run: |
           MONOREPO_VERSION=$(./tools/get-version.sh .)
-          bazel run //macro:push --config=ci -- --tag "sha-${{ github.sha }}"
-          bazel run //macro:push --config=ci -- --tag "$MONOREPO_VERSION"
-          bazel run //macro:push --config=ci -- --tag latest
+          bazel run //lake:push --config=ci -- --tag "sha-${{ github.sha }}"
+          bazel run //lake:push --config=ci -- --tag "$MONOREPO_VERSION"
+          bazel run //lake:push --config=ci -- --tag latest

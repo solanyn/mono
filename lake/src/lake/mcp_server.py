@@ -8,7 +8,7 @@ import pyarrow.compute as pc
 from fastmcp import FastMCP
 
 from datalake import DatalakeConfig, read_parquet
-from macro.state import (
+from lake.state import (
     load_state,
     update_cycle_position as _update_cycle,
     track_narrative as _track_narrative,

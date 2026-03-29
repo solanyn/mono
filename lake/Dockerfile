@@ -6,29 +6,29 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 COPY libs/datalake/pyproject.toml libs/datalake/pyproject.toml
 COPY libs/datalake/src/ libs/datalake/src/
-COPY macro/pyproject.toml macro/pyproject.toml
-COPY macro/src/ macro/src/
+COPY lake/pyproject.toml lake/pyproject.toml
+COPY lake/src/ lake/src/
 
 RUN uv pip install --system --no-cache \
     ./libs/datalake \
-    ./macro
+    ./lake
 
 FROM python:3.13-slim
 
-RUN groupadd -r macro && useradd -r -g macro -d /app macro
+RUN groupadd -r lake && useradd -r -g lake -d /app lake
 
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --from=builder /build/libs/datalake/src/datalake /usr/local/lib/python3.13/site-packages/datalake
-COPY --from=builder /build/macro/src/macro /usr/local/lib/python3.13/site-packages/macro
+COPY --from=builder /build/lake/src/lake /usr/local/lib/python3.13/site-packages/lake
 
-RUN mkdir -p /data && chown macro:macro /data
+RUN mkdir -p /data && chown lake:lake /data
 
-USER macro
+USER lake
 WORKDIR /app
 
 ENV PYTHONUNBUFFERED=1
-ENV MACRO_STATE_PATH=/data/macro-state.json
+ENV LAKE_STATE_PATH=/data/lake-state.json
 
 ENTRYPOINT ["python", "-m"]
-CMD ["macro.ingest.cli", "all"]
+CMD ["lake.ingest.cli", "all"]

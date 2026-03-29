@@ -1,12 +1,12 @@
 import asyncio
 import sys
 
-from macro.agent import macro_agent
+from lake.agent import lake_agent
 
 
 async def main():
     print("Macro-financial reasoning agent. Type 'quit' to exit.\n")
-    async with macro_agent:
+    async with lake_agent:
         while True:
             try:
                 query = input("> ")
@@ -16,7 +16,7 @@ async def main():
                 break
             if not query.strip():
                 continue
-            result = await macro_agent.run(query)
+            result = await lake_agent.run(query)
             print(f"\n{result.output}\n")
 
 

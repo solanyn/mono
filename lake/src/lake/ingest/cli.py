@@ -1,12 +1,12 @@
 import sys
 
-from macro.ingest import rba_csv, abs_sdmx, aemo, rss, reddit, domain
-from macro.promote.bronze_to_silver import promote_rba
-from macro.promote.abs_to_silver import promote_abs
-from macro.promote.aemo_to_silver import promote_aemo
-from macro.promote.rss_to_silver import promote_rss
-from macro.promote.reddit_to_silver import promote_reddit
-from macro.promote.domain_to_silver import promote_domain
+from lake.ingest import rba_csv, abs_sdmx, aemo, rss, reddit, domain
+from lake.promote.bronze_to_silver import promote_rba
+from lake.promote.abs_to_silver import promote_abs
+from lake.promote.aemo_to_silver import promote_aemo
+from lake.promote.rss_to_silver import promote_rss
+from lake.promote.reddit_to_silver import promote_reddit
+from lake.promote.domain_to_silver import promote_domain
 
 INGESTS = [
     ("rba", rba_csv.ingest),
@@ -49,7 +49,7 @@ COMMANDS["all"] = run_all
 
 def main():
     if len(sys.argv) < 2 or sys.argv[1] not in COMMANDS:
-        print(f"Usage: python -m macro.ingest.cli <{'|'.join(COMMANDS)}>")
+        print(f"Usage: python -m lake.ingest.cli <{'|'.join(COMMANDS)}>")
         sys.exit(1)
     cmd = sys.argv[1]
     COMMANDS[cmd]()

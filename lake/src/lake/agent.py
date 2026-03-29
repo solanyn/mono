@@ -5,13 +5,13 @@ from pydantic_ai.mcp import MCPServerStdio
 
 mcp_server = MCPServerStdio(
     "python",
-    args=["-m", "macro.mcp_server"],
+    args=["-m", "lake.mcp_server"],
     cwd=os.path.dirname(os.path.abspath(__file__)),
 )
 
-macro_agent = Agent(
+lake_agent = Agent(
     os.getenv("MACRO_MODEL", "openai:gpt-4o-mini"),
-    name="macro_agent",
+    name="lake_agent",
     defer_model_check=True,
     toolsets=[mcp_server],
     system_prompt="""\
