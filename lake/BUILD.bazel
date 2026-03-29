@@ -34,6 +34,12 @@ go_library(
 )
 
 go_library(
+    name = "config_lib",
+    srcs = glob(["internal/config/*.go"]),
+    importpath = "github.com/solanyn/mono/lake/internal/config",
+)
+
+go_library(
     name = "ingest_lib",
     srcs = glob(["internal/ingest/*.go"]),
     importpath = "github.com/solanyn/mono/lake/internal/ingest",
@@ -70,6 +76,7 @@ go_library(
     srcs = glob(["internal/scheduler/*.go"]),
     importpath = "github.com/solanyn/mono/lake/internal/scheduler",
     deps = [
+        ":config_lib",
         ":ingest_lib",
         ":kafka_lib",
         ":storage_lib",
@@ -84,6 +91,7 @@ go_binary(
     goarch = "amd64",
     pure = "on",
     deps = [
+        ":config_lib",
         ":kafka_lib",
         ":scheduler_lib",
         ":storage_lib",
@@ -99,6 +107,7 @@ go_binary(
     goarch = "amd64",
     pure = "on",
     deps = [
+        ":config_lib",
         ":kafka_lib",
         ":promote_lib",
         ":storage_lib",
@@ -115,6 +124,7 @@ go_binary(
     pure = "on",
     deps = [
         ":aggregate_lib",
+        ":config_lib",
         ":kafka_lib",
         ":storage_lib",
         "@com_github_prometheus_client_golang//prometheus/promhttp",
