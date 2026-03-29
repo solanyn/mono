@@ -84,6 +84,20 @@ py_test(
     args = ["-v"],
 )
 
+py_test(
+    name = "test_domain",
+    srcs = [
+        "tests/conftest.py",
+        "tests/test_domain.py",
+    ],
+    data = glob(["tests/fixtures/**"]),
+    deps = [
+        ":macro_lib",
+        "@macro_pypi//pytest",
+    ],
+    args = ["-v"],
+)
+
 tar(
     name = "ingest_layer",
     srcs = [":ingest"],

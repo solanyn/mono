@@ -55,6 +55,10 @@ def _find_latest_silver_reddit(config: DatalakeConfig | None = None) -> pa.Table
     return _find_latest("reddit_sentiment", "reddit_sentiment.parquet", config=config)
 
 
+def _find_latest_silver_domain(config: DatalakeConfig | None = None) -> pa.Table | None:
+    return _find_latest("domain_listings", "domain_listings.parquet", config=config)
+
+
 @mcp.tool()
 def get_rate_history(months: int = 12) -> str:
     """Query silver RBA rates for cash rate target series, returning the last N months of data."""
@@ -415,6 +419,57 @@ def resolve_narrative(narrative_id: str, status: str, evidence: str = "") -> str
         return json.dumps({"error": f"Narrative {narrative_id} not found"})
     return json.dumps(
         {"id": narrative.id, "status": narrative.status, "claim": narrative.claim}
+    )
+
+
+@mcp.tool()
+def get_property(suburb: str, months: int = 12) -> str:
+    """Query silver Domain listings for a suburb, returning data from the last N months.
+
+    suburb: suburb name (e.g. "Sydney", "Parramatta")
+    months: how far back to look
+    """
+    table = _find_latest_silver_domain()
+    if table is None:
+        return json.dumps(
+            {
+                "error": "No silver Domain data found. Run domain ingest and promote-domain first."
+            }
+        )
+
+    mask = pc.equal(pc.utf8_upper(table.column("suburb")), suburb.upper())
+    filtered = table.filter(mask)
+
+    rows = []
+    for i in range(filtered.num_rows):
+        rows.append(
+            {
+                "listing_id": filtered.column("listing_id")[i].as_py(),
+                "suburb": filtered.column("suburb")[i].as_py(),
+                "state": filtered.column("state")[i].as_py(),
+                "postcode": filtered.column("postcode")[i].as_py(),
+                "property_type": filtered.column("property_type")[i].as_py(),
+                "bedrooms": filtered.column("bedrooms")[i].as_py(),
+                "bathrooms": filtered.column("bathrooms")[i].as_py(),
+                "price_guide": filtered.column("price_guide")[i].as_py(),
+                "auction_date": filtered.column("auction_date")[i].as_py(),
+                "sold_price": filtered.column("sold_price")[i].as_py(),
+                "days_on_market": filtered.column("days_on_market")[i].as_py(),
+                "latitude": filtered.column("latitude")[i].as_py(),
+                "longitude": filtered.column("longitude")[i].as_py(),
+            }
+        )
+
+    sold = [r["sold_price"] for r in rows if r["sold_price"] is not None]
+    median_price = sorted(sold)[len(sold) // 2] if sold else None
+
+    return json.dumps(
+        {
+            "suburb": suburb,
+            "count": len(rows),
+            "median_sold_price": median_price,
+            "listings": rows,
+        }
     )
 
 

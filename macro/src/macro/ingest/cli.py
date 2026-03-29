@@ -1,11 +1,12 @@
 import sys
 
-from macro.ingest import rba_csv, abs_sdmx, aemo, rss, reddit
+from macro.ingest import rba_csv, abs_sdmx, aemo, rss, reddit, domain
 from macro.promote.bronze_to_silver import promote_rba
 from macro.promote.abs_to_silver import promote_abs
 from macro.promote.aemo_to_silver import promote_aemo
 from macro.promote.rss_to_silver import promote_rss
 from macro.promote.reddit_to_silver import promote_reddit
+from macro.promote.domain_to_silver import promote_domain
 
 INGESTS = [
     ("rba", rba_csv.ingest),
@@ -13,6 +14,7 @@ INGESTS = [
     ("aemo", aemo.ingest),
     ("rss", rss.ingest),
     ("reddit", reddit.ingest),
+    ("domain", domain.ingest),
 ]
 
 PROMOTIONS = [
@@ -21,6 +23,7 @@ PROMOTIONS = [
     ("promote-aemo", promote_aemo),
     ("promote-rss", promote_rss),
     ("promote-reddit", promote_reddit),
+    ("promote-domain", promote_domain),
 ]
 
 COMMANDS = {name: fn for name, fn in INGESTS + PROMOTIONS}

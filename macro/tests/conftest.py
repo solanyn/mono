@@ -34,3 +34,13 @@ def reddit_new_json():
 @pytest.fixture
 def rss_guardian_xml():
     return (FIXTURES_DIR / "rss_guardian.xml").read_text()
+
+
+@pytest.fixture
+def domain_auctions_json():
+    return json.loads((FIXTURES_DIR / "domain_auctions.json").read_text())
+
+
+@pytest.fixture
+def domain_listings_json():
+    return json.loads((FIXTURES_DIR / "domain_listings.json").read_text())
