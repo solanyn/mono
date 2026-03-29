@@ -1,6 +1,6 @@
 load("@rules_go//go:def.bzl", "go_binary", "go_library")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_push")
-load("@aspect_bazel_lib//lib:tar.bzl", "tar")
+load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 
 go_library(
     name = "storage_lib",
@@ -113,39 +113,42 @@ go_binary(
     visibility = ["//visibility:public"],
 )
 
-tar(
+pkg_tar(
     name = "ingest_layer",
     srcs = [":ingest"],
+    strip_prefix = ".",
 )
 
-tar(
+pkg_tar(
     name = "promote_layer",
     srcs = [":promote"],
+    strip_prefix = ".",
 )
 
-tar(
+pkg_tar(
     name = "aggregate_layer",
     srcs = [":aggregate"],
+    strip_prefix = ".",
 )
 
 oci_image(
     name = "ingest_image",
     base = "@distroless_static_linux_amd64",
-    entrypoint = ["/lake/ingest_/ingest"],
+    entrypoint = ["/ingest_/ingest"],
     tars = [":ingest_layer"],
 )
 
 oci_image(
     name = "promote_image",
     base = "@distroless_static_linux_amd64",
-    entrypoint = ["/lake/promote_/promote"],
+    entrypoint = ["/promote_/promote"],
     tars = [":promote_layer"],
 )
 
 oci_image(
     name = "aggregate_image",
     base = "@distroless_static_linux_amd64",
-    entrypoint = ["/lake/aggregate_/aggregate"],
+    entrypoint = ["/aggregate_/aggregate"],
     tars = [":aggregate_layer"],
 )
 
