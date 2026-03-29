@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/parquet-go/parquet-go"
@@ -56,7 +57,7 @@ func ReadBronze(data []byte) ([]BronzeRow, error) {
 	r := parquet.NewGenericReader[BronzeRow](f)
 	rows := make([]BronzeRow, f.NumRows())
 	n, err := r.Read(rows)
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return nil, fmt.Errorf("parquet read: %w", err)
 	}
 	return rows[:n], nil
