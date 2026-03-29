@@ -2,7 +2,7 @@ load("@rules_python//python:py_binary.bzl", "py_binary")
 load("@rules_python//python:py_library.bzl", "py_library")
 load("@rules_python//python:py_test.bzl", "py_test")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
-load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
+load("@aspect_bazel_lib//lib:tar.bzl", "tar")
 
 py_library(
     name = "lake_mcp_lib",
@@ -89,7 +89,7 @@ py_test(
     args = ["-v"],
 )
 
-pkg_tar(
+tar(
     name = "mcp_server_layer",
     srcs = [":mcp_server"],
 )
