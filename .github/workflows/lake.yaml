@@ -4,11 +4,13 @@ on:
     branches: [main]
     paths:
       - "lake/**"
+      - "lake-mcp/**"
       - "libs/datalake/**"
   pull_request:
     branches: [main]
     paths:
       - "lake/**"
+      - "lake-mcp/**"
       - "libs/datalake/**"
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -16,7 +18,23 @@ concurrency:
 permissions:
   packages: write
 jobs:
-  test:
+  test-go:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: lake/go.mod
+      - name: Build
+        run: go build ./cmd/ingest/
+        working-directory: lake
+      - name: Test
+        run: go test ./...
+        working-directory: lake
+
+  test-python:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -28,13 +46,13 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v6
       - name: Install dependencies
-        run: uv pip install --system -e libs/datalake -e "lake[dev]"
+        run: uv pip install --system -e libs/datalake -e "lake-mcp[dev]"
       - name: Run tests
-        run: python -m pytest libs/datalake/tests/ lake/tests/ -v
+        run: python -m pytest libs/datalake/tests/ lake-mcp/tests/ -v
 
   build-and-push:
     runs-on: ubuntu-latest
-    needs: test
+    needs: [test-go, test-python]
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:
       - name: Checkout
@@ -51,11 +69,12 @@ jobs:
         uses: bazel-contrib/setup-bazel@0.19.0
         with:
           bazelisk-cache: true
-      - name: Build image
-        run: bazel build //lake:image --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }}
-      - name: Push image
+      - name: Build images
+        run: |
+          bazel build //lake-mcp:image --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }}
+      - name: Push images
         run: |
           MONOREPO_VERSION=$(./tools/get-version.sh .)
-          bazel run //lake:push --config=ci -- --tag "sha-${{ github.sha }}"
-          bazel run //lake:push --config=ci -- --tag "$MONOREPO_VERSION"
-          bazel run //lake:push --config=ci -- --tag latest
+          bazel run //lake-mcp:push --config=ci -- --tag "sha-${{ github.sha }}"
+          bazel run //lake-mcp:push --config=ci -- --tag "$MONOREPO_VERSION"
+          bazel run //lake-mcp:push --config=ci -- --tag latest
