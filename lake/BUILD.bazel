@@ -131,21 +131,21 @@ tar(
 oci_image(
     name = "ingest_image",
     base = "@distroless_static_linux_amd64",
-    entrypoint = ["/ingest"],
+    entrypoint = ["/lake/ingest_/ingest"],
     tars = [":ingest_layer"],
 )
 
 oci_image(
     name = "promote_image",
     base = "@distroless_static_linux_amd64",
-    entrypoint = ["/promote"],
+    entrypoint = ["/lake/promote_/promote"],
     tars = [":promote_layer"],
 )
 
 oci_image(
     name = "aggregate_image",
     base = "@distroless_static_linux_amd64",
-    entrypoint = ["/aggregate"],
+    entrypoint = ["/lake/aggregate_/aggregate"],
     tars = [":aggregate_layer"],
 )
 
