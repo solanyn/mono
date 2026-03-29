@@ -1,6 +1,6 @@
 module github.com/solanyn/mono/lake
 
-go 1.23.6
+go 1.24.9
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.36.3
@@ -8,14 +8,14 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.79.3
 	github.com/google/uuid v1.6.0
 	github.com/mmcdole/gofeed v1.3.0
-	github.com/parquet-go/parquet-go v0.25.0
+	github.com/parquet-go/parquet-go v0.29.0
 	github.com/prometheus/client_golang v1.22.0
 	github.com/robfig/cron/v3 v3.0.1
 )
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.0 // indirect
-	github.com/andybalholm/brotli v1.1.0 // indirect
+	github.com/andybalholm/brotli v1.1.1 // indirect
 	github.com/andybalholm/cascadia v1.3.1 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.10 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.34 // indirect
@@ -36,13 +36,16 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
+	github.com/parquet-go/bitpack v1.0.0 // indirect
+	github.com/parquet-go/jsonlite v1.0.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
+	github.com/twpayne/go-geom v1.6.1 // indirect
 	golang.org/x/net v0.33.0 // indirect
-	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	google.golang.org/protobuf v1.36.5 // indirect
 )
