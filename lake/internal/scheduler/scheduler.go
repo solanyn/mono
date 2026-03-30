@@ -62,6 +62,42 @@ func (s *Scheduler) Start() {
 		return ingest.IngestNSWVG(ctx, s.s3, s.cfg.BronzeBucket)
 	}))
 
+	s.cron.AddFunc(s.cfg.CronASX, s.wrapIngest("asx", func(ctx context.Context) (ingest.Result, error) {
+		return ingest.IngestASX(ctx, s.s3, s.cfg.BronzeBucket)
+	}))
+
+	s.cron.AddFunc(s.cfg.CronABSBA, s.wrapIngest("abs_ba", func(ctx context.Context) (ingest.Result, error) {
+		return ingest.IngestABSBuildingApprovals(ctx, s.s3, s.cfg.BronzeBucket)
+	}))
+
+	s.cron.AddFunc(s.cfg.CronABSMig, s.wrapIngest("abs_migration", func(ctx context.Context) (ingest.Result, error) {
+		return ingest.IngestABSMigration(ctx, s.s3, s.cfg.BronzeBucket)
+	}))
+
+	s.cron.AddFunc(s.cfg.CronRBACredit, s.wrapIngest("rba_credit", func(ctx context.Context) (ingest.Result, error) {
+		return ingest.IngestRBACredit(ctx, s.s3, s.cfg.BronzeBucket)
+	}))
+
+	s.cron.AddFunc(s.cfg.CronWeather, s.wrapIngest("weather", func(ctx context.Context) (ingest.Result, error) {
+		return ingest.IngestWeather(ctx, s.s3, s.cfg.BronzeBucket)
+	}))
+
+	s.cron.AddFunc(s.cfg.CronGitHub, s.wrapIngest("github_trending", func(ctx context.Context) (ingest.Result, error) {
+		return ingest.IngestGitHubTrending(ctx, s.s3, s.cfg.BronzeBucket)
+	}))
+
+	s.cron.AddFunc(s.cfg.CronPyPI, s.wrapIngest("pypi_stats", func(ctx context.Context) (ingest.Result, error) {
+		return ingest.IngestPyPIStats(ctx, s.s3, s.cfg.BronzeBucket)
+	}))
+
+	s.cron.AddFunc(s.cfg.CronNpm, s.wrapIngest("npm_stats", func(ctx context.Context) (ingest.Result, error) {
+		return ingest.IngestNpmStats(ctx, s.s3, s.cfg.BronzeBucket)
+	}))
+
+	s.cron.AddFunc(s.cfg.CronHN, s.wrapIngest("hn_stories", func(ctx context.Context) (ingest.Result, error) {
+		return ingest.IngestHN(ctx, s.s3, s.cfg.BronzeBucket)
+	}))
+
 	s.cron.Start()
 	log.Println("scheduler: started")
 }

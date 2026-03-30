@@ -30,6 +30,16 @@ type Config struct {
 	CronDomain string
 	CronNSWVG  string
 
+	CronASX       string
+	CronABSBA     string
+	CronABSMig    string
+	CronRBACredit string
+	CronWeather   string
+	CronGitHub    string
+	CronPyPI      string
+	CronNpm       string
+	CronHN        string
+
 	IcebergCatalogURI string
 }
 
@@ -61,6 +71,16 @@ func Load() Config {
 		CronReddit: envOr("CRON_REDDIT", "*/30 * * * *"),
 		CronDomain: envOr("CRON_DOMAIN", "0 23 * * *"),
 		CronNSWVG:  envOr("CRON_NSW_VG", "0 0 * * 0"),
+
+		CronASX:       envOr("CRON_ASX", "0 * * * *"),
+		CronABSBA:     envOr("CRON_ABS_BA", "0 22 * * *"),
+		CronABSMig:    envOr("CRON_ABS_MIG", "30 22 * * *"),
+		CronRBACredit: envOr("CRON_RBA_CREDIT", "30 20 * * *"),
+		CronWeather:   envOr("CRON_WEATHER", "0 6 * * *"),
+		CronGitHub:    envOr("CRON_GITHUB", "0 12 * * *"),
+		CronPyPI:      envOr("CRON_PYPI", "0 13 * * *"),
+		CronNpm:       envOr("CRON_NPM", "30 13 * * *"),
+		CronHN:        envOr("CRON_HN", "0 * * * *"),
 
 		IcebergCatalogURI: envOr("ICEBERG_CATALOG_URI", "http://lakekeeper.storage.svc.cluster.local:8181/catalog"),
 	}
