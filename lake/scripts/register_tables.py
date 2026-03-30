@@ -1,115 +1,161 @@
-"""Register Iceberg tables in Lakekeeper for existing S3 parquet data."""
+"""Register Iceberg tables in Lakekeeper with full catalog metadata."""
 
 import os
-import sys
 
-import boto3
 from pyiceberg.catalog import load_catalog
-from pyiceberg.exceptions import (
-    NamespaceAlreadyExistsError,
-    NoSuchNamespaceError,
-    TableAlreadyExistsError,
-)
+from pyiceberg.exceptions import NamespaceAlreadyExistsError, TableAlreadyExistsError
 from pyiceberg.schema import Schema
-from pyiceberg.types import (
-    DoubleType,
-    LongType,
-    NestedField,
-    StringType,
-    TimestampType,
-)
+from pyiceberg.types import NestedField, StringType, TimestampType
 
 BRONZE_SCHEMA = Schema(
-    NestedField(1, "_source", StringType(), required=False),
-    NestedField(2, "_ingested_at", TimestampType(), required=False),
-    NestedField(3, "_raw_payload", StringType(), required=False),
-    NestedField(4, "_batch_id", StringType(), required=False),
+    NestedField(
+        1,
+        "_source",
+        StringType(),
+        required=False,
+        doc="Source identifier (e.g. rba.f1, aemo.nem_summary)",
+    ),
+    NestedField(
+        2,
+        "_ingested_at",
+        TimestampType(),
+        required=False,
+        doc="UTC timestamp when row was ingested",
+    ),
+    NestedField(
+        3,
+        "_raw_payload",
+        StringType(),
+        required=False,
+        doc="JSON-encoded raw payload from source API",
+    ),
+    NestedField(
+        4,
+        "_batch_id",
+        StringType(),
+        required=False,
+        doc="UUID identifying the ingest batch",
+    ),
 )
 
-SILVER_SCHEMAS = {
-    "rba_rates": Schema(
-        NestedField(1, "_source", StringType(), required=False),
-        NestedField(2, "_ingested_at", TimestampType(), required=False),
-        NestedField(3, "_raw_payload", StringType(), required=False),
-        NestedField(4, "_batch_id", StringType(), required=False),
-    ),
-    "abs_indicators": Schema(
-        NestedField(1, "_source", StringType(), required=False),
-        NestedField(2, "_ingested_at", TimestampType(), required=False),
-        NestedField(3, "_raw_payload", StringType(), required=False),
-        NestedField(4, "_batch_id", StringType(), required=False),
-    ),
-    "aemo_prices": Schema(
-        NestedField(1, "_source", StringType(), required=False),
-        NestedField(2, "_ingested_at", TimestampType(), required=False),
-        NestedField(3, "_raw_payload", StringType(), required=False),
-        NestedField(4, "_batch_id", StringType(), required=False),
-    ),
-    "news_articles": Schema(
-        NestedField(1, "_source", StringType(), required=False),
-        NestedField(2, "_ingested_at", TimestampType(), required=False),
-        NestedField(3, "_raw_payload", StringType(), required=False),
-        NestedField(4, "_batch_id", StringType(), required=False),
-    ),
-    "reddit_sentiment": Schema(
-        NestedField(1, "_source", StringType(), required=False),
-        NestedField(2, "_ingested_at", TimestampType(), required=False),
-        NestedField(3, "_raw_payload", StringType(), required=False),
-        NestedField(4, "_batch_id", StringType(), required=False),
-    ),
-    "domain_listings": Schema(
-        NestedField(1, "_source", StringType(), required=False),
-        NestedField(2, "_ingested_at", TimestampType(), required=False),
-        NestedField(3, "_raw_payload", StringType(), required=False),
-        NestedField(4, "_batch_id", StringType(), required=False),
-    ),
-    "nsw_vg_sales": Schema(
-        NestedField(1, "_source", StringType(), required=False),
-        NestedField(2, "_ingested_at", TimestampType(), required=False),
-        NestedField(3, "_raw_payload", StringType(), required=False),
-        NestedField(4, "_batch_id", StringType(), required=False),
-    ),
+NAMESPACE_PROPS = {
+    "bronze": {
+        "description": "Raw ingested data from external APIs. Schema: _source, _ingested_at, _raw_payload, _batch_id. One table per data source."
+    },
+    "silver": {
+        "description": "Cleaned and transformed data promoted from bronze. Structured columns extracted from raw JSON payloads."
+    },
+    "gold": {
+        "description": "Aggregated and enriched data for analytics and agent consumption. Cross-source joins and time-series rollups."
+    },
 }
 
-BRONZE_SOURCES = {
-    "rba": "rba",
-    "abs": "abs",
-    "aemo": "aemo",
-    "rss": "rss",
-    "reddit": "reddit",
-    "domain": "domain",
-    "nsw_vg": "nsw_vg",
+BRONZE_TABLES = {
+    "rba": {
+        "description": "RBA interest rate statistics (Table F1). Cash rate target, interbank rates, OIS, bank bills, treasury notes.",
+        "source_url": "https://rba.gov.au/statistics/tables/csv/f1-data.csv",
+        "source_name": "Reserve Bank of Australia",
+        "update_frequency": "daily",
+        "temporal_coverage": "2011-present",
+        "auth": "none",
+        "gotchas": "CSV has metadata header rows before the actual data. Series IDs change occasionally.",
+    },
+    "abs": {
+        "description": "ABS CPI monthly index numbers across 34 sub-categories via SDMX JSON.",
+        "source_url": "https://data.api.abs.gov.au/data/CPI",
+        "source_name": "Australian Bureau of Statistics",
+        "update_frequency": "monthly",
+        "temporal_coverage": "2020-present",
+        "auth": "none",
+        "gotchas": "SDMX JSON format with nested series/observations structure. Dimension IDs need resolving.",
+    },
+    "aemo": {
+        "description": "AEMO NEM 5-minute spot prices, demand, generation and interconnector flows by region.",
+        "source_url": "https://visualisations.aemo.com.au/aemo/apps/api/report/ELEC_NEM_SUMMARY",
+        "source_name": "Australian Energy Market Operator",
+        "update_frequency": "5min",
+        "temporal_coverage": "snapshot (latest interval)",
+        "auth": "none",
+        "gotchas": "Returns current interval only. Historical data requires separate NEMWEB downloads.",
+    },
+    "rss": {
+        "description": "RSS feed articles from Guardian AU Business, RBA media releases and speeches.",
+        "source_url": "https://www.theguardian.com/au/business/rss",
+        "source_name": "Multiple (Guardian, RBA)",
+        "update_frequency": "15min",
+        "temporal_coverage": "rolling (latest ~50 articles per feed)",
+        "auth": "none",
+        "gotchas": "Feed items may duplicate across polls. Deduplicate by URL.",
+    },
+    "reddit": {
+        "description": "Reddit r/AusFinance hot and new posts with scores, comments and flair.",
+        "source_url": "https://www.reddit.com/r/AusFinance/.json",
+        "source_name": "Reddit",
+        "update_frequency": "30min",
+        "temporal_coverage": "rolling (top 25 hot + 25 new)",
+        "auth": "none",
+        "gotchas": "Rate limited. User-Agent required. Posts deduplicated by post_id across hot/new.",
+    },
+    "domain": {
+        "description": "Domain.com.au Sydney auction results and residential listings search.",
+        "source_url": "https://api.domain.com.au/v1/salesResults/Sydney",
+        "source_name": "Domain Group",
+        "update_frequency": "daily",
+        "temporal_coverage": "latest auction round + active listings",
+        "auth": "oauth2_client_credentials",
+        "gotchas": "Free tier: ~500 req/day. OAuth2 token expires after 1h. Rate limit with 500ms delays.",
+    },
+    "nsw_vg": {
+        "description": "NSW Valuer General bulk property sales data. ZIP/CSV with 23 columns per sale.",
+        "source_url": "https://valuation.property.nsw.gov.au/embed/propertySalesInformation",
+        "source_name": "NSW Valuer General",
+        "update_frequency": "weekly",
+        "temporal_coverage": "current + previous year",
+        "auth": "none",
+        "gotchas": "ZIP contains multiple CSVs. Header row starts with 'A' record type. Large files (100k+ rows/year).",
+    },
 }
 
-SILVER_SOURCES = {
-    "rba_rates": "rba_rates",
-    "abs_indicators": "abs_indicators",
-    "aemo_prices": "aemo_prices",
-    "news_articles": "news_articles",
-    "reddit_sentiment": "reddit_sentiment",
-    "domain_listings": "domain_listings",
-    "nsw_vg_sales": "nsw_vg_sales",
+SILVER_TABLES = {
+    "rba_rates": {
+        "description": "Cleaned RBA interest rates with parsed dates and numeric values.",
+        "source_name": "Reserve Bank of Australia",
+        "update_frequency": "daily",
+    },
+    "abs_indicators": {
+        "description": "Structured ABS CPI indicators with resolved dimension labels.",
+        "source_name": "Australian Bureau of Statistics",
+        "update_frequency": "monthly",
+    },
+    "aemo_prices": {
+        "description": "NEM spot prices and demand by region with parsed timestamps.",
+        "source_name": "Australian Energy Market Operator",
+        "update_frequency": "5min",
+    },
+    "news_articles": {
+        "description": "Parsed news articles with title, URL, published date and source attribution.",
+        "source_name": "Multiple (Guardian, RBA)",
+        "update_frequency": "15min",
+    },
+    "reddit_sentiment": {
+        "description": "Reddit posts with extracted sentiment signals, scores and engagement metrics.",
+        "source_name": "Reddit r/AusFinance",
+        "update_frequency": "30min",
+    },
+    "domain_listings": {
+        "description": "Structured property listings with suburb, price, bedrooms, coordinates.",
+        "source_name": "Domain Group",
+        "update_frequency": "daily",
+    },
+    "nsw_vg_sales": {
+        "description": "Cleaned NSW property sales with parsed addresses, dates and normalised prices.",
+        "source_name": "NSW Valuer General",
+        "update_frequency": "weekly",
+    },
 }
 
 
-def create_namespace(catalog, name):
-    try:
-        catalog.create_namespace(name)
-        print(f"Created namespace: {name}")
-    except NamespaceAlreadyExistsError:
-        print(f"Namespace exists: {name}")
-
-
-def create_table(catalog, namespace, table_name, schema, location):
-    identifier = f"{namespace}.{table_name}"
-    try:
-        catalog.create_table(identifier, schema=schema, location=location)
-        print(f"Created table: {identifier}")
-    except TableAlreadyExistsError:
-        print(f"Table exists: {identifier}")
-
-
-def main():
+def get_catalog(warehouse):
     catalog_uri = os.environ.get(
         "ICEBERG_CATALOG_URI",
         "http://lakekeeper.storage.svc.cluster.local:8181/catalog",
@@ -123,13 +169,13 @@ def main():
     s3_secret_key = os.environ.get(
         "AWS_SECRET_ACCESS_KEY", os.environ.get("S3_SECRET_KEY", "")
     )
-    s3_region = os.environ.get("AWS_REGION", os.environ.get("S3_REGION", "us-east-1"))
-
-    catalog = load_catalog(
-        "lakekeeper",
+    s3_region = os.environ.get("AWS_REGION", "us-east-1")
+    return load_catalog(
+        f"lakekeeper-{warehouse}",
         **{
             "type": "rest",
             "uri": catalog_uri,
+            "warehouse": warehouse,
             "s3.endpoint": s3_endpoint,
             "s3.access-key-id": s3_access_key,
             "s3.secret-access-key": s3_secret_key,
@@ -138,17 +184,57 @@ def main():
         },
     )
 
-    for ns in ("bronze", "silver", "gold"):
-        create_namespace(catalog, ns)
 
-    for table_name, prefix in BRONZE_SOURCES.items():
-        location = f"s3://bronze/{prefix}/"
-        create_table(catalog, "bronze", table_name, BRONZE_SCHEMA, location)
+def create_ns(catalog, name, props=None):
+    try:
+        catalog.create_namespace(name, properties=props or {})
+        print(f"Created namespace: {name}")
+    except NamespaceAlreadyExistsError:
+        if props:
+            try:
+                catalog.update_namespace_properties(name, updates=props)
+            except Exception:
+                pass
 
-    for table_name, prefix in SILVER_SOURCES.items():
-        schema = SILVER_SCHEMAS.get(table_name, BRONZE_SCHEMA)
-        location = f"s3://silver/{prefix}/"
-        create_table(catalog, "silver", table_name, schema, location)
+
+def create_tbl(catalog, ns, name, location, props=None):
+    try:
+        tbl = catalog.create_table(
+            f"{ns}.{name}",
+            schema=BRONZE_SCHEMA,
+            location=location,
+            properties=props or {},
+        )
+        print(f"Created table: {ns}.{name}")
+        return tbl
+    except TableAlreadyExistsError:
+        if props:
+            try:
+                tbl = catalog.load_table(f"{ns}.{name}")
+                with tbl.transaction() as tx:
+                    tx.set_properties(**props)
+            except Exception:
+                pass
+        return None
+
+
+def main():
+    for layer in ("bronze", "silver", "gold"):
+        cat = get_catalog(layer)
+        ns_props = NAMESPACE_PROPS.get(layer, {})
+        create_ns(cat, "default", ns_props)
+
+    bronze_cat = get_catalog("bronze")
+    for name, meta in BRONZE_TABLES.items():
+        create_tbl(
+            bronze_cat, "default", name, f"s3://bronze/iceberg/{name}/", props=meta
+        )
+
+    silver_cat = get_catalog("silver")
+    for name, meta in SILVER_TABLES.items():
+        create_tbl(
+            silver_cat, "default", name, f"s3://silver/iceberg/{name}/", props=meta
+        )
 
     print("Table registration complete")
 
