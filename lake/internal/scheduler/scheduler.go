@@ -98,6 +98,18 @@ func (s *Scheduler) Start() {
 		return ingest.IngestHN(ctx, s.s3, s.cfg.BronzeBucket)
 	}))
 
+	s.cron.AddFunc(s.cfg.CronNSWFuel, s.wrapIngest("nsw_fuel", func(ctx context.Context) (ingest.Result, error) {
+		return ingest.IngestNSWFuel(ctx, s.s3, s.cfg.BronzeBucket)
+	}))
+
+	s.cron.AddFunc(s.cfg.CronNSWProperty, s.wrapIngest("nsw_property_licences", func(ctx context.Context) (ingest.Result, error) {
+		return ingest.IngestNSWPropertyLicences(ctx, s.s3, s.cfg.BronzeBucket)
+	}))
+
+	s.cron.AddFunc(s.cfg.CronNSWTrades, s.wrapIngest("nsw_trades_licences", func(ctx context.Context) (ingest.Result, error) {
+		return ingest.IngestNSWTradesLicences(ctx, s.s3, s.cfg.BronzeBucket)
+	}))
+
 	s.cron.Start()
 	log.Println("scheduler: started")
 }
