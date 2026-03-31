@@ -142,7 +142,7 @@ jsonschema==4.26.0
     # via mcp
 jsonschema-specifications==2025.9.1
     # via jsonschema
-langchain==1.2.10
+langchain==1.2.13
     # via
     #   ag-ui-langgraph
     #   copilotkit
