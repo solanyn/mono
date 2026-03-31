@@ -52,7 +52,7 @@ boto3==1.42.80
     #   datalake (libs/datalake/pyproject.toml)
     #   datalake
     #   pydantic-ai-slim
-botocore==1.42.79
+botocore==1.42.80
     # via
     #   aiobotocore
     #   boto3
