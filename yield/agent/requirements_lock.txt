@@ -51,7 +51,7 @@ colorama==0.4.6
     # via griffecli
 copilotkit==0.1.83
     # via -r requirements.txt
-cryptography==46.0.5
+cryptography==46.0.6
     # via
     #   google-auth
     #   pyjwt
