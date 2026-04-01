@@ -8,7 +8,7 @@ aiofile==3.9.0
     # via py-key-value-aio
 aiohappyeyeballs==2.6.1
     # via aiohttp
-aiohttp==3.13.4
+aiohttp==3.13.5
     # via
     #   aiobotocore
     #   s3fs
