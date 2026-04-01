@@ -59,10 +59,13 @@ go_library(
     srcs = glob(["internal/ingest/*.go"]),
     importpath = "github.com/solanyn/mono/lake/internal/ingest",
     deps = [
+        ":kafka_lib",
         ":metrics_lib",
         ":storage_lib",
+        "@com_github_go_shiori_go_readability//:go-readability",
         "@com_github_google_uuid//:uuid",
         "@com_github_mmcdole_gofeed//:gofeed",
+        "@com_github_robfig_cron_v3//:cron",
     ],
 )
 
@@ -109,6 +112,7 @@ go_binary(
     deps = [
         ":config_lib",
         ":iceberg_lib",
+        ":ingest_lib",
         ":kafka_lib",
         ":scheduler_lib",
         ":storage_lib",

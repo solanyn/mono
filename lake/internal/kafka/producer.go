@@ -53,6 +53,20 @@ func (p *Producer) publish(ctx context.Context, topic, key string, event interfa
 	return nil
 }
 
+func (p *Producer) PublishRaw(ctx context.Context, topic, key string, data []byte) error {
+	record := &kgo.Record{
+		Topic: topic,
+		Key:   []byte(key),
+		Value: data,
+	}
+	results := p.client.ProduceSync(ctx, record)
+	if err := results.FirstErr(); err != nil {
+		return fmt.Errorf("kafka produce %s: %w", topic, err)
+	}
+	log.Printf("kafka: published to %s key=%s", topic, key)
+	return nil
+}
+
 func (p *Producer) Close() {
 	p.client.Close()
 }

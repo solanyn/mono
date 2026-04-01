@@ -543,6 +543,11 @@ go_deps.module(
     version = "v4.13.1",
 )
 go_deps.module(
+    path = "github.com/araddon/dateparse",
+    sum = "h1:FxWPpzIjnTlhPwqqXc4/vE0f7GvRjuAsbW+HOIe8KnA=",
+    version = "v0.0.0-20210429162001-6b43995a97de",
+)
+go_deps.module(
     path = "github.com/apparentlymart/go-textseg/v15",
     sum = "h1:uYvfpb3DyLSCGWnctWKGj857c6ew1u1fNQOlOtuGxQY=",
     version = "v15.0.0",
@@ -838,6 +843,16 @@ go_deps.module(
     version = "v0.23.0",
 )
 go_deps.module(
+    path = "github.com/go-shiori/dom",
+    sum = "h1:wpkoddUomPfHiOziHZixGO5ZBS73cKqVzZipfrLmO1w=",
+    version = "v0.0.0-20230515143342-73569d674e1c",
+)
+go_deps.module(
+    path = "github.com/go-shiori/go-readability",
+    sum = "h1:A3B75Yp163FAIf9nLlFMl4pwIj+T3uKxfI7mbvvY2Ls=",
+    version = "v0.0.0-20251205110129-5db1dc9836f0",
+)
+go_deps.module(
     path = "github.com/go-viper/mapstructure/v2",
     sum = "h1:EBsztssimR/CONLSZZ04E8qAkxNYq4Qp9LvH92wZUgs=",
     version = "v2.4.0",
@@ -861,6 +876,11 @@ go_deps.module(
     path = "github.com/gogo/protobuf",
     sum = "h1:Ov1cvc58UF3b5XjBnZv7+opcTcQFZebYjWzi34vdm4Q=",
     version = "v1.3.2",
+)
+go_deps.module(
+    path = "github.com/gogs/chardet",
+    sum = "h1:3BSP1Tbs2djlpprl7wCLuiqMaUh5SJkkzI2gDs+FgLs=",
+    version = "v0.0.0-20211120154057-b7413eaefb8f",
 )
 go_deps.module(
     path = "github.com/golang-jwt/jwt/v5",
@@ -1715,6 +1735,7 @@ use_repo(
     "com_github_apache_iceberg_go",
     "com_github_apache_thrift",
     "com_github_apparentlymart_go_textseg_v15",
+    "com_github_araddon_dateparse",
     "com_github_aws_aws_sdk_go_v2",
     "com_github_aws_aws_sdk_go_v2_aws_protocol_eventstream",
     "com_github_aws_aws_sdk_go_v2_config",
@@ -1800,11 +1821,14 @@ use_repo(
     "com_github_go_openapi_jsonpointer",
     "com_github_go_openapi_jsonreference",
     "com_github_go_openapi_swag",
+    "com_github_go_shiori_dom",
+    "com_github_go_shiori_go_readability",
     "com_github_go_viper_mapstructure_v2",
     "com_github_goccy_go_json",
     "com_github_goccy_go_yaml",
     "com_github_gofrs_flock",
     "com_github_gogo_protobuf",
+    "com_github_gogs_chardet",
     "com_github_golang_jwt_jwt_v5",
     "com_github_golang_protobuf",
     "com_github_golang_snappy",

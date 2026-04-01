@@ -13,6 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/solanyn/mono/lake/internal/config"
 	icebergw "github.com/solanyn/mono/lake/internal/iceberg"
+	"github.com/solanyn/mono/lake/internal/ingest"
 	"github.com/solanyn/mono/lake/internal/kafka"
 	"github.com/solanyn/mono/lake/internal/scheduler"
 	"github.com/solanyn/mono/lake/internal/storage"
@@ -47,6 +48,10 @@ func main() {
 	sched := scheduler.New(cfg, s3, iceWriter, producer)
 	sched.Start()
 	defer sched.Stop()
+
+	rssCollector := ingest.NewRSSCollector(s3, producer, cfg.BronzeBucket)
+	rssCollector.Start()
+	defer rssCollector.Stop()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {

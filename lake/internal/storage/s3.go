@@ -41,6 +41,19 @@ func (c *Client) PutParquet(ctx context.Context, bucket, dataset, filename strin
 	return key, nil
 }
 
+func (c *Client) PutRaw(ctx context.Context, bucket, key, contentType string, data []byte) error {
+	_, err := c.s3.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(bucket),
+		Key:         aws.String(key),
+		Body:        bytes.NewReader(data),
+		ContentType: aws.String(contentType),
+	})
+	if err != nil {
+		return fmt.Errorf("s3 put %s/%s: %w", bucket, key, err)
+	}
+	return nil
+}
+
 func (c *Client) GetObject(ctx context.Context, bucket, key string) ([]byte, error) {
 	resp, err := c.s3.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(bucket),
