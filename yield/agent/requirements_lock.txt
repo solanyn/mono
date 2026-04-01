@@ -75,7 +75,7 @@ fastapi==0.115.14
     #   copilotkit
 fastavro==1.12.1
     # via cohere
-filelock==3.25.1
+filelock==3.25.2
     # via huggingface-hub
 fsspec==2026.2.0
     # via huggingface-hub
