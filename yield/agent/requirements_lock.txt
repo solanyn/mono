@@ -83,7 +83,7 @@ google-auth==2.49.0
     # via pydantic-ai-slim
 griffe==2.0.0
     # via pydantic-ai-slim
-griffecli==2.0.0
+griffecli==2.0.2
     # via griffe
 griffelib==2.0.0
     # via
