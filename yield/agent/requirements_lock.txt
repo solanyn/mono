@@ -188,7 +188,7 @@ opentelemetry-api==1.40.0
     # via
     #   fasta2a
     #   pydantic-ai-slim
-orjson==3.11.7
+orjson==3.11.8
     # via
     #   langgraph-sdk
     #   langsmith
