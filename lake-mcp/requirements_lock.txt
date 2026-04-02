@@ -47,7 +47,7 @@ authlib==1.6.9
     # via fastmcp
 beartype==0.22.9
     # via py-key-value-aio
-boto3==1.42.81
+boto3==1.42.82
     # via
     #   datalake (libs/datalake/pyproject.toml)
     #   datalake
