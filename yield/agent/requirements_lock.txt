@@ -66,7 +66,7 @@ eval-type-backport==0.3.1
     # via
     #   mistralai
     #   pydantic-ai-slim
-fasta2a==0.2.4
+fasta2a==0.6.0
     # via pydantic-ai-slim
 fastapi==0.115.14
     # via
