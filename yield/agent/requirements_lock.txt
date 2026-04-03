@@ -85,7 +85,7 @@ griffe==2.0.2
     # via pydantic-ai-slim
 griffecli==2.0.2
     # via griffe
-griffelib==2.0.0
+griffelib==2.0.2
     # via
     #   griffe
     #   griffecli
