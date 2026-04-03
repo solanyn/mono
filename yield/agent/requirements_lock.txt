@@ -77,7 +77,7 @@ fastavro==1.12.1
     # via cohere
 filelock==3.25.2
     # via huggingface-hub
-fsspec==2026.2.0
+fsspec==2026.3.0
     # via huggingface-hub
 google-auth==2.49.1
     # via pydantic-ai-slim
