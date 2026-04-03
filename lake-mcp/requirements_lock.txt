@@ -114,7 +114,7 @@ exceptiongroup==1.3.1
     # via fastmcp
 fastavro==1.12.1
     # via cohere
-fastmcp==3.1.1
+fastmcp==3.2.0
     # via lake-mcp (lake-mcp/pyproject.toml)
 feedparser==6.0.12
     # via lake-mcp (lake-mcp/pyproject.toml)
