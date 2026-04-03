@@ -1,0 +1,30 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "lib",
+    srcs = glob(["*.go"]),
+    importpath = "github.com/solanyn/mono/kobo/dash-server",
+    deps = [
+        "@com_github_fogleman_gg//:gg",
+        "@org_golang_x_image//font:font",
+        "@org_golang_x_image//font/gofont/gobold:gobold",
+        "@org_golang_x_image//font/gofont/goregular:goregular",
+        "@org_golang_x_image//font/opentype:opentype",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+go_binary(
+    name = "dash-server",
+    embed = [":lib"],
+    visibility = ["//visibility:public"],
+)
+
+go_binary(
+    name = "dash-server_linux_amd64",
+    embed = [":lib"],
+    goos = "linux",
+    goarch = "amd64",
+    pure = "on",
+    visibility = ["//visibility:public"],
+)
