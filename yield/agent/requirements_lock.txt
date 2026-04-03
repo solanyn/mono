@@ -68,7 +68,7 @@ eval-type-backport==0.3.1
     #   pydantic-ai-slim
 fasta2a==0.6.0
     # via pydantic-ai-slim
-fastapi==0.115.14
+fastapi==0.135.3
     # via
     #   -r requirements.txt
     #   ag-ui-langgraph
