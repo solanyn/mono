@@ -89,7 +89,7 @@ griffelib==2.0.0
     # via
     #   griffe
     #   griffecli
-groq==1.1.0
+groq==1.1.2
     # via pydantic-ai-slim
 h11==0.16.0
     # via
