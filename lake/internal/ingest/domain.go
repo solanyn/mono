@@ -20,6 +20,30 @@ import (
 const domainAuthURL = "https://auth.domain.com.au/v1/connect/token"
 const domainAPIBase = "https://api.domain.com.au/v1"
 
+var defaultSuburbs = []string{
+	"Macquarie Park", "Ryde", "Chatswood", "Rhodes",
+	"Wentworth Point", "Kogarah", "Sydney Olympic Park",
+	"Marrickville", "Hurstville",
+}
+
+func getSuburbs() []string {
+	env := os.Getenv("DOMAIN_SUBURBS")
+	if env == "" {
+		return defaultSuburbs
+	}
+	var suburbs []string
+	for _, s := range strings.Split(env, ",") {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			suburbs = append(suburbs, s)
+		}
+	}
+	if len(suburbs) == 0 {
+		return defaultSuburbs
+	}
+	return suburbs
+}
+
 func IngestDomain(ctx context.Context, s3 *storage.Client, bucket string) (Result, error) {
 	start := time.Now()
 	source := "domain"
@@ -47,17 +71,18 @@ func IngestDomain(ctx context.Context, s3 *storage.Client, bucket string) (Resul
 		log.Printf("domain: fetched %d auction results", len(auctions))
 	}
 
-	time.Sleep(500 * time.Millisecond)
-
-	suburbs := []string{"Sydney", "Parramatta", "Chatswood", "Bondi"}
-	for _, suburb := range suburbs {
-		time.Sleep(500 * time.Millisecond)
-		listings, err := fetchListings(ctx, token, suburb)
-		if err != nil {
-			log.Printf("domain: listings %s: %v", suburb, err)
-			continue
+	suburbs := getSuburbs()
+	for _, listingType := range []string{"Sale", "Rent"} {
+		for _, suburb := range suburbs {
+			time.Sleep(500 * time.Millisecond)
+			listings, err := fetchListings(ctx, token, suburb, listingType)
+			if err != nil {
+				log.Printf("domain: %s %s: %v", strings.ToLower(listingType), suburb, err)
+				continue
+			}
+			rows = append(rows, listings...)
+			log.Printf("domain: %s %s: %d listings", strings.ToLower(listingType), suburb, len(listings))
 		}
-		rows = append(rows, listings...)
 	}
 
 	if len(rows) == 0 {
@@ -81,7 +106,7 @@ func IngestDomain(ctx context.Context, s3 *storage.Client, bucket string) (Resul
 	metrics.IngestTotal.WithLabelValues(source).Inc()
 	metrics.IngestDuration.WithLabelValues(source).Observe(time.Since(start).Seconds())
 	metrics.LastIngestTimestamp.WithLabelValues(source).SetToCurrentTime()
-	log.Printf("domain: wrote %d rows to %s", len(rows), key)
+	log.Printf("domain: wrote %d rows to %s (suburbs=%d, types=sale+rent)", len(rows), key, len(suburbs))
 	return Result{Source: source, Key: key, RowCount: len(rows)}, nil
 }
 
@@ -192,6 +217,7 @@ func extractListings(data map[string]interface{}) []map[string]interface{} {
 			"auction_date":   auctionDate,
 			"sold_price":     m["reportedPrice"],
 			"days_on_market": m["daysOnMarket"],
+			"listing_type":   "sale",
 		}
 		if geo != nil {
 			listing["latitude"] = geo["latitude"]
@@ -202,8 +228,8 @@ func extractListings(data map[string]interface{}) []map[string]interface{} {
 	return listings
 }
 
-func fetchListings(ctx context.Context, token, suburb string) ([]map[string]interface{}, error) {
-	body := fmt.Sprintf(`{"listingType":"Sale","locations":[{"suburb":"%s","state":"NSW"}],"pageSize":50}`, suburb)
+func fetchListings(ctx context.Context, token, suburb, listingType string) ([]map[string]interface{}, error) {
+	body := fmt.Sprintf(`{"listingType":"%s","locations":[{"suburb":"%s","state":"NSW"}],"pageSize":50}`, listingType, suburb)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, domainAPIBase+"/listings/residential/_search", strings.NewReader(body))
 	if err != nil {
@@ -232,6 +258,7 @@ func fetchListings(ctx context.Context, token, suburb string) ([]map[string]inte
 		return nil, fmt.Errorf("unmarshal: %w", err)
 	}
 
+	lt := strings.ToLower(listingType)
 	var rows []map[string]interface{}
 	for _, item := range items {
 		listing, _ := item["listing"].(map[string]interface{})
@@ -252,8 +279,10 @@ func fetchListings(ctx context.Context, token, suburb string) ([]map[string]inte
 			"property_type": prop["propertyType"],
 			"bedrooms":      prop["bedrooms"],
 			"bathrooms":     prop["bathrooms"],
+			"carspaces":     prop["carspaces"],
 			"latitude":      prop["latitude"],
 			"longitude":     prop["longitude"],
+			"listing_type":  lt,
 			"source":        "listings_search",
 		}
 		if priceDetails != nil {
