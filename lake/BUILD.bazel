@@ -50,6 +50,7 @@ go_library(
         "@com_github_apache_iceberg_go//:iceberg-go",
         "@com_github_apache_iceberg_go//catalog",
         "@com_github_apache_iceberg_go//catalog/rest",
+        "@com_github_apache_iceberg_go//io/gocloud",
         "@com_github_apache_iceberg_go//table",
     ],
 )

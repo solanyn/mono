@@ -13,6 +13,7 @@ import (
 	iceberggo "github.com/apache/iceberg-go"
 	"github.com/apache/iceberg-go/catalog"
 	_ "github.com/apache/iceberg-go/catalog/rest"
+	_ "github.com/apache/iceberg-go/io/gocloud"
 	"github.com/apache/iceberg-go/table"
 )
 
