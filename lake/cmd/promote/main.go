@@ -12,6 +12,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/solanyn/mono/lake/internal/config"
+	icebergw "github.com/solanyn/mono/lake/internal/iceberg"
 	"github.com/solanyn/mono/lake/internal/kafka"
 	"github.com/solanyn/mono/lake/internal/promote"
 	"github.com/solanyn/mono/lake/internal/storage"
@@ -20,6 +21,18 @@ import (
 func main() {
 	cfg := config.Load()
 	s3 := storage.NewClient(cfg.S3Endpoint, cfg.S3AccessKey, cfg.S3SecretKey, cfg.S3Region)
+
+	var iceWriter *icebergw.Writer
+	if cfg.IcebergCatalogURI != "" {
+		iceWriter = icebergw.NewWriter(icebergw.Config{
+			CatalogURI:  cfg.IcebergCatalogURI,
+			S3Endpoint:  cfg.S3Endpoint,
+			S3AccessKey: cfg.S3AccessKey,
+			S3SecretKey: cfg.S3SecretKey,
+			S3Region:    cfg.S3Region,
+		})
+		log.Printf("iceberg writer enabled: %s", cfg.IcebergCatalogURI)
+	}
 
 	brokers := strings.Split(cfg.KafkaBrokers, ",")
 
@@ -56,7 +69,7 @@ func main() {
 		log.Println("lake-promote: consuming", cfg.KafkaTopicBronze)
 		if err := consumer.ConsumeBronzeWritten(ctx, func(ctx context.Context, event kafka.BronzeWritten) error {
 			log.Printf("promote: received bronze event source=%s key=%s", event.Source, event.Key)
-			result, err := promote.PromoteSource(ctx, s3, cfg.BronzeBucket, cfg.SilverBucket, event.Source, event.Key)
+			result, err := promote.PromoteSource(ctx, s3, iceWriter, cfg.BronzeBucket, cfg.SilverBucket, event.Source, event.Key)
 			if err != nil {
 				return err
 			}
