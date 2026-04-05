@@ -7,6 +7,7 @@ import (
 	"log"
 	"time"
 
+	icebergw "github.com/solanyn/mono/lake/internal/iceberg"
 	"github.com/solanyn/mono/lake/internal/metrics"
 	"github.com/solanyn/mono/lake/internal/storage"
 )
@@ -27,7 +28,7 @@ var sourceConfig = map[string]string{
 	"nsw_vg": "bulk_sales.parquet",
 }
 
-func PromoteSource(ctx context.Context, s3 *storage.Client, bronzeBucket, silverBucket, source, bronzeKey string) (Result, error) {
+func PromoteSource(ctx context.Context, s3 *storage.Client, iceWriter *icebergw.Writer, bronzeBucket, silverBucket, source, bronzeKey string) (Result, error) {
 	start := time.Now()
 
 	data, err := s3.GetObject(ctx, bronzeBucket, bronzeKey)
@@ -54,12 +55,26 @@ func PromoteSource(ctx context.Context, s3 *storage.Client, bronzeBucket, silver
 		return Result{}, fmt.Errorf("write silver %s: %w", source, err)
 	}
 
+	if iceWriter != nil {
+		var maps []map[string]interface{}
+		for _, row := range rows {
+			var m map[string]interface{}
+			if err := json.Unmarshal([]byte(row.RawPayload), &m); err != nil {
+				continue
+			}
+			maps = append(maps, m)
+		}
+		if err := iceWriter.AppendSilver(ctx, dataset, maps, source, "promote"); err != nil {
+			log.Printf("iceberg commit %s: %v (data written to S3, catalog not updated)", dataset, err)
+		}
+	}
+
 	metrics.PromoteTotal.WithLabelValues("silver").Inc()
 	log.Printf("promote %s: %d rows → %s (%.1fs)", source, len(rows), key, time.Since(start).Seconds())
 	return Result{Source: source, Key: key, RowCount: len(rows)}, nil
 }
 
-func PromoteBronzeToSilver(ctx context.Context, s3 *storage.Client, bronzeBucket, silverBucket string) error {
+func PromoteBronzeToSilver(ctx context.Context, s3 *storage.Client, iceWriter *icebergw.Writer, bronzeBucket, silverBucket string) error {
 	for dataset, filename := range sourceConfig {
 		data, err := s3.GetLatest(ctx, bronzeBucket, dataset, filename)
 		if err != nil {
@@ -84,6 +99,20 @@ func PromoteBronzeToSilver(ctx context.Context, s3 *storage.Client, bronzeBucket
 		if err != nil {
 			log.Printf("promote %s: write silver: %v", dataset, err)
 			continue
+		}
+
+		if iceWriter != nil {
+			var maps []map[string]interface{}
+			for _, row := range rows {
+				var m map[string]interface{}
+				if err := json.Unmarshal([]byte(row.RawPayload), &m); err != nil {
+					continue
+				}
+				maps = append(maps, m)
+			}
+			if err := iceWriter.AppendSilver(ctx, sd, maps, dataset, "promote"); err != nil {
+				log.Printf("iceberg commit %s: %v (data written to S3, catalog not updated)", sd, err)
+			}
 		}
 
 		metrics.PromoteTotal.WithLabelValues("silver").Inc()
