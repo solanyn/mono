@@ -74,6 +74,7 @@ go_library(
     srcs = glob(["internal/promote/*.go"]),
     importpath = "github.com/solanyn/mono/lake/internal/promote",
     deps = [
+        ":iceberg_lib",
         ":metrics_lib",
         ":storage_lib",
     ],
@@ -132,6 +133,7 @@ go_binary(
         ":kafka_lib",
         ":promote_lib",
         ":storage_lib",
+        ":iceberg_lib",
         "@com_github_prometheus_client_golang//prometheus/promhttp",
     ],
     visibility = ["//visibility:public"],
