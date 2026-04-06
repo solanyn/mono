@@ -170,7 +170,7 @@ jobs:
           repository-cache: true
       - name: Build kobo binaries
         run: |
-          bazel build //kobo/kobo-dash:kobo-dash_linux_arm //kobo/dash-server:dash-server_linux_amd64
+          bazel build //kobo/kobo-dash:kobo-dash_linux_arm
       - name: Generate version
         id: version
         run: |
@@ -184,4 +184,3 @@ jobs:
           generate_release_notes: true
           files: |
             bazel-bin/kobo/kobo-dash/kobo-dash_linux_arm
-            bazel-bin/kobo/dash-server/dash-server_linux_amd64
