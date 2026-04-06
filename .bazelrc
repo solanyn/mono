@@ -14,12 +14,8 @@ build:ci --workspace_status_command=tools/workspace_status.sh
 
 test:ci --stamp
 
-# BuildBuddy remote cache
-build:remote --bes_results_url=https://goyangi.buildbuddy.io/invocation/
-build:remote --bes_backend=grpcs://goyangi.buildbuddy.io
-build:remote --remote_cache=grpcs://goyangi.buildbuddy.io
-build:remote --experimental_remote_cache_compression
-build:remote --noremote_upload_local_results
+# Buildbarn remote cache (in-cluster)
+build:remote --remote_cache=grpc://buildbarn-frontend.buildbarn.svc.cluster.local:8980
 build:remote --remote_timeout=10m
 
 try-import %workspace%/user.bazelrc
