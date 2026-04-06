@@ -203,7 +203,7 @@ partialjson==0.0.8
     # via copilotkit
 prompt-toolkit==3.0.52
     # via pydantic-ai-slim
-pyasn1==0.6.2
+pyasn1==0.6.3
     # via
     #   pyasn1-modules
     #   rsa
