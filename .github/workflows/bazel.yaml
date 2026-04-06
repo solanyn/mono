@@ -21,9 +21,9 @@ jobs:
         with:
           bazelisk-cache: true
       - name: Build all targets
-        run: bazel build //... --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }}
+        run: bazel build //... --config=ci
       - name: Test all targets
-        run: bazel test //... --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }}
+        run: bazel test //... --config=ci
 
   push-images:
     runs-on: ubuntu-latest
@@ -54,7 +54,7 @@ jobs:
           fi
           for target in $OCI_TARGETS; do
             echo "Pushing $target"
-            bazel run $target --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }}
+            bazel run $target --config=ci
             bazel run $target --config=ci -- --tag "$MONOREPO_VERSION"
             bazel run $target --config=ci -- --tag latest
           done
@@ -90,7 +90,7 @@ jobs:
         with:
           bazelisk-cache: true
       - name: Build website
-        run: bazel build //website:build --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }}
+        run: bazel build //website:build --config=ci
       - name: Deploy to Cloudflare Pages
         run: npx wrangler@latest pages deploy bazel-bin/website/dist --project-name=goyangi --branch=main --commit-dirty=true
         env:
@@ -111,7 +111,7 @@ jobs:
         with:
           bazelisk-cache: true
       - name: Build website
-        run: bazel build //website:build --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }}
+        run: bazel build //website:build --config=ci
       - name: Deploy preview to Cloudflare Pages
         id: deploy
         run: |
