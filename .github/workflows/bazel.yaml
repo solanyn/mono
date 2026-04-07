@@ -96,7 +96,7 @@ jobs:
       - name: Build website
         run: bazel build //website:build --config=ci --config=remote
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "22"
       - name: Deploy to Cloudflare Pages
@@ -121,7 +121,7 @@ jobs:
       - name: Build website
         run: bazel build //website:build --config=ci --config=remote
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "22"
       - name: Deploy preview to Cloudflare Pages
