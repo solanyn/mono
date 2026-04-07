@@ -2133,7 +2133,7 @@ oci.pull(
 )
 oci.pull(
     name = "python_slim",
-    digest = "sha256:0e363ca31b820b23242a62c1e702ada9b57bfae2b9905f81b5ed383c54b729f3",
+    digest = "sha256:f1927c75e81efd1e091dbd64b6c0ecaa5630b38635a3d1c04034ac636e1f94c8",
     image = "docker.io/library/python",
     platforms = ["linux/amd64"],
     tag = "3.13-slim",
