@@ -64,7 +64,7 @@ jobs:
           done
 
   deploy-resume:
-    runs-on: mono-runner
+    runs-on: ubuntu-latest
     needs: test
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:
@@ -94,7 +94,11 @@ jobs:
           mkdir -p $HOME/bin && curl -fsSL https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 -o $HOME/bin/bazel
           chmod +x $HOME/bin/bazel && echo "$HOME/bin" >> $GITHUB_PATH
       - name: Build website
-        run: bazel build //website:build --config=ci
+        run: bazel build //website:build --config=ci --config=remote
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Deploy to Cloudflare Pages
         run: npx wrangler@latest pages deploy bazel-bin/website/dist --project-name=goyangi --branch=main --commit-dirty=true
         env:
@@ -115,7 +119,11 @@ jobs:
           mkdir -p $HOME/bin && curl -fsSL https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 -o $HOME/bin/bazel
           chmod +x $HOME/bin/bazel && echo "$HOME/bin" >> $GITHUB_PATH
       - name: Build website
-        run: bazel build //website:build --config=ci
+        run: bazel build //website:build --config=ci --config=remote
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Deploy preview to Cloudflare Pages
         id: deploy
         run: |
