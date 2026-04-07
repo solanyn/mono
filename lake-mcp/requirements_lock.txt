@@ -2,7 +2,7 @@
 #    uv pip compile lake-mcp/pyproject.toml libs/datalake/pyproject.toml --extra dev --python-version 3.12 -o lake-mcp/requirements_lock.txt
 ag-ui-protocol==0.1.15
     # via pydantic-ai-slim
-aiobotocore==3.3.0
+aiobotocore==3.4.0
     # via s3fs
 aiofile==3.9.0
     # via py-key-value-aio
