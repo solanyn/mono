@@ -17,5 +17,6 @@ test:ci --stamp
 # Buildbarn remote cache (in-cluster)
 build:remote --remote_cache=grpc://buildbarn-frontend.buildbarn.svc.cluster.local:8980
 build:remote --remote_timeout=10m
+build:remote --remote_local_fallback
 
 try-import %workspace%/user.bazelrc
