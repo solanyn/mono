@@ -12,21 +12,25 @@ permissions:
   packages: write
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: mono-runner
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq build-essential
       - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@0.19.0
-        with:
-          bazelisk-cache: true
+        run: |
+          mkdir -p $HOME/bin && curl -fsSL https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 -o $HOME/bin/bazel
+          chmod +x $HOME/bin/bazel && echo "$HOME/bin" >> $GITHUB_PATH
       - name: Build all targets
-        run: bazel build //... --config=ci
+        run: bazel build //... --config=ci --config=remote
       - name: Test all targets
-        run: bazel test //... --config=ci
+        run: bazel test //... --config=ci --config=remote
 
   push-images:
-    runs-on: ubuntu-latest
+    runs-on: mono-runner
     needs: test
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:
@@ -41,9 +45,9 @@ jobs:
           username: "${{ github.actor }}"
           password: "${{ github.token }}"
       - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@0.19.0
-        with:
-          bazelisk-cache: true
+        run: |
+          mkdir -p $HOME/bin && curl -fsSL https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 -o $HOME/bin/bazel
+          chmod +x $HOME/bin/bazel && echo "$HOME/bin" >> $GITHUB_PATH
       - name: Push OCI images
         run: |
           MONOREPO_VERSION=$(./tools/get-version.sh .)
@@ -79,18 +83,22 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
 
   deploy-website:
-    runs-on: ubuntu-latest
+    runs-on: mono-runner
     needs: test
     if: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@0.19.0
-        with:
-          bazelisk-cache: true
+        run: |
+          mkdir -p $HOME/bin && curl -fsSL https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 -o $HOME/bin/bazel
+          chmod +x $HOME/bin/bazel && echo "$HOME/bin" >> $GITHUB_PATH
       - name: Build website
-        run: bazel build //website:build --config=ci
+        run: bazel build //website:build --config=ci --config=remote
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Deploy to Cloudflare Pages
         run: npx wrangler@latest pages deploy bazel-bin/website/dist --project-name=goyangi --branch=main --commit-dirty=true
         env:
@@ -98,7 +106,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
   deploy-preview:
-    runs-on: ubuntu-latest
+    runs-on: mono-runner
     needs: test
     if: ${{ github.event_name == 'pull_request' }}
     permissions:
@@ -107,11 +115,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@0.19.0
-        with:
-          bazelisk-cache: true
+        run: |
+          mkdir -p $HOME/bin && curl -fsSL https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 -o $HOME/bin/bazel
+          chmod +x $HOME/bin/bazel && echo "$HOME/bin" >> $GITHUB_PATH
       - name: Build website
-        run: bazel build //website:build --config=ci
+        run: bazel build //website:build --config=ci --config=remote
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Deploy preview to Cloudflare Pages
         id: deploy
         run: |
@@ -152,7 +164,7 @@ jobs:
             }
 
   release:
-    runs-on: ubuntu-latest
+    runs-on: mono-runner
     needs: test
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     permissions:
@@ -163,14 +175,12 @@ jobs:
         with:
           fetch-depth: 0
       - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@0.19.0
-        with:
-          bazelisk-cache: true
-          disk-cache: ${{ github.workflow }}
-          repository-cache: true
+        run: |
+          mkdir -p $HOME/bin && curl -fsSL https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 -o $HOME/bin/bazel
+          chmod +x $HOME/bin/bazel && echo "$HOME/bin" >> $GITHUB_PATH
       - name: Build kobo binaries
         run: |
-          bazel build //kobo/kobo-dash:kobo-dash_linux_arm
+          bazel build //kobo/kobo-dash:kobo-dash_linux_arm --config=ci
       - name: Generate version
         id: version
         run: |
