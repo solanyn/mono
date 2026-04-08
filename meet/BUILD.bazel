@@ -1,0 +1,45 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "config_lib",
+    srcs = glob(["config/*.go"]),
+    importpath = "github.com/solanyn/mono/meet/config",
+    deps = [
+        "@com_github_pelletier_go_toml//:go-toml",
+    ],
+)
+
+go_library(
+    name = "audio_lib",
+    srcs = glob(["audio/*.go", "audio/*.m", "audio/*.h"]),
+    cgo = True,
+    clinkopts = [
+        "-framework ScreenCaptureKit",
+        "-framework CoreMedia",
+        "-framework CoreAudio",
+        "-framework AudioToolbox",
+        "-framework Foundation",
+        "-framework AVFoundation",
+    ],
+    copts = ["-x objective-c"],
+    importpath = "github.com/solanyn/mono/meet/audio",
+    target_compatible_with = ["@platforms//os:macos"],
+)
+
+go_library(
+    name = "lib",
+    srcs = ["main.go"],
+    importpath = "github.com/solanyn/mono/meet",
+    deps = [
+        ":audio_lib",
+        ":config_lib",
+        "@com_github_spf13_cobra//:cobra",
+    ],
+)
+
+go_binary(
+    name = "meet",
+    embed = [":lib"],
+    target_compatible_with = ["@platforms//os:macos"],
+    visibility = ["//visibility:public"],
+)
