@@ -53,7 +53,7 @@ func Load() *Config {
 	cfg := defaults()
 
 	home, _ := os.UserHomeDir()
-	cfgPath := filepath.Join(home, ".config", "meet", "config.toml")
+	cfgPath := filepath.Join(home, ".config", "scrib", "config.toml")
 
 	if data, err := os.ReadFile(cfgPath); err == nil {
 		toml.Unmarshal(data, cfg)

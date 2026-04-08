@@ -3,7 +3,7 @@ load("@rules_go//go:def.bzl", "go_binary", "go_library")
 go_library(
     name = "config_lib",
     srcs = glob(["config/*.go"]),
-    importpath = "github.com/solanyn/mono/meet/config",
+    importpath = "github.com/solanyn/mono/scrib/config",
     deps = [
         "@com_github_pelletier_go_toml//:go-toml",
     ],
@@ -22,20 +22,20 @@ go_library(
         "-framework AVFoundation",
     ],
     copts = ["-x objective-c"],
-    importpath = "github.com/solanyn/mono/meet/audio",
+    importpath = "github.com/solanyn/mono/scrib/audio",
     target_compatible_with = ["@platforms//os:macos"],
 )
 
 go_library(
     name = "client_lib",
     srcs = glob(["client/*.go"]),
-    importpath = "github.com/solanyn/mono/meet/client",
+    importpath = "github.com/solanyn/mono/scrib/client",
 )
 
 go_library(
     name = "lib",
     srcs = ["main.go"],
-    importpath = "github.com/solanyn/mono/meet",
+    importpath = "github.com/solanyn/mono/scrib",
     deps = [
         ":audio_lib",
         ":client_lib",
@@ -45,7 +45,7 @@ go_library(
 )
 
 go_binary(
-    name = "meet",
+    name = "scrib",
     embed = [":lib"],
     target_compatible_with = ["@platforms//os:macos"],
     visibility = ["//visibility:public"],

@@ -1,4 +1,4 @@
-module github.com/solanyn/mono/meet
+module github.com/solanyn/mono/scrib
 
 go 1.22
 

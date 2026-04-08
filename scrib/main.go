@@ -9,9 +9,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/solanyn/mono/meet/audio"
-	"github.com/solanyn/mono/meet/client"
-	"github.com/solanyn/mono/meet/config"
+	"github.com/solanyn/mono/scrib/audio"
+	"github.com/solanyn/mono/scrib/client"
+	"github.com/solanyn/mono/scrib/config"
 	"github.com/spf13/cobra"
 )
 
@@ -19,7 +19,7 @@ func main() {
 	cfg := config.Load()
 
 	rootCmd := &cobra.Command{
-		Use:   "meet",
+		Use:   "scrib",
 		Short: "Meeting audio capture & annotation",
 	}
 

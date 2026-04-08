@@ -1,24 +1,24 @@
-# meet — Meeting Audio Capture & Annotation
+# scrib — Scribing Audio Capture & Annotation
 
-CLI tool for recording meeting audio and generating diarised, summarised notes.
+CLI tool for recording scribing audio and generating diarised, summarised notes.
 
 ## Usage
 
 ```bash
 # Record system audio + mic (stereo WAV)
-meet record standup
+scrib record standup
 # → Recording... press Ctrl+C to stop
-# → Saved to ~/meetings/2026-04-09-standup.wav
+# → Saved to ~/scribings/2026-04-09-standup.wav
 
 # Record and auto-annotate on stop
-meet record standup --annotate
+scrib record standup --annotate
 
 # Annotate an existing recording
-meet annotate ~/meetings/2026-04-09-standup.wav
+scrib annotate ~/scribings/2026-04-09-standup.wav
 # → VAD + STT (concurrent) → merge → summarise → markdown
 
 # List recordings
-meet list
+scrib list
 ```
 
 ## Pipeline
@@ -29,7 +29,7 @@ audio.wav
   ├─ POST :8000/v1/audio/transcriptions   → transcript + timestamps (Parakeet)
   └─ merge in Go (align words to speakers by time overlap)
        └─ POST :8001/v1/chat/completions  → summary (Opus/Haiku/Gemma 4)
-            └─ output: ~/meetings/name.md
+            └─ output: ~/scribings/name.md
 ```
 
 VAD and STT run concurrently.
@@ -42,12 +42,12 @@ VAD and STT run concurrently.
 
 ## Config
 
-`~/.config/meet/config.toml`:
+`~/.config/scrib/config.toml`:
 ```toml
 gateway_url = "https://gateway.goyangi.io"
 audio_url = "http://localhost:8000"
-output_dir = "~/meetings"
-obsidian_vault = "~/vault/Meetings"
+output_dir = "~/scribings"
+obsidian_vault = "~/vault/Scribings"
 
 [summarise]
 model = "auto"
@@ -64,8 +64,8 @@ template = "standup"
 
 ```bash
 # With Bazel
-bazel build //meet
+bazel build //scrib
 
 # With Go
-cd meet && go build -o meet .
+cd scrib && go build -o scrib .
 ```
