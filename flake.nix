@@ -40,7 +40,7 @@
             pname = "scrib";
             version = "0.1.0";
             src = ./scrib;
-            vendorHash = null; # set to lib.fakeHash to get real hash on first build
+            vendorHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
             buildInputs = with pkgs.darwin.apple_sdk_12_3.frameworks; [
               ScreenCaptureKit
               CoreMedia
@@ -49,7 +49,7 @@
               Foundation
               AVFoundation
             ];
-            CGO_ENABLED = "1";
+            env.CGO_ENABLED = "1";
             meta = {
               description = "Meeting audio capture & annotation";
               platforms = pkgs.lib.platforms.darwin;
