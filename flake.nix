@@ -35,7 +35,27 @@
         packages = {
           postgresql = pg;
           redis = pkgs.redis;
-        };
+        } // (if pkgs.stdenv.isDarwin then {
+          scrib = pkgs.buildGoModule {
+            pname = "scrib";
+            version = "0.1.0";
+            src = ./scrib;
+            vendorHash = null; # update after first build
+            buildInputs = with pkgs.darwin.apple_sdk_12_3.frameworks; [
+              ScreenCaptureKit
+              CoreMedia
+              CoreAudio
+              AudioToolbox
+              Foundation
+              AVFoundation
+            ];
+            CGO_ENABLED = "1";
+            meta = {
+              description = "Meeting audio capture & annotation";
+              platforms = pkgs.lib.platforms.darwin;
+            };
+          };
+        } else {});
       }
     );
 }
