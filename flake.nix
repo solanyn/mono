@@ -41,13 +41,9 @@
             version = "0.1.0";
             src = ./scrib;
             vendorHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-            buildInputs = with pkgs.darwin.apple_sdk.frameworks; [
-              ScreenCaptureKit
-              CoreMedia
-              CoreAudio
-              AudioToolbox
-              Foundation
-              AVFoundation
+            buildInputs = pkgs.lib.optionals pkgs.stdenv.isDarwin [
+              pkgs.apple-sdk_15
+              (pkgs.darwinMinVersionHook "13.0")
             ];
             env.CGO_ENABLED = "1";
             meta = {
