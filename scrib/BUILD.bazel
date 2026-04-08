@@ -33,6 +33,15 @@ go_library(
 )
 
 go_library(
+    name = "store_lib",
+    srcs = glob(["store/*.go"]),
+    importpath = "github.com/solanyn/mono/scrib/store",
+    deps = [
+        "@org_modernc_sqlite//:sqlite",
+    ],
+)
+
+go_library(
     name = "lib",
     srcs = ["main.go"],
     importpath = "github.com/solanyn/mono/scrib",
@@ -40,6 +49,7 @@ go_library(
         ":audio_lib",
         ":client_lib",
         ":config_lib",
+        ":store_lib",
         "@com_github_spf13_cobra//:cobra",
     ],
 )

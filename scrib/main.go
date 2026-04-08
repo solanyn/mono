@@ -12,6 +12,7 @@ import (
 	"github.com/solanyn/mono/scrib/audio"
 	"github.com/solanyn/mono/scrib/client"
 	"github.com/solanyn/mono/scrib/config"
+	"github.com/solanyn/mono/scrib/store"
 	"github.com/spf13/cobra"
 )
 
@@ -24,38 +25,87 @@ func main() {
 	}
 
 	var annotateAfter bool
+	var template string
 
 	recordCmd := &cobra.Command{
 		Use:   "record [name]",
 		Short: "Record system audio input and output",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if template != "" {
+				cfg.Summarise.Template = template
+			}
 			return runRecord(cfg, args, annotateAfter)
 		},
 	}
 	recordCmd.Flags().BoolVar(&annotateAfter, "annotate", false, "Run annotation pipeline after recording stops")
-
-	listCmd := &cobra.Command{
-		Use:   "list",
-		Short: "List recordings in output directory",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runList(cfg)
-		},
-	}
+	recordCmd.Flags().StringVarP(&template, "template", "t", "", "Summary template (standup, 1on1, planning)")
 
 	annotateCmd := &cobra.Command{
 		Use:   "annotate <file>",
 		Short: "Diarise and summarise a recording",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if template != "" {
+				cfg.Summarise.Template = template
+			}
 			return runAnnotate(cfg, args[0])
 		},
 	}
+	annotateCmd.Flags().StringVarP(&template, "template", "t", "", "Summary template (standup, 1on1, planning)")
 
-	rootCmd.AddCommand(recordCmd, listCmd, annotateCmd)
+	historyCmd := &cobra.Command{
+		Use:   "history",
+		Short: "List meetings from database",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runHistory(cfg)
+		},
+	}
+
+	searchCmd := &cobra.Command{
+		Use:   "search <query>",
+		Short: "Full-text search across all transcripts",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runSearch(cfg, args[0])
+		},
+	}
+
+	speakersCmd := &cobra.Command{
+		Use:   "speakers",
+		Short: "List known speakers",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runSpeakers(cfg)
+		},
+	}
+
+	speakersAddCmd := &cobra.Command{
+		Use:   "add <name>",
+		Short: "Add a known speaker",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runSpeakersAdd(cfg, args[0])
+		},
+	}
+	speakersCmd.AddCommand(speakersAddCmd)
+
+	showCmd := &cobra.Command{
+		Use:   "show <id>",
+		Short: "Show meeting details and transcript",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runShow(cfg, args[0])
+		},
+	}
+
+	rootCmd.AddCommand(recordCmd, annotateCmd, historyCmd, searchCmd, speakersCmd, showCmd)
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
+}
+
+func openDB() (*store.DB, error) {
+	return store.Open(store.DefaultPath())
 }
 
 func runRecord(cfg *config.Config, args []string, annotateAfter bool) error {
@@ -96,38 +146,23 @@ func runRecord(cfg *config.Config, args []string, annotateAfter bool) error {
 	dur := time.Duration(len(samples)/2/cfg.SampleRate) * time.Second
 	fmt.Printf("Saved %s (%s)\n", outPath, dur)
 
+	// Store in database
+	db, err := openDB()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: couldn't open db: %v\n", err)
+	} else {
+		defer db.Close()
+		db.InsertMeeting(&store.Meeting{
+			Name:       name,
+			RecordedAt: time.Now(),
+			DurationS:  dur.Seconds(),
+			Template:   cfg.Summarise.Template,
+			AudioPath:  outPath,
+		})
+	}
+
 	if annotateAfter {
 		return runAnnotate(cfg, outPath)
-	}
-	return nil
-}
-
-func runList(cfg *config.Config) error {
-	outDir := cfg.ExpandedOutputDir()
-	entries, err := os.ReadDir(outDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			fmt.Println("No recordings yet.")
-			return nil
-		}
-		return err
-	}
-
-	var found bool
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".wav") {
-			continue
-		}
-		info, err := e.Info()
-		if err != nil {
-			continue
-		}
-		found = true
-		sizeMB := float64(info.Size()) / 1024 / 1024
-		fmt.Printf("  %s  (%.1f MB)\n", e.Name(), sizeMB)
-	}
-	if !found {
-		fmt.Println("No recordings yet.")
 	}
 	return nil
 }
@@ -143,6 +178,41 @@ func runAnnotate(cfg *config.Config, audioPath string) error {
 		return fmt.Errorf("annotate: %w", err)
 	}
 
+	// Store in database
+	db, dbErr := openDB()
+	var meetingID int64
+	if dbErr == nil {
+		defer db.Close()
+		name := strings.TrimSuffix(filepath.Base(audioPath), filepath.Ext(audioPath))
+		meetingID, _ = db.InsertMeeting(&store.Meeting{
+			Name:        name,
+			RecordedAt:  time.Now(),
+			DurationS:   result.RawVAD.DurationSeconds,
+			Template:    cfg.Summarise.Template,
+			AudioPath:   audioPath,
+			NumSpeakers: result.RawVAD.NumSpeakers,
+		})
+
+		// Store segments
+		for _, seg := range result.Segments {
+			db.InsertSegment(&store.Segment{
+				MeetingID:    meetingID,
+				SpeakerLabel: seg.Speaker,
+				StartS:       seg.Start,
+				EndS:         seg.End,
+				Text:         seg.Text,
+			})
+		}
+
+		// Store summary
+		db.InsertSummary(&store.Summary{
+			MeetingID: meetingID,
+			Template:  cfg.Summarise.Template,
+			Content:   result.Summary,
+		})
+	}
+
+	// Write markdown output
 	outPath := strings.TrimSuffix(audioPath, filepath.Ext(audioPath)) + ".md"
 	name := strings.TrimSuffix(filepath.Base(audioPath), filepath.Ext(audioPath))
 	now := time.Now().Format("2006-01-02 15:04")
@@ -158,6 +228,9 @@ func runAnnotate(cfg *config.Config, audioPath string) error {
 
 	fmt.Printf("  → %d speakers, %s duration\n", result.RawVAD.NumSpeakers, result.Duration)
 	fmt.Printf("  → Saved to %s\n", outPath)
+	if meetingID > 0 {
+		fmt.Printf("  → Stored in db (meeting #%d)\n", meetingID)
+	}
 
 	if cfg.ObsidianVault != "" {
 		vaultDir := expandPath(cfg.ObsidianVault)
@@ -168,6 +241,147 @@ func runAnnotate(cfg *config.Config, audioPath string) error {
 		} else {
 			fmt.Printf("  → Synced to %s\n", vaultPath)
 		}
+	}
+
+	return nil
+}
+
+func runHistory(cfg *config.Config) error {
+	db, err := openDB()
+	if err != nil {
+		return fmt.Errorf("open db: %w", err)
+	}
+	defer db.Close()
+
+	meetings, err := db.ListMeetings(20)
+	if err != nil {
+		return fmt.Errorf("list meetings: %w", err)
+	}
+
+	if len(meetings) == 0 {
+		fmt.Println("No meetings yet.")
+		return nil
+	}
+
+	for _, m := range meetings {
+		dur := time.Duration(m.DurationS * float64(time.Second))
+		fmt.Printf("  #%-4d  %s  %-20s  %s  %d speakers\n",
+			m.ID,
+			m.RecordedAt.Format("2006-01-02 15:04"),
+			m.Name,
+			dur.Round(time.Second),
+			m.NumSpeakers,
+		)
+	}
+	return nil
+}
+
+func runSearch(cfg *config.Config, query string) error {
+	db, err := openDB()
+	if err != nil {
+		return fmt.Errorf("open db: %w", err)
+	}
+	defer db.Close()
+
+	results, err := db.Search(query, 20)
+	if err != nil {
+		return fmt.Errorf("search: %w", err)
+	}
+
+	if len(results) == 0 {
+		fmt.Printf("No results for %q\n", query)
+		return nil
+	}
+
+	for _, r := range results {
+		mins := int(r.StartS) / 60
+		secs := int(r.StartS) % 60
+		fmt.Printf("  [%s %s] %s (%d:%02d): %s\n",
+			r.RecordedAt.Format("2006-01-02"),
+			r.MeetingName,
+			r.SpeakerLabel,
+			mins, secs,
+			r.Text,
+		)
+	}
+	return nil
+}
+
+func runSpeakers(cfg *config.Config) error {
+	db, err := openDB()
+	if err != nil {
+		return fmt.Errorf("open db: %w", err)
+	}
+	defer db.Close()
+
+	speakers, err := db.ListSpeakers()
+	if err != nil {
+		return fmt.Errorf("list speakers: %w", err)
+	}
+
+	if len(speakers) == 0 {
+		fmt.Println("No known speakers yet. Use 'scrib speakers add <name>' to add one.")
+		return nil
+	}
+
+	for _, s := range speakers {
+		hasEmbed := "no voiceprint"
+		if len(s.Embedding) > 0 {
+			hasEmbed = "has voiceprint"
+		}
+		fmt.Printf("  #%-4d  %-20s  %s\n", s.ID, s.Name, hasEmbed)
+	}
+	return nil
+}
+
+func runSpeakersAdd(cfg *config.Config, name string) error {
+	db, err := openDB()
+	if err != nil {
+		return fmt.Errorf("open db: %w", err)
+	}
+	defer db.Close()
+
+	id, err := db.InsertSpeaker(name, nil)
+	if err != nil {
+		return fmt.Errorf("add speaker: %w", err)
+	}
+
+	fmt.Printf("Added speaker %q (#%d)\n", name, id)
+	return nil
+}
+
+func runShow(cfg *config.Config, idStr string) error {
+	db, err := openDB()
+	if err != nil {
+		return fmt.Errorf("open db: %w", err)
+	}
+	defer db.Close()
+
+	var id int64
+	fmt.Sscanf(idStr, "%d", &id)
+
+	meeting, err := db.GetMeeting(id)
+	if err != nil {
+		return fmt.Errorf("get meeting: %w", err)
+	}
+
+	dur := time.Duration(meeting.DurationS * float64(time.Second))
+	fmt.Printf("# %s — %s\n", meeting.Name, meeting.RecordedAt.Format("2006-01-02 15:04"))
+	fmt.Printf("Duration: %s | Speakers: %d | Template: %s\n", dur.Round(time.Second), meeting.NumSpeakers, meeting.Template)
+	fmt.Printf("Audio: %s\n\n", meeting.AudioPath)
+
+	// Show latest summary
+	summaries, _ := db.GetSummaries(id)
+	if len(summaries) > 0 {
+		fmt.Println(summaries[0].Content)
+		fmt.Println()
+	}
+
+	// Show transcript
+	segments, _ := db.GetSegments(id)
+	if len(segments) > 0 {
+		fmt.Println("## Transcript")
+		fmt.Print(store.FormatTranscript(segments))
 	}
 
 	return nil
