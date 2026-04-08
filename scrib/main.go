@@ -20,6 +20,8 @@ import (
 func main() {
 	cfg := config.Load()
 
+	var template string
+
 	rootCmd := &cobra.Command{
 		Use:   "scrib [name]",
 		Short: "Meeting audio capture & annotation",
@@ -35,7 +37,6 @@ func main() {
 	rootCmd.Flags().StringVarP(&template, "template", "t", "", "Summary template (standup, 1on1, planning)")
 
 	var annotateAfter bool
-	var template string
 
 	recordCmd := &cobra.Command{
 		Use:   "record [name]",
