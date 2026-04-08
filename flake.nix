@@ -41,7 +41,7 @@
             version = "0.1.0";
             src = ./scrib;
             vendorHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-            buildInputs = with pkgs.darwin.apple_sdk_12_3.frameworks; [
+            buildInputs = with pkgs.darwin.apple_sdk.frameworks; [
               ScreenCaptureKit
               CoreMedia
               CoreAudio
