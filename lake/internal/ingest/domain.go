@@ -20,28 +20,67 @@ import (
 const domainAuthURL = "https://auth.domain.com.au/v1/connect/token"
 const domainAPIBase = "https://api.domain.com.au/v1"
 
-var defaultSuburbs = []string{
-	"Macquarie Park", "Ryde", "Chatswood", "Rhodes",
-	"Wentworth Point", "Kogarah", "Sydney Olympic Park",
-	"Marrickville", "Hurstville",
+var defaultSuburbs = map[string][]string{
+	"NSW": {
+		"Macquarie Park", "Ryde", "Chatswood", "Rhodes",
+		"Wentworth Point", "Kogarah", "Sydney Olympic Park",
+		"Marrickville", "Hurstville",
+	},
+	"VIC": {
+		// Current IP location
+		"Preston",
+		// Eastern suburbs — comparable price range ($900k-$1.1M median house)
+		"Box Hill", "Blackburn", "Mitcham", "Ringwood",
+		"Croydon", "Forest Hill", "Nunawading", "Vermont",
+		"Doncaster", "Templestowe Lower", "Wantirna",
+		"Bayswater", "Boronia", "Ferntree Gully",
+	},
 }
 
-func getSuburbs() []string {
+var defaultAuctionCities = []string{"Sydney", "Melbourne"}
+
+func getSuburbs() map[string][]string {
 	env := os.Getenv("DOMAIN_SUBURBS")
 	if env == "" {
 		return defaultSuburbs
 	}
-	var suburbs []string
-	for _, s := range strings.Split(env, ",") {
-		s = strings.TrimSpace(s)
-		if s != "" {
-			suburbs = append(suburbs, s)
+	// Format: "NSW:Ryde,Chatswood;VIC:Preston,Box Hill"
+	result := make(map[string][]string)
+	for _, stateBlock := range strings.Split(env, ";") {
+		parts := strings.SplitN(strings.TrimSpace(stateBlock), ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		state := strings.TrimSpace(parts[0])
+		for _, s := range strings.Split(parts[1], ",") {
+			s = strings.TrimSpace(s)
+			if s != "" {
+				result[state] = append(result[state], s)
+			}
 		}
 	}
-	if len(suburbs) == 0 {
+	if len(result) == 0 {
 		return defaultSuburbs
 	}
-	return suburbs
+	return result
+}
+
+func getAuctionCities() []string {
+	env := os.Getenv("DOMAIN_AUCTION_CITIES")
+	if env == "" {
+		return defaultAuctionCities
+	}
+	var cities []string
+	for _, c := range strings.Split(env, ",") {
+		c = strings.TrimSpace(c)
+		if c != "" {
+			cities = append(cities, c)
+		}
+	}
+	if len(cities) == 0 {
+		return defaultAuctionCities
+	}
+	return cities
 }
 
 func IngestDomain(ctx context.Context, s3 *storage.Client, bucket string) (Result, error) {
@@ -63,25 +102,33 @@ func IngestDomain(ctx context.Context, s3 *storage.Client, bucket string) (Resul
 
 	var rows []map[string]interface{}
 
-	auctions, err := fetchAuctionResults(ctx, token)
-	if err != nil {
-		log.Printf("domain: auction results: %v", err)
-	} else {
-		rows = append(rows, auctions...)
-		log.Printf("domain: fetched %d auction results", len(auctions))
+	// Auction results for each city
+	for _, city := range getAuctionCities() {
+		auctions, err := fetchAuctionResults(ctx, token, city)
+		if err != nil {
+			log.Printf("domain: auction results %s: %v", city, err)
+		} else {
+			rows = append(rows, auctions...)
+			log.Printf("domain: fetched %d auction results for %s", len(auctions), city)
+		}
+		time.Sleep(500 * time.Millisecond)
 	}
 
+	// Listings by state and suburb
 	suburbs := getSuburbs()
-	for _, listingType := range []string{"Sale", "Rent"} {
-		for _, suburb := range suburbs {
-			time.Sleep(500 * time.Millisecond)
-			listings, err := fetchListings(ctx, token, suburb, listingType)
-			if err != nil {
-				log.Printf("domain: %s %s: %v", strings.ToLower(listingType), suburb, err)
-				continue
+	listingTypes := []string{"Sale", "Rent", "RecentlySold"}
+	for state, stateSuburbs := range suburbs {
+		for _, listingType := range listingTypes {
+			for _, suburb := range stateSuburbs {
+				time.Sleep(500 * time.Millisecond)
+				listings, err := fetchListings(ctx, token, suburb, state, listingType)
+				if err != nil {
+					log.Printf("domain: %s %s %s: %v", strings.ToLower(listingType), suburb, state, err)
+					continue
+				}
+				rows = append(rows, listings...)
+				log.Printf("domain: %s %s %s: %d listings", strings.ToLower(listingType), suburb, state, len(listings))
 			}
-			rows = append(rows, listings...)
-			log.Printf("domain: %s %s: %d listings", strings.ToLower(listingType), suburb, len(listings))
 		}
 	}
 
@@ -103,10 +150,14 @@ func IngestDomain(ctx context.Context, s3 *storage.Client, bucket string) (Resul
 		return Result{}, fmt.Errorf("put s3: %w", err)
 	}
 
+	totalSuburbs := 0
+	for _, ss := range suburbs {
+		totalSuburbs += len(ss)
+	}
 	metrics.IngestTotal.WithLabelValues(source).Inc()
 	metrics.IngestDuration.WithLabelValues(source).Observe(time.Since(start).Seconds())
 	metrics.LastIngestTimestamp.WithLabelValues(source).SetToCurrentTime()
-	log.Printf("domain: wrote %d rows to %s (suburbs=%d, types=sale+rent)", len(rows), key, len(suburbs))
+	log.Printf("domain: wrote %d rows to %s (suburbs=%d, types=sale+rent+sold, cities=%d)", len(rows), key, totalSuburbs, len(getAuctionCities()))
 	return Result{Source: source, Key: key, RowCount: len(rows)}, nil
 }
 
@@ -143,8 +194,8 @@ func getDomainToken(ctx context.Context, clientID, clientSecret string) (string,
 	return tokenResp.AccessToken, nil
 }
 
-func fetchAuctionResults(ctx context.Context, token string) ([]map[string]interface{}, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, domainAPIBase+"/salesResults/Sydney", nil)
+func fetchAuctionResults(ctx context.Context, token, city string) ([]map[string]interface{}, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, domainAPIBase+"/salesResults/"+city, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -176,6 +227,7 @@ func fetchAuctionResults(ctx context.Context, token string) ([]map[string]interf
 			if m, ok := item.(map[string]interface{}); ok {
 				for _, listing := range extractListings(m) {
 					listing["source"] = "auction_results"
+					listing["city"] = city
 					rows = append(rows, listing)
 				}
 			}
@@ -186,6 +238,7 @@ func fetchAuctionResults(ctx context.Context, token string) ([]map[string]interf
 	var rows []map[string]interface{}
 	for _, listing := range extractListings(result) {
 		listing["source"] = "auction_results"
+		listing["city"] = city
 		rows = append(rows, listing)
 	}
 	return rows, nil
@@ -228,8 +281,8 @@ func extractListings(data map[string]interface{}) []map[string]interface{} {
 	return listings
 }
 
-func fetchListings(ctx context.Context, token, suburb, listingType string) ([]map[string]interface{}, error) {
-	body := fmt.Sprintf(`{"listingType":"%s","locations":[{"suburb":"%s","state":"NSW"}],"pageSize":50}`, listingType, suburb)
+func fetchListings(ctx context.Context, token, suburb, state, listingType string) ([]map[string]interface{}, error) {
+	body := fmt.Sprintf(`{"listingType":"%s","locations":[{"suburb":"%s","state":"%s"}],"pageSize":50}`, listingType, suburb, state)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, domainAPIBase+"/listings/residential/_search", strings.NewReader(body))
 	if err != nil {
