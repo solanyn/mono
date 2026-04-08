@@ -2,7 +2,7 @@
   description = "solanyn/mono development environment";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
@@ -17,7 +17,7 @@
           packages = [
             pg
             pkgs.redis
-            pkgs.go_1_23
+            pkgs.go
             pkgs.bazelisk
             pkgs.goose
             pkgs.python312
@@ -40,7 +40,7 @@
             pname = "scrib";
             version = "0.1.0";
             src = ./scrib;
-            vendorHash = null; # update after first build
+            vendorHash = null; # set to lib.fakeHash to get real hash on first build
             buildInputs = with pkgs.darwin.apple_sdk_12_3.frameworks; [
               ScreenCaptureKit
               CoreMedia
