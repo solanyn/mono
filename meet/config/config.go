@@ -8,19 +8,44 @@ import (
 	toml "github.com/pelletier/go-toml"
 )
 
+type ScribeConfig struct {
+	NoiseRemoval bool `toml:"noise_removal"`
+	AutoScroll   bool `toml:"auto_scroll"`
+	NotesWidth   int  `toml:"notes_width"`
+}
+
+type SummariseConfig struct {
+	Model    string `toml:"model"`
+	Template string `toml:"template"`
+}
+
 type Config struct {
-	GatewayURL string `toml:"gateway_url"`
-	OutputDir  string `toml:"output_dir"`
-	SampleRate int    `toml:"sample_rate"`
-	Format     string `toml:"format"`
+	GatewayURL   string          `toml:"gateway_url"`
+	AudioURL     string          `toml:"audio_url"`
+	OutputDir    string          `toml:"output_dir"`
+	ObsidianVault string         `toml:"obsidian_vault"`
+	SampleRate   int             `toml:"sample_rate"`
+	Format       string          `toml:"format"`
+	Scribe       ScribeConfig    `toml:"scribe"`
+	Summarise    SummariseConfig `toml:"summarise"`
 }
 
 func defaults() *Config {
 	return &Config{
-		GatewayURL: "https://gateway.goyangi.io",
-		OutputDir:  "~/meetings",
-		SampleRate: 16000,
-		Format:     "wav",
+		GatewayURL:   "https://gateway.goyangi.io",
+		AudioURL:     "http://localhost:8000",
+		OutputDir:    "~/meetings",
+		SampleRate:   16000,
+		Format:       "wav",
+		Scribe: ScribeConfig{
+			NoiseRemoval: true,
+			AutoScroll:   true,
+			NotesWidth:   30,
+		},
+		Summarise: SummariseConfig{
+			Model:    "auto",
+			Template: "standup",
+		},
 	}
 }
 

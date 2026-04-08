@@ -27,11 +27,18 @@ go_library(
 )
 
 go_library(
+    name = "client_lib",
+    srcs = glob(["client/*.go"]),
+    importpath = "github.com/solanyn/mono/meet/client",
+)
+
+go_library(
     name = "lib",
     srcs = ["main.go"],
     importpath = "github.com/solanyn/mono/meet",
     deps = [
         ":audio_lib",
+        ":client_lib",
         ":config_lib",
         "@com_github_spf13_cobra//:cobra",
     ],

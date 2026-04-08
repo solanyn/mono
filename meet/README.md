@@ -1,56 +1,71 @@
-# meet
+# meet — Meeting Audio Capture & Annotation
 
-macOS CLI for capturing meeting audio (system output + microphone input).
+CLI tool for recording meeting audio and generating diarised, summarised notes.
 
 ## Usage
 
 ```bash
-# Start recording — captures system audio + mic as stereo WAV
-meet record [name]
-# → Recording to ~/meetings/2026-04-09-standup.wav
-# → Press Ctrl+C to stop...
+# Record system audio + mic (stereo WAV)
+meet record standup
+# → Recording... press Ctrl+C to stop
+# → Saved to ~/meetings/2026-04-09-standup.wav
+
+# Record and auto-annotate on stop
+meet record standup --annotate
+
+# Annotate an existing recording
+meet annotate ~/meetings/2026-04-09-standup.wav
+# → VAD + STT (concurrent) → merge → summarise → markdown
 
 # List recordings
 meet list
 ```
 
-## Config
+## Pipeline
 
-Optional `~/.config/meet/config.toml`:
-
-```toml
-gateway_url = "https://gateway.goyangi.io"
-output_dir = "~/meetings"
-sample_rate = 16000
-format = "wav"
+```
+audio.wav
+  ├─ POST :8000/v1/audio/vad             → speaker segments (Sortformer)
+  ├─ POST :8000/v1/audio/transcriptions   → transcript + timestamps (Parakeet)
+  └─ merge in Go (align words to speakers by time overlap)
+       └─ POST :8001/v1/chat/completions  → summary (Opus/Haiku/Gemma 4)
+            └─ output: ~/meetings/name.md
 ```
 
-## Architecture
+VAD and STT run concurrently.
 
-- System audio captured via **ScreenCaptureKit** (macOS 13+, no virtual audio device needed)
-- Microphone captured via **CoreAudio AudioQueue**
-- Output: 16kHz stereo WAV — left channel = mic, right channel = system audio
-- Stereo separation enables better speaker diarisation downstream
+## Audio Capture
+
+- **System audio**: ScreenCaptureKit (macOS 13+, no virtual devices needed)
+- **Microphone**: CoreAudio AudioQueue
+- **Output**: 16kHz stereo WAV (L=mic, R=system)
+
+## Config
+
+`~/.config/meet/config.toml`:
+```toml
+gateway_url = "https://gateway.goyangi.io"
+audio_url = "http://localhost:8000"
+output_dir = "~/meetings"
+obsidian_vault = "~/vault/Meetings"
+
+[summarise]
+model = "auto"
+template = "standup"
+```
 
 ## Requirements
 
-- macOS 13+ (Ventura)
-- Screen Recording permission (for ScreenCaptureKit)
-- Microphone permission
+- macOS 13+ (ScreenCaptureKit)
+- mlx-audio server on localhost:8000 (with VAD overlay for Sortformer)
+- kgateway on localhost:8001 (or gateway.goyangi.io)
 
 ## Build
 
 ```bash
 # With Bazel
-bazel build //meet:meet
+bazel build //meet
 
-# With Go directly (macOS only)
+# With Go
 cd meet && go build -o meet .
 ```
-
-## Roadmap
-
-- `meet annotate <file>` — STT + diarisation + summarisation via kgateway
-- `meet record --annotate` — one-shot record then annotate
-- Speaker voiceprint learning
-- Obsidian vault integration
