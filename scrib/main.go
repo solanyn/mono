@@ -13,6 +13,7 @@ import (
 	"github.com/solanyn/mono/scrib/client"
 	"github.com/solanyn/mono/scrib/config"
 	"github.com/solanyn/mono/scrib/store"
+	"github.com/solanyn/mono/scrib/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -20,9 +21,18 @@ func main() {
 	cfg := config.Load()
 
 	rootCmd := &cobra.Command{
-		Use:   "scrib",
+		Use:   "scrib [name]",
 		Short: "Meeting audio capture & annotation",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if template != "" {
+				cfg.Summarise.Template = template
+			}
+			return runTUI(cfg, args)
+		},
 	}
+
+	rootCmd.Flags().StringVarP(&template, "template", "t", "", "Summary template (standup, 1on1, planning)")
 
 	var annotateAfter bool
 	var template string
@@ -393,4 +403,35 @@ func expandPath(p string) string {
 		return filepath.Join(home, p[2:])
 	}
 	return p
+}
+
+func runTUI(cfg *config.Config, args []string) error {
+	outDir := cfg.ExpandedOutputDir()
+	if err := os.MkdirAll(outDir, 0755); err != nil {
+		return fmt.Errorf("create output dir: %w", err)
+	}
+
+	name := time.Now().Format("2006-01-02-150405")
+	if len(args) > 0 && args[0] != "" {
+		name = time.Now().Format("2006-01-02") + "-" + args[0]
+	}
+	outPath := filepath.Join(outDir, name+".wav")
+
+	c := client.New(cfg.AudioURL, cfg.GatewayURL)
+
+	db, _ := openDB()
+	if db != nil {
+		defer db.Close()
+	}
+
+	return tui.Run(tui.Options{
+		Name:       name,
+		OutputPath: outPath,
+		SampleRate: cfg.SampleRate,
+		AudioURL:   cfg.AudioURL,
+		GatewayURL: cfg.GatewayURL,
+		Client:     c,
+		Template:   cfg.Summarise.Template,
+		DB:         db,
+	})
 }
