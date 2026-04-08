@@ -1,44 +1,62 @@
-# scrib — Scribing Audio Capture & Annotation
+# scrib — Meeting Audio Capture & Annotation
 
-CLI tool for recording scribing audio and generating diarised, summarised notes.
+CLI + TUI for recording meeting audio and generating diarised, summarised notes.
+Pure Go, all processing via HTTP calls to mlx-audio server and kgateway.
 
 ## Usage
 
 ```bash
-# Record system audio + mic (stereo WAV)
+# TUI mode (default) — record + live feedback + auto-process
+scrib standup
+scrib standup -t 1on1
+
+# Headless recording
 scrib record standup
-# → Recording... press Ctrl+C to stop
-# → Saved to ~/scribings/2026-04-09-standup.wav
+scrib record standup --annotate    # auto-process on stop
 
-# Record and auto-annotate on stop
-scrib record standup --annotate
+# Post-hoc annotation
+scrib annotate ~/meetings/2026-04-09-standup.wav
 
-# Annotate an existing recording
-scrib annotate ~/scribings/2026-04-09-standup.wav
-# → VAD + STT (concurrent) → merge → summarise → markdown
+# Database queries
+scrib history                      # list meetings
+scrib show 1                       # view meeting + transcript
+scrib search "gateway migration"   # FTS across all transcripts
 
-# List recordings
-scrib list
+# Speaker management
+scrib speakers                     # list known speakers
+scrib speakers add Andrew          # add speaker for future matching
 ```
 
-## Pipeline
+## Architecture
 
 ```
-audio.wav
-  ├─ POST :8000/v1/audio/vad             → speaker segments (Sortformer)
-  ├─ POST :8000/v1/audio/transcriptions   → transcript + timestamps (Parakeet)
-  └─ merge in Go (align words to speakers by time overlap)
-       └─ POST :8001/v1/chat/completions  → summary (Opus/Haiku/Gemma 4)
-            └─ output: ~/scribings/name.md
+scrib (Go + BubbleTea)
+  │
+  ├─ TUI: record → process → results (all in one)
+  ├─ record: headless capture
+  └─ annotate: post-hoc pipeline
+       │
+       ├─ POST :8000/v1/audio/vad             → Sortformer (speaker segments)
+       ├─ POST :8000/v1/audio/transcriptions   → Parakeet (STT + timestamps)
+       ├─ merge in Go (align words to speakers by time overlap)
+       └─ POST :8001/v1/chat/completions       → LLM summary
+            └─ output: markdown + SQLite
 ```
-
-VAD and STT run concurrently.
 
 ## Audio Capture
 
-- **System audio**: ScreenCaptureKit (macOS 13+, no virtual devices needed)
+- **System audio**: ScreenCaptureKit (macOS 13+)
 - **Microphone**: CoreAudio AudioQueue
 - **Output**: 16kHz stereo WAV (L=mic, R=system)
+
+## Storage
+
+SQLite at `~/.local/share/scrib/scrib.db`:
+- **meetings** — recording metadata
+- **segments** — diarised transcript with timestamps
+- **speakers** — known speakers with voiceprint embeddings
+- **summaries** — generated notes (re-summarisable with different templates)
+- **segments_fts** — FTS5 full-text search across all transcripts
 
 ## Config
 
@@ -46,8 +64,8 @@ VAD and STT run concurrently.
 ```toml
 gateway_url = "https://gateway.goyangi.io"
 audio_url = "http://localhost:8000"
-output_dir = "~/scribings"
-obsidian_vault = "~/vault/Scribings"
+output_dir = "~/meetings"
+obsidian_vault = "~/vault/Meetings"
 
 [summarise]
 model = "auto"
@@ -57,15 +75,11 @@ template = "standup"
 ## Requirements
 
 - macOS 13+ (ScreenCaptureKit)
-- mlx-audio server on localhost:8000 (with VAD overlay for Sortformer)
-- kgateway on localhost:8001 (or gateway.goyangi.io)
+- mlx-audio server with VAD overlay on :8000
+- kgateway on :8001 (or gateway.goyangi.io)
 
 ## Build
 
 ```bash
-# With Bazel
-bazel build //scrib
-
-# With Go
-cd scrib && go build -o scrib .
+cd scrib && go build -o ~/bin/scrib .
 ```
