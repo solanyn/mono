@@ -57,7 +57,7 @@
             version = "0.1.0";
             src = ./scrib;
             subPackages = [ "cmd/scrib-server" ];
-            vendorHash = "sha256-VmXvT/o04hJWLSFCzsSULav3MPVfHvU0LyIiEo407gI=";
+            vendorHash = "sha256-1LdrUGrOSvMPMItC8VhNiBpoB1Gq9nS4dMWYb4IgV7c=";
             env.CGO_ENABLED = "0";
             meta.description = "Scrib sync server";
           };
