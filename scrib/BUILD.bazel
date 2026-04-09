@@ -99,3 +99,18 @@ go_binary(
     target_compatible_with = ["@platforms//os:macos"],
     visibility = ["//visibility:public"],
 )
+
+go_library(
+    name = "server_cmd_lib",
+    srcs = ["cmd/scrib-server/main.go"],
+    importpath = "github.com/solanyn/mono/scrib/cmd/scrib-server",
+    deps = [
+        ":server_lib",
+    ],
+)
+
+go_binary(
+    name = "scrib-server",
+    embed = [":server_cmd_lib"],
+    visibility = ["//visibility:public"],
+)

@@ -1,4 +1,4 @@
-// Package main provides the scrib-server binary.
+// scrib-server entrypoint — standalone binary for k8s deployment
 package main
 
 import (
