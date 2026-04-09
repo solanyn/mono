@@ -2,6 +2,7 @@
 package store
 
 import (
+	"crypto/rand"
 	"database/sql"
 	"fmt"
 	"os"
@@ -11,6 +12,14 @@ import (
 
 	_ "modernc.org/sqlite"
 )
+
+func newUUID() string {
+	b := make([]byte, 16)
+	rand.Read(b)
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}
 
 // DB wraps the SQLite connection.
 type DB struct {
@@ -46,24 +55,32 @@ func migrate(db *sql.DB) error {
 	_, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS speakers (
 			id        INTEGER PRIMARY KEY,
+			uuid      TEXT NOT NULL UNIQUE,
 			name      TEXT NOT NULL,
 			embedding BLOB,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			synced_at  DATETIME
 		);
 
 		CREATE TABLE IF NOT EXISTS meetings (
 			id           INTEGER PRIMARY KEY,
+			uuid         TEXT NOT NULL UNIQUE,
 			name         TEXT NOT NULL,
 			recorded_at  DATETIME NOT NULL,
 			duration_s   REAL,
 			template     TEXT DEFAULT 'standup',
 			audio_path   TEXT,
+			audio_blob_key TEXT,
 			num_speakers INTEGER DEFAULT 0,
-			created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+			created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+			synced_at    DATETIME
 		);
 
 		CREATE TABLE IF NOT EXISTS segments (
 			id         INTEGER PRIMARY KEY,
+			uuid       TEXT NOT NULL UNIQUE,
 			meeting_id INTEGER NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
 			speaker_id INTEGER REFERENCES speakers(id),
 			speaker_label TEXT,
@@ -74,10 +91,18 @@ func migrate(db *sql.DB) error {
 
 		CREATE TABLE IF NOT EXISTS summaries (
 			id         INTEGER PRIMARY KEY,
+			uuid       TEXT NOT NULL UNIQUE,
 			meeting_id INTEGER NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
 			template   TEXT NOT NULL,
 			content    TEXT NOT NULL,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
+
+		CREATE TABLE IF NOT EXISTS sync_state (
+			id          INTEGER PRIMARY KEY,
+			server_url  TEXT NOT NULL,
+			last_cursor TEXT DEFAULT '',
+			last_synced DATETIME
 		);
 
 		CREATE VIRTUAL TABLE IF NOT EXISTS segments_fts USING fts5(
@@ -104,18 +129,22 @@ func migrate(db *sql.DB) error {
 
 // Meeting represents a recorded meeting.
 type Meeting struct {
-	ID          int64
-	Name        string
-	RecordedAt  time.Time
-	DurationS   float64
-	Template    string
-	AudioPath   string
-	NumSpeakers int
+	ID           int64
+	UUID         string
+	Name         string
+	RecordedAt   time.Time
+	DurationS    float64
+	Template     string
+	AudioPath    string
+	AudioBlobKey string
+	NumSpeakers  int
+	SyncedAt     *time.Time
 }
 
 // Segment represents a diarised transcript segment.
 type Segment struct {
 	ID           int64
+	UUID         string
 	MeetingID    int64
 	SpeakerID    *int64
 	SpeakerLabel string
@@ -127,13 +156,16 @@ type Segment struct {
 // Speaker represents a known speaker with optional voiceprint.
 type Speaker struct {
 	ID        int64
+	UUID      string
 	Name      string
 	Embedding []byte
+	SyncedAt  *time.Time
 }
 
 // Summary represents a meeting summary generated from a template.
 type Summary struct {
 	ID        int64
+	UUID      string
 	MeetingID int64
 	Template  string
 	Content   string
@@ -142,10 +174,13 @@ type Summary struct {
 
 // InsertMeeting creates a new meeting record.
 func (d *DB) InsertMeeting(m *Meeting) (int64, error) {
+	if m.UUID == "" {
+		m.UUID = newUUID()
+	}
 	res, err := d.db.Exec(
-		`INSERT INTO meetings (name, recorded_at, duration_s, template, audio_path, num_speakers)
-		 VALUES (?, ?, ?, ?, ?, ?)`,
-		m.Name, m.RecordedAt, m.DurationS, m.Template, m.AudioPath, m.NumSpeakers,
+		`INSERT INTO meetings (uuid, name, recorded_at, duration_s, template, audio_path, audio_blob_key, num_speakers)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		m.UUID, m.Name, m.RecordedAt, m.DurationS, m.Template, m.AudioPath, m.AudioBlobKey, m.NumSpeakers,
 	)
 	if err != nil {
 		return 0, err
@@ -155,10 +190,13 @@ func (d *DB) InsertMeeting(m *Meeting) (int64, error) {
 
 // InsertSegment adds a transcript segment to a meeting.
 func (d *DB) InsertSegment(s *Segment) (int64, error) {
+	if s.UUID == "" {
+		s.UUID = newUUID()
+	}
 	res, err := d.db.Exec(
-		`INSERT INTO segments (meeting_id, speaker_id, speaker_label, start_s, end_s, text)
-		 VALUES (?, ?, ?, ?, ?, ?)`,
-		s.MeetingID, s.SpeakerID, s.SpeakerLabel, s.StartS, s.EndS, s.Text,
+		`INSERT INTO segments (uuid, meeting_id, speaker_id, speaker_label, start_s, end_s, text)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		s.UUID, s.MeetingID, s.SpeakerID, s.SpeakerLabel, s.StartS, s.EndS, s.Text,
 	)
 	if err != nil {
 		return 0, err
@@ -168,9 +206,12 @@ func (d *DB) InsertSegment(s *Segment) (int64, error) {
 
 // InsertSummary stores a summary for a meeting.
 func (d *DB) InsertSummary(s *Summary) (int64, error) {
+	if s.UUID == "" {
+		s.UUID = newUUID()
+	}
 	res, err := d.db.Exec(
-		`INSERT INTO summaries (meeting_id, template, content) VALUES (?, ?, ?)`,
-		s.MeetingID, s.Template, s.Content,
+		`INSERT INTO summaries (uuid, meeting_id, template, content) VALUES (?, ?, ?, ?)`,
+		s.UUID, s.MeetingID, s.Template, s.Content,
 	)
 	if err != nil {
 		return 0, err
@@ -181,8 +222,8 @@ func (d *DB) InsertSummary(s *Summary) (int64, error) {
 // InsertSpeaker adds a known speaker.
 func (d *DB) InsertSpeaker(name string, embedding []byte) (int64, error) {
 	res, err := d.db.Exec(
-		`INSERT INTO speakers (name, embedding) VALUES (?, ?)`,
-		name, embedding,
+		`INSERT INTO speakers (uuid, name, embedding) VALUES (?, ?, ?)`,
+		newUUID(), name, embedding,
 	)
 	if err != nil {
 		return 0, err
@@ -196,7 +237,7 @@ func (d *DB) ListMeetings(limit int) ([]Meeting, error) {
 		limit = 50
 	}
 	rows, err := d.db.Query(
-		`SELECT id, name, recorded_at, duration_s, template, audio_path, num_speakers
+		`SELECT id, uuid, name, recorded_at, duration_s, template, audio_path, num_speakers
 		 FROM meetings ORDER BY recorded_at DESC LIMIT ?`, limit,
 	)
 	if err != nil {
@@ -207,7 +248,7 @@ func (d *DB) ListMeetings(limit int) ([]Meeting, error) {
 	var meetings []Meeting
 	for rows.Next() {
 		var m Meeting
-		if err := rows.Scan(&m.ID, &m.Name, &m.RecordedAt, &m.DurationS, &m.Template, &m.AudioPath, &m.NumSpeakers); err != nil {
+		if err := rows.Scan(&m.ID, &m.UUID, &m.Name, &m.RecordedAt, &m.DurationS, &m.Template, &m.AudioPath, &m.NumSpeakers); err != nil {
 			return nil, err
 		}
 		meetings = append(meetings, m)
@@ -219,9 +260,9 @@ func (d *DB) ListMeetings(limit int) ([]Meeting, error) {
 func (d *DB) GetMeeting(id int64) (*Meeting, error) {
 	var m Meeting
 	err := d.db.QueryRow(
-		`SELECT id, name, recorded_at, duration_s, template, audio_path, num_speakers
+		`SELECT id, uuid, name, recorded_at, duration_s, template, audio_path, num_speakers
 		 FROM meetings WHERE id = ?`, id,
-	).Scan(&m.ID, &m.Name, &m.RecordedAt, &m.DurationS, &m.Template, &m.AudioPath, &m.NumSpeakers)
+	).Scan(&m.ID, &m.UUID, &m.Name, &m.RecordedAt, &m.DurationS, &m.Template, &m.AudioPath, &m.NumSpeakers)
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +272,7 @@ func (d *DB) GetMeeting(id int64) (*Meeting, error) {
 // GetSegments returns all segments for a meeting.
 func (d *DB) GetSegments(meetingID int64) ([]Segment, error) {
 	rows, err := d.db.Query(
-		`SELECT id, meeting_id, speaker_id, speaker_label, start_s, end_s, text
+		`SELECT id, uuid, meeting_id, speaker_id, speaker_label, start_s, end_s, text
 		 FROM segments WHERE meeting_id = ? ORDER BY start_s`, meetingID,
 	)
 	if err != nil {
@@ -242,7 +283,7 @@ func (d *DB) GetSegments(meetingID int64) ([]Segment, error) {
 	var segments []Segment
 	for rows.Next() {
 		var s Segment
-		if err := rows.Scan(&s.ID, &s.MeetingID, &s.SpeakerID, &s.SpeakerLabel, &s.StartS, &s.EndS, &s.Text); err != nil {
+		if err := rows.Scan(&s.ID, &s.UUID, &s.MeetingID, &s.SpeakerID, &s.SpeakerLabel, &s.StartS, &s.EndS, &s.Text); err != nil {
 			return nil, err
 		}
 		segments = append(segments, s)
@@ -253,7 +294,7 @@ func (d *DB) GetSegments(meetingID int64) ([]Segment, error) {
 // GetSummaries returns all summaries for a meeting.
 func (d *DB) GetSummaries(meetingID int64) ([]Summary, error) {
 	rows, err := d.db.Query(
-		`SELECT id, meeting_id, template, content, created_at
+		`SELECT id, uuid, meeting_id, template, content, created_at
 		 FROM summaries WHERE meeting_id = ? ORDER BY created_at DESC`, meetingID,
 	)
 	if err != nil {
@@ -264,7 +305,7 @@ func (d *DB) GetSummaries(meetingID int64) ([]Summary, error) {
 	var summaries []Summary
 	for rows.Next() {
 		var s Summary
-		if err := rows.Scan(&s.ID, &s.MeetingID, &s.Template, &s.Content, &s.CreatedAt); err != nil {
+		if err := rows.Scan(&s.ID, &s.UUID, &s.MeetingID, &s.Template, &s.Content, &s.CreatedAt); err != nil {
 			return nil, err
 		}
 		summaries = append(summaries, s)
@@ -274,7 +315,7 @@ func (d *DB) GetSummaries(meetingID int64) ([]Summary, error) {
 
 // ListSpeakers returns all known speakers.
 func (d *DB) ListSpeakers() ([]Speaker, error) {
-	rows, err := d.db.Query(`SELECT id, name, embedding FROM speakers ORDER BY name`)
+	rows, err := d.db.Query(`SELECT id, uuid, name, embedding FROM speakers ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -283,7 +324,7 @@ func (d *DB) ListSpeakers() ([]Speaker, error) {
 	var speakers []Speaker
 	for rows.Next() {
 		var s Speaker
-		if err := rows.Scan(&s.ID, &s.Name, &s.Embedding); err != nil {
+		if err := rows.Scan(&s.ID, &s.UUID, &s.Name, &s.Embedding); err != nil {
 			return nil, err
 		}
 		speakers = append(speakers, s)
@@ -357,4 +398,97 @@ func FormatTranscript(segments []Segment) string {
 		fmt.Fprintf(&sb, "**%s** (%d:%02d): %s\n", label, mins, secs, seg.Text)
 	}
 	return sb.String()
+}
+
+// UnsyncedMeetings returns meetings not yet synced to server.
+func (d *DB) UnsyncedMeetings() ([]Meeting, error) {
+	rows, err := d.db.Query(
+		`SELECT id, uuid, name, recorded_at, duration_s, template, audio_path, COALESCE(audio_blob_key,''), num_speakers
+		 FROM meetings WHERE synced_at IS NULL ORDER BY recorded_at`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var meetings []Meeting
+	for rows.Next() {
+		var m Meeting
+		if err := rows.Scan(&m.ID, &m.UUID, &m.Name, &m.RecordedAt, &m.DurationS, &m.Template, &m.AudioPath, &m.AudioBlobKey, &m.NumSpeakers); err != nil {
+			return nil, err
+		}
+		meetings = append(meetings, m)
+	}
+	return meetings, nil
+}
+
+// UnsyncedSegments returns segments for a meeting not yet synced.
+func (d *DB) UnsyncedSegments(meetingID int64) ([]Segment, error) {
+	return d.GetSegments(meetingID)
+}
+
+// UnsyncedSummaries returns summaries for a meeting.
+func (d *DB) UnsyncedSummaries(meetingID int64) ([]Summary, error) {
+	return d.GetSummaries(meetingID)
+}
+
+// MarkMeetingSynced marks a meeting as synced.
+func (d *DB) MarkMeetingSynced(uuid string) error {
+	_, err := d.db.Exec(`UPDATE meetings SET synced_at = CURRENT_TIMESTAMP WHERE uuid = ?`, uuid)
+	return err
+}
+
+// MarkMeetingBlobKey sets the S3 blob key for a meeting's audio.
+func (d *DB) MarkMeetingBlobKey(uuid, blobKey string) error {
+	_, err := d.db.Exec(`UPDATE meetings SET audio_blob_key = ? WHERE uuid = ?`, blobKey, uuid)
+	return err
+}
+
+// GetMeetingByUUID returns a meeting by UUID.
+func (d *DB) GetMeetingByUUID(uuid string) (*Meeting, error) {
+	var m Meeting
+	err := d.db.QueryRow(
+		`SELECT id, uuid, name, recorded_at, duration_s, template, audio_path, num_speakers
+		 FROM meetings WHERE uuid = ?`, uuid,
+	).Scan(&m.ID, &m.UUID, &m.Name, &m.RecordedAt, &m.DurationS, &m.Template, &m.AudioPath, &m.NumSpeakers)
+	if err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+// UpsertFromSync inserts or updates a meeting from server sync data.
+func (d *DB) UpsertFromSync(m *Meeting) error {
+	_, err := d.db.Exec(
+		`INSERT INTO meetings (uuid, name, recorded_at, duration_s, template, audio_path, audio_blob_key, num_speakers, synced_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		 ON CONFLICT(uuid) DO UPDATE SET
+		   name=excluded.name, duration_s=excluded.duration_s, template=excluded.template,
+		   audio_blob_key=excluded.audio_blob_key, num_speakers=excluded.num_speakers,
+		   synced_at=CURRENT_TIMESTAMP`,
+		m.UUID, m.Name, m.RecordedAt, m.DurationS, m.Template, m.AudioPath, m.AudioBlobKey, m.NumSpeakers,
+	)
+	return err
+}
+
+// UpsertSegmentFromSync inserts or ignores a segment from server sync.
+func (d *DB) UpsertSegmentFromSync(s *Segment, meetingUUID string) error {
+	_, err := d.db.Exec(
+		`INSERT INTO segments (uuid, meeting_id, speaker_id, speaker_label, start_s, end_s, text)
+		 VALUES (?, (SELECT id FROM meetings WHERE uuid = ?), ?, ?, ?, ?, ?)
+		 ON CONFLICT(uuid) DO NOTHING`,
+		s.UUID, meetingUUID, s.SpeakerID, s.SpeakerLabel, s.StartS, s.EndS, s.Text,
+	)
+	return err
+}
+
+// UpsertSummaryFromSync inserts or updates a summary from server sync.
+func (d *DB) UpsertSummaryFromSync(s *Summary, meetingUUID string) error {
+	_, err := d.db.Exec(
+		`INSERT INTO summaries (uuid, meeting_id, template, content)
+		 VALUES (?, (SELECT id FROM meetings WHERE uuid = ?), ?, ?)
+		 ON CONFLICT(uuid) DO UPDATE SET content=excluded.content, template=excluded.template`,
+		s.UUID, meetingUUID, s.Template, s.Content,
+	)
+	return err
 }

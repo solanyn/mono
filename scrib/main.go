@@ -13,6 +13,7 @@ import (
 	"github.com/solanyn/mono/scrib/client"
 	"github.com/solanyn/mono/scrib/config"
 	"github.com/solanyn/mono/scrib/store"
+	"github.com/solanyn/mono/scrib/sync"
 	"github.com/solanyn/mono/scrib/tui"
 	"github.com/spf13/cobra"
 )
@@ -109,7 +110,15 @@ func main() {
 		},
 	}
 
-	rootCmd.AddCommand(recordCmd, annotateCmd, historyCmd, searchCmd, speakersCmd, showCmd)
+	syncCmd := &cobra.Command{
+		Use:   "sync",
+		Short: "Sync meetings to/from scrib server",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runSync(cfg)
+		},
+	}
+
+	rootCmd.AddCommand(recordCmd, annotateCmd, historyCmd, searchCmd, speakersCmd, showCmd, syncCmd)
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
@@ -435,4 +444,50 @@ func runTUI(cfg *config.Config, args []string) error {
 		Template:   cfg.Summarise.Template,
 		DB:         db,
 	})
+}
+
+func runSync(cfg *config.Config) error {
+	if cfg.Sync.ServerURL == "" {
+		return fmt.Errorf("sync.server_url not configured in ~/.config/scrib/config.toml")
+	}
+
+	db, err := openDB()
+	if err != nil {
+		return fmt.Errorf("open db: %w", err)
+	}
+	defer db.Close()
+
+	clientID := cfg.Sync.ClientID
+	if clientID == "" {
+		hostname, _ := os.Hostname()
+		clientID = hostname
+	}
+
+	sc := sync.NewClient(cfg.Sync.ServerURL, clientID, db)
+
+	// Push first
+	fmt.Println("Pushing unsynced meetings...")
+	pushResult, err := sc.Push()
+	if err != nil {
+		return fmt.Errorf("push: %w", err)
+	}
+	if pushResult.Synced > 0 {
+		fmt.Printf("  → Pushed %d meetings\n", pushResult.Synced)
+	} else {
+		fmt.Println("  → Nothing to push")
+	}
+
+	// Then pull
+	fmt.Println("Pulling from server...")
+	pulled, err := sc.Pull()
+	if err != nil {
+		return fmt.Errorf("pull: %w", err)
+	}
+	if pulled > 0 {
+		fmt.Printf("  → Pulled %d meetings\n", pulled)
+	} else {
+		fmt.Println("  → Nothing new")
+	}
+
+	return nil
 }

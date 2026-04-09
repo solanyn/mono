@@ -19,15 +19,21 @@ type SummariseConfig struct {
 	Template string `toml:"template"`
 }
 
+type SyncConfig struct {
+	ServerURL string `toml:"server_url"`
+	ClientID  string `toml:"client_id"`
+}
+
 type Config struct {
-	GatewayURL   string          `toml:"gateway_url"`
-	AudioURL     string          `toml:"audio_url"`
-	OutputDir    string          `toml:"output_dir"`
-	ObsidianVault string         `toml:"obsidian_vault"`
-	SampleRate   int             `toml:"sample_rate"`
-	Format       string          `toml:"format"`
-	Scribe       ScribeConfig    `toml:"scribe"`
-	Summarise    SummariseConfig `toml:"summarise"`
+	GatewayURL    string          `toml:"gateway_url"`
+	AudioURL      string          `toml:"audio_url"`
+	OutputDir     string          `toml:"output_dir"`
+	ObsidianVault string          `toml:"obsidian_vault"`
+	SampleRate    int             `toml:"sample_rate"`
+	Format        string          `toml:"format"`
+	Scribe        ScribeConfig    `toml:"scribe"`
+	Summarise     SummariseConfig `toml:"summarise"`
+	Sync          SyncConfig      `toml:"sync"`
 }
 
 func defaults() *Config {

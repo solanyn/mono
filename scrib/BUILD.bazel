@@ -57,6 +57,28 @@ go_library(
 )
 
 go_library(
+    name = "sync_lib",
+    srcs = glob(["sync/*.go"]),
+    importpath = "github.com/solanyn/mono/scrib/sync",
+    deps = [
+        ":store_lib",
+    ],
+)
+
+go_library(
+    name = "server_lib",
+    srcs = glob(["server/*.go"]),
+    importpath = "github.com/solanyn/mono/scrib/server",
+    deps = [
+        "@com_github_go_chi_chi_v5//:chi",
+        "@com_github_go_chi_chi_v5//middleware",
+        "@com_github_lib_pq//:pq",
+        "@com_github_minio_minio_go_v7//:minio-go",
+        "@com_github_minio_minio_go_v7//pkg/credentials",
+    ],
+)
+
+go_library(
     name = "lib",
     srcs = ["main.go"],
     importpath = "github.com/solanyn/mono/scrib",
@@ -65,6 +87,7 @@ go_library(
         ":client_lib",
         ":config_lib",
         ":store_lib",
+        ":sync_lib",
         ":tui_lib",
         "@com_github_spf13_cobra//:cobra",
     ],
