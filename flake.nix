@@ -51,7 +51,17 @@
               platforms = pkgs.lib.platforms.darwin;
             };
           };
-        } else {});
+        } else {}) // {
+          scrib-server = pkgs.buildGoModule {
+            pname = "scrib-server";
+            version = "0.1.0";
+            src = ./scrib;
+            subPackages = [ "cmd/scrib-server" ];
+            vendorHash = "sha256-VmXvT/o04hJWLSFCzsSULav3MPVfHvU0LyIiEo407gI=";
+            env.CGO_ENABLED = "0";
+            meta.description = "Scrib sync server";
+          };
+        };
       }
     );
 }
