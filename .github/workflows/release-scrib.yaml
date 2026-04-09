@@ -1,0 +1,57 @@
+name: Release Scrib
+
+on:
+  push:
+    tags:
+      - 'scrib/v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: scrib/go.mod
+          cache-dependency-path: scrib/go.sum
+
+      - name: Build scrib (darwin/arm64)
+        working-directory: scrib
+        env:
+          CGO_ENABLED: "1"
+          GOOS: darwin
+          GOARCH: arm64
+        run: |
+          go build -ldflags="-s -w -X main.version=${GITHUB_REF_NAME#scrib/}" -o scrib-darwin-arm64 .
+
+      - name: Build scrib (darwin/amd64)
+        working-directory: scrib
+        env:
+          CGO_ENABLED: "1"
+          GOOS: darwin
+          GOARCH: amd64
+        run: |
+          go build -ldflags="-s -w -X main.version=${GITHUB_REF_NAME#scrib/}" -o scrib-darwin-amd64 .
+
+      - name: Build scrib-server (linux/amd64)
+        working-directory: scrib
+        env:
+          CGO_ENABLED: "0"
+          GOOS: linux
+          GOARCH: amd64
+        run: |
+          go build -ldflags="-s -w -X main.version=${GITHUB_REF_NAME#scrib/}" -o scrib-server-linux-amd64 ./cmd/scrib-server
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Scrib ${{ github.ref_name }}"
+          generate_release_notes: true
+          files: |
+            scrib/scrib-darwin-arm64
+            scrib/scrib-darwin-amd64
+            scrib/scrib-server-linux-amd64

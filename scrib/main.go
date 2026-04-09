@@ -18,14 +18,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var version = "dev"
+
 func main() {
 	cfg := config.Load()
 
 	var template string
 
 	rootCmd := &cobra.Command{
-		Use:   "scrib [name]",
-		Short: "Meeting audio capture & annotation",
+		Use:     "scrib [name]",
+		Short:   "Meeting audio capture & annotation",
+		Version: version,
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if template != "" {
