@@ -4,6 +4,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -23,6 +24,8 @@ const (
 	phaseProcessing
 	phaseResults
 )
+
+const chunkInterval = 10 * time.Second
 
 // Options configures the TUI.
 type Options struct {
@@ -45,14 +48,15 @@ type model struct {
 	startTime time.Time
 	elapsed   time.Duration
 
-	// recording phase
+	// recording phase — live transcription
 	transcript []transcriptLine
 	viewport   viewport.Model
+	lastFrame  int // frame offset for next chunk
 
 	// processing phase
-	spinner  spinner.Model
-	steps    []processStep
-	stepIdx  int
+	spinner spinner.Model
+	steps   []processStep
+	stepIdx int
 
 	// results phase
 	result    *client.AnnotateResult
@@ -74,14 +78,23 @@ type processStep struct {
 
 // messages
 type tickMsg time.Time
+type chunkTickMsg time.Time
+type chunkResultMsg struct {
+	ts   time.Duration
+	text string
+}
+type chunkErrMsg struct{ err error }
 type pipelineDoneMsg struct {
 	result *client.AnnotateResult
 	err    error
 }
-type stepDoneMsg int
 
 func tickCmd() tea.Cmd {
 	return tea.Tick(time.Second, func(t time.Time) tea.Msg { return tickMsg(t) })
+}
+
+func chunkTickCmd() tea.Cmd {
+	return tea.Tick(chunkInterval, func(t time.Time) tea.Msg { return chunkTickMsg(t) })
 }
 
 func initialModel(opts Options) model {
@@ -99,15 +112,14 @@ func initialModel(opts Options) model {
 		spinner:   sp,
 		steps: []processStep{
 			{label: "Saving audio"},
-			{label: "Speaker diarisation"},
-			{label: "Transcription"},
+			{label: "Speaker diarisation + transcription"},
 			{label: "Summarising"},
 		},
 	}
 }
 
 func (m model) Init() tea.Cmd {
-	return tea.Batch(tickCmd(), m.spinner.Tick)
+	return tea.Batch(tickCmd(), chunkTickCmd(), m.spinner.Tick)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -146,17 +158,30 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		cmds = append(cmds, tickCmd())
 
+	case chunkTickMsg:
+		if m.phase == phaseRecording {
+			cmds = append(cmds, m.transcribeChunk(), chunkTickCmd())
+		}
+
+	case chunkResultMsg:
+		if msg.text != "" {
+			m.transcript = append(m.transcript, transcriptLine{
+				ts:   msg.ts,
+				text: msg.text,
+			})
+		}
+
+	case chunkErrMsg:
+		// Silently skip failed chunks — don't crash the TUI
+		m.transcript = append(m.transcript, transcriptLine{
+			ts:   m.elapsed,
+			text: dimStyle.Render("[transcription failed]"),
+		})
+
 	case spinner.TickMsg:
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		cmds = append(cmds, cmd)
-
-	case stepDoneMsg:
-		idx := int(msg)
-		if idx < len(m.steps) {
-			m.steps[idx].done = true
-			m.stepIdx = idx + 1
-		}
 
 	case pipelineDoneMsg:
 		if msg.err != nil {
@@ -185,6 +210,36 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
+func (m *model) transcribeChunk() tea.Cmd {
+	fromFrame := m.lastFrame
+	samples := m.recorder.Snapshot(fromFrame)
+	if len(samples) < m.opts.SampleRate*2 { // less than 1 second of audio
+		return nil
+	}
+
+	chunkTS := time.Duration(fromFrame/m.opts.SampleRate) * time.Second
+	m.lastFrame = m.recorder.FrameCount()
+
+	c := m.opts.Client
+
+	return func() tea.Msg {
+		// Write chunk to temp WAV
+		tmpPath, err := audio.WriteWAVTemp(samples, m.opts.SampleRate, 2)
+		if err != nil {
+			return chunkErrMsg{err: err}
+		}
+		defer os.Remove(tmpPath)
+
+		result, err := c.Transcribe(tmpPath)
+		if err != nil {
+			return chunkErrMsg{err: err}
+		}
+
+		text := strings.TrimSpace(result.Text)
+		return chunkResultMsg{ts: chunkTS, text: text}
+	}
+}
+
 func (m model) runPipeline() tea.Cmd {
 	return func() tea.Msg {
 		// Step 0: save audio
@@ -193,7 +248,7 @@ func (m model) runPipeline() tea.Cmd {
 			return pipelineDoneMsg{err: err}
 		}
 
-		// Steps 1-3: annotate (VAD + STT + summarise)
+		// Steps 1-2: annotate (VAD + STT + summarise)
 		result, err := m.opts.Client.Annotate(m.opts.OutputPath, 0.5, m.opts.Template)
 		if err != nil {
 			return pipelineDoneMsg{err: err}
@@ -287,7 +342,7 @@ func (m model) viewProcessing() string {
 	title := titleStyle.Render(fmt.Sprintf("─ %s ", m.opts.Name))
 
 	var sb strings.Builder
-	sb.WriteString("\n  Processing...\n\n")
+	sb.WriteString("\n  Processing full recording...\n\n")
 	for i, step := range m.steps {
 		if step.done {
 			sb.WriteString(fmt.Sprintf("  %s %s\n", checkStyle.Render("✓"), step.label))
@@ -320,7 +375,7 @@ func (m model) viewResults() string {
 
 func (m model) renderTranscript() string {
 	if len(m.transcript) == 0 {
-		return dimStyle.Render("\n  Listening... transcript will appear here\n")
+		return dimStyle.Render("\n  Listening... live transcript appears every 10s\n")
 	}
 	var sb strings.Builder
 	for _, line := range m.transcript {

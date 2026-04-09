@@ -40,3 +40,18 @@ func WriteWAV(path string, samples []int16, sampleRate, channels int) error {
 	// Write samples
 	return binary.Write(f, binary.LittleEndian, samples)
 }
+
+// WriteWAVTemp writes samples to a temporary WAV file and returns the path.
+func WriteWAVTemp(samples []int16, sampleRate, channels int) (string, error) {
+	f, err := os.CreateTemp("", "scrib-chunk-*.wav")
+	if err != nil {
+		return "", err
+	}
+	path := f.Name()
+	f.Close()
+	if err := WriteWAV(path, samples, sampleRate, channels); err != nil {
+		os.Remove(path)
+		return "", err
+	}
+	return path, nil
+}

@@ -109,3 +109,27 @@ func (r *Recorder) Stop() []int16 {
 	r.samples = nil
 	return out
 }
+
+// Snapshot returns a copy of samples recorded so far without stopping.
+// Returns samples from offset onwards (interleaved stereo).
+func (r *Recorder) Snapshot(fromFrame int) []int16 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if !r.recording {
+		return nil
+	}
+	fromIdx := fromFrame * 2
+	if fromIdx >= len(r.samples) {
+		return nil
+	}
+	out := make([]int16, len(r.samples)-fromIdx)
+	copy(out, r.samples[fromIdx:])
+	return out
+}
+
+// FrameCount returns the current number of stereo frames recorded.
+func (r *Recorder) FrameCount() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.samples) / 2
+}
