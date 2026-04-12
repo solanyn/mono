@@ -21,7 +21,7 @@ go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
 go_sdk.download(version = "1.25.0")
 
 go_deps = use_extension("@gazelle//:extensions.bzl", "go_deps")
-go_deps.from_file(go_mod = "//burst:go.mod")
+go_deps.from_file(go_mod = "//cronprint:go.mod")
 go_deps.module(
     path = "github.com/fogleman/gg",
     sum = "h1:/7zJX8F6AaYQc57WQCyN9cAIz+4bCJGO9B+dyW29am8=",
@@ -1718,36 +1718,6 @@ go_deps.module(
     version = "v1.46.1",
 )
 go_deps.module(
-    path = "sigs.k8s.io/controller-runtime",
-    sum = "h1:nWVM7aq+Il2ABxwiCizrVDSlmDcshi9llbaFbC0ji/Q=",
-    version = "v0.19.0",
-)
-go_deps.module(
-    path = "go.uber.org/zap",
-    sum = "h1:sI7k6L95XOKS281NhVKOFCUNIvv9e0w4BF8N3u+tCRo=",
-    version = "v1.26.0",
-)
-go_deps.module(
-    path = "github.com/go-logr/zapr",
-    sum = "h1:XGdV8XW8zdwFiwOA2Dryh1gj2KRQyOOoNmBy4EplIcQ=",
-    version = "v1.3.0",
-)
-go_deps.module(
-    path = "github.com/evanphx/json-patch/v5",
-    sum = "h1:kcBlZQbplgElYIlo/n1hJbls2z/1awpXxpRi0/FOJfg=",
-    version = "v5.9.0",
-)
-go_deps.module(
-    path = "gomodules.xyz/jsonpatch/v2",
-    sum = "h1:Ci3iUJyx9UeRx7CeFN8ARgGbkESwJK+KB9lLcWxY/Zw=",
-    version = "v2.4.0",
-)
-go_deps.module(
-    path = "k8s.io/apiextensions-apiserver",
-    sum = "h1:fZgCVhGwsclj3qCw1buVXCV6khjRzKC5eCFt24kyLSk=",
-    version = "v0.31.0",
-)
-go_deps.module(
     path = "sigs.k8s.io/json",
     sum = "h1:/Rv+M11QRah1itp8VhT6HoVx1Ray9eB4DBr+K+/sCJ8=",
     version = "v0.0.0-20241010143419-9aa6b5e7a4b3",
@@ -1775,7 +1745,6 @@ use_repo(
     "com_github_alecthomas_repr",
     "com_github_andybalholm_brotli",
     "com_github_andybalholm_cascadia",
-    "com_github_openprinting_goipp",
     "com_github_antlr4_go_antlr_v4",
     "com_github_apache_arrow_go_v18",
     "com_github_apache_iceberg_go",
@@ -1854,7 +1823,6 @@ use_repo(
     "com_github_envoyproxy_go_control_plane",
     "com_github_envoyproxy_go_control_plane_envoy",
     "com_github_envoyproxy_protoc_gen_validate",
-    "com_github_evanphx_json_patch_v5",
     "com_github_fatih_color",
     "com_github_felixge_httpsnoop",
     "com_github_fogleman_gg",
@@ -1865,7 +1833,6 @@ use_repo(
     "com_github_go_jose_go_jose_v4",
     "com_github_go_logr_logr",
     "com_github_go_logr_stdr",
-    "com_github_go_logr_zapr",
     "com_github_go_ole_go_ole",
     "com_github_go_openapi_jsonpointer",
     "com_github_go_openapi_jsonreference",
@@ -1878,8 +1845,8 @@ use_repo(
     "com_github_gofrs_flock",
     "com_github_gogo_protobuf",
     "com_github_gogs_chardet",
-    "com_github_golang_freetype",
     "com_github_golang_jwt_jwt_v5",
+    "com_github_golang_freetype",
     "com_github_golang_protobuf",
     "com_github_golang_snappy",
     "com_github_google_flatbuffers",
@@ -1967,6 +1934,7 @@ use_repo(
     "com_github_olekukonko_tablewriter",
     "com_github_opencontainers_go_digest",
     "com_github_opencontainers_image_spec",
+    "com_github_openprinting_goipp",
     "com_github_parquet_go_bitpack",
     "com_github_parquet_go_jsonlite",
     "com_github_parquet_go_parquet_go",
@@ -2063,12 +2031,10 @@ use_repo(
     "in_yaml_go_yaml_v3",
     "io_cncf_tags_container_device_interface",
     "io_k8s_api",
-    "io_k8s_apiextensions_apiserver",
     "io_k8s_apimachinery",
     "io_k8s_client_go",
     "io_k8s_klog_v2",
     "io_k8s_kube_openapi",
-    "io_k8s_sigs_controller_runtime",
     "io_k8s_sigs_json",
     "io_k8s_sigs_structured_merge_diff_v4",
     "io_k8s_sigs_yaml",
@@ -2117,8 +2083,6 @@ use_repo(
     "org_uber_go_atomic",
     "org_uber_go_goleak",
     "org_uber_go_multierr",
-    "org_uber_go_zap",
-    "xyz_gomodules_jsonpatch_v2",
 )
 
 # python
