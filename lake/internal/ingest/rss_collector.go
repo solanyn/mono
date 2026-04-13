@@ -25,9 +25,13 @@ import (
 
 const (
 	rssUserAgent      = "lake-rss/1.0 (+https://github.com/solanyn/mono)"
-	maxConcurrency    = 10
+	maxConcurrency    = 4
 	minDomainInterval = time.Second
 	minExtractLen     = 200
+	maxArticleBytes   = 2 * 1024 * 1024 // 2MB per article (was 10MB)
+	seenTTL           = 24 * time.Hour
+	seenMaxSize       = 50000
+	startupStagger    = 5 * time.Second // per-feed stagger on startup
 )
 
 type ArticleEvent struct {
@@ -57,8 +61,7 @@ type RSSCollector struct {
 	producer *kafka.Producer
 	bucket   string
 	cron     *cron.Cron
-	seen     map[string]struct{}
-	mu       sync.Mutex
+	seen     *TTLCache
 	sem      chan struct{}
 	domains  map[string]time.Time
 	domainMu sync.Mutex
@@ -72,7 +75,7 @@ func NewRSSCollector(s3 *storage.Client, producer *kafka.Producer, bucket string
 		producer: producer,
 		bucket:   bucket,
 		cron:     cron.New(cron.WithLocation(loc)),
-		seen:     make(map[string]struct{}),
+		seen:     NewTTLCache(seenTTL, seenMaxSize),
 		sem:      make(chan struct{}, maxConcurrency),
 		domains:  make(map[string]time.Time),
 		client: &http.Client{
@@ -94,17 +97,20 @@ func (c *RSSCollector) Start() {
 		secs := int(f.Interval.Seconds())
 		expr := fmt.Sprintf("@every %ds", secs)
 
-		time.AfterFunc(jitter+time.Duration(i)*time.Second, func() {
+		// Stagger startup over minutes to avoid burst of concurrent fetches
+		delay := jitter + time.Duration(i)*startupStagger
+		time.AfterFunc(delay, func() {
 			c.processFeed(f)
 			c.cron.AddFunc(expr, func() { c.processFeed(f) })
 		})
 	}
 	c.cron.Start()
-	log.Printf("rss_collector: started with %d feeds", len(Feeds))
+	log.Printf("rss_collector: started with %d feeds (stagger=%s)", len(Feeds), startupStagger)
 }
 
 func (c *RSSCollector) Stop() {
 	c.cron.Stop()
+	c.seen.Stop()
 }
 
 func (c *RSSCollector) processFeed(feed Feed) {
@@ -144,15 +150,10 @@ func (c *RSSCollector) processFeed(feed Feed) {
 		guid := itemGUID(item)
 		dedupeKey := feed.Slug + "|" + guid
 
-		c.mu.Lock()
-		_, seen := c.seen[dedupeKey]
-		if !seen {
-			c.seen[dedupeKey] = struct{}{}
-		}
-		c.mu.Unlock()
-		if seen {
+		if c.seen.Has(dedupeKey) {
 			continue
 		}
+		c.seen.Set(dedupeKey)
 
 		published := itemPublished(item)
 		author := itemAuthor(item)
@@ -310,7 +311,7 @@ func (c *RSSCollector) fetchURL(ctx context.Context, rawURL string) ([]byte, err
 		return nil, fmt.Errorf("http %d: %s", resp.StatusCode, rawURL)
 	}
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxArticleBytes))
 	if err != nil {
 		return nil, err
 	}
