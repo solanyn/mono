@@ -44,6 +44,9 @@ type Config struct {
 	CronNSWProperty string
 	CronNSWTrades   string
 
+	CronVicVG string
+	CronSQM   string
+
 	IcebergCatalogURI string
 }
 
@@ -89,6 +92,9 @@ func Load() Config {
 		CronNSWFuel:     envOr("CRON_NSW_FUEL", "0 * * * *"),
 		CronNSWProperty: envOr("CRON_NSW_PROPERTY", "0 3 * * *"),
 		CronNSWTrades:   envOr("CRON_NSW_TRADES", "30 3 * * *"),
+
+		CronVicVG: envOr("CRON_VIC_VG", "0 2 * * 0"),   // Weekly Sunday 2am
+		CronSQM:   envOr("CRON_SQM", "0 4 * * 1"),       // Weekly Monday 4am
 
 		IcebergCatalogURI: envOr("ICEBERG_CATALOG_URI", "http://lakekeeper.storage.svc.cluster.local:8181/catalog"),
 	}
