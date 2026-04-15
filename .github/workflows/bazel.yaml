@@ -12,7 +12,7 @@ permissions:
   packages: write
 jobs:
   test:
-    runs-on: mono-runner
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,12 +25,12 @@ jobs:
           mkdir -p $HOME/bin && curl -fsSL https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 -o $HOME/bin/bazel
           chmod +x $HOME/bin/bazel && echo "$HOME/bin" >> $GITHUB_PATH
       - name: Build all targets
-        run: bazel build //... --config=ci --config=remote
+        run: bazel build //... --config=ci 
       - name: Test all targets
-        run: bazel test //... --config=ci --config=remote
+        run: bazel test //... --config=ci 
 
   push-images:
-    runs-on: mono-runner
+    runs-on: ubuntu-latest
     needs: test
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:
@@ -83,7 +83,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
 
   deploy-website:
-    runs-on: mono-runner
+    runs-on: ubuntu-latest
     needs: test
     if: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' }}
     steps:
@@ -94,7 +94,7 @@ jobs:
           mkdir -p $HOME/bin && curl -fsSL https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 -o $HOME/bin/bazel
           chmod +x $HOME/bin/bazel && echo "$HOME/bin" >> $GITHUB_PATH
       - name: Build website
-        run: bazel build //website:build --config=ci --config=remote
+        run: bazel build //website:build --config=ci 
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
@@ -106,7 +106,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
   deploy-preview:
-    runs-on: mono-runner
+    runs-on: ubuntu-latest
     needs: test
     if: ${{ github.event_name == 'pull_request' }}
     permissions:
@@ -119,7 +119,7 @@ jobs:
           mkdir -p $HOME/bin && curl -fsSL https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 -o $HOME/bin/bazel
           chmod +x $HOME/bin/bazel && echo "$HOME/bin" >> $GITHUB_PATH
       - name: Build website
-        run: bazel build //website:build --config=ci --config=remote
+        run: bazel build //website:build --config=ci 
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
@@ -164,7 +164,7 @@ jobs:
             }
 
   release:
-    runs-on: mono-runner
+    runs-on: ubuntu-latest
     needs: test
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     permissions:
