@@ -1737,6 +1737,134 @@ go_deps.module(
     sum = "h1:KqQDr4vIlxwfYh0Ed/uJGVgX+CHAkahrgabg6Q8GYxc=",
     version = "v1.0.1",
 )
+
+# scrib dependencies (not in cronprint/go.mod)
+go_deps.module(
+    path = "github.com/aymanbagabas/go-osc52/v2",
+    sum = "h1:uYgXzlJ7ZpABp8OJ+exZzJJhRNQ2ASbcXHWsFqH8hp8=",
+    version = "v2.0.1",
+)
+go_deps.module(
+    path = "github.com/charmbracelet/bubbles",
+    sum = "h1:9d/Zd5GdnauMI5ivUIVisuEm3ave1XwXtD1ckyV6r3E=",
+    version = "v1.0.0",
+)
+go_deps.module(
+    path = "github.com/charmbracelet/bubbletea",
+    sum = "h1:ORQfo0fk8U+po9VaNvnV95UPWA1BitP1E0N6xJPlHr4=",
+    version = "v1.3.10",
+)
+go_deps.module(
+    path = "github.com/charmbracelet/colorprofile",
+    sum = "h1:U1d9Dljmdf9DLegaJ0nGZNJvoXAhayhmidOdcBwAvKk=",
+    version = "v0.4.1",
+)
+go_deps.module(
+    path = "github.com/charmbracelet/lipgloss",
+    sum = "h1:/6Q8FR2o+kj8rz4Dq0zQc3vYf7X+B0binUUBwA0aL30=",
+    version = "v1.1.0",
+)
+go_deps.module(
+    path = "github.com/charmbracelet/x/ansi",
+    sum = "h1:2JNYLgQUsyqaiLovhU2Rv/pb8r6ydXKS3NIttu3VGZQ=",
+    version = "v0.11.6",
+)
+go_deps.module(
+    path = "github.com/charmbracelet/x/cellbuf",
+    sum = "h1:J1YVbR7MUuEGIFPCaaZ96KDl5NoS0DAWkskup+mOY+Q=",
+    version = "v0.0.15",
+)
+go_deps.module(
+    path = "github.com/charmbracelet/x/term",
+    sum = "h1:kF8CY5RddLWrsgVwpw4kAa6TESp6EB5y3uxGLeCqzAI=",
+    version = "v0.2.2",
+)
+go_deps.module(
+    path = "github.com/clipperhouse/displaywidth",
+    sum = "h1:aCAAqTlh4GIVkhQnJpbL0T/WfcrJXHcj8C0yjYcjOZA=",
+    version = "v0.9.0",
+)
+go_deps.module(
+    path = "github.com/clipperhouse/stringish",
+    sum = "h1:v/WhFtE1q0ovMta2+m+UbpZ+2/HEXNWYXQgCt4hdOzA=",
+    version = "v0.1.1",
+)
+go_deps.module(
+    path = "github.com/clipperhouse/uax29/v2",
+    sum = "h1:Wn1g7MK6OoeDT0vL+Q0SQLDz/KpfsVRgg6W7ihQeh4g=",
+    version = "v2.5.0",
+)
+go_deps.module(
+    path = "github.com/erikgeiser/coninput",
+    sum = "h1:vw97MGsxSvLiUE2X8qFplwetxpGLQrlU1Q9AUEIzCaM=",
+    version = "v0.0.0-20211004153227-1c3628e74d0f",
+)
+go_deps.module(
+    path = "github.com/go-ini/ini",
+    sum = "h1:ByCAeIL28uOIIG0E3PJtZPDL8WnHpFKFOtgjp+3Ies8=",
+    version = "v1.67.0",
+)
+go_deps.module(
+    path = "github.com/klauspost/crc32",
+    sum = "h1:D7kQaZhnkX/Y0tstFGf8VUzv2UofNGqCjnC3zdHB0Hw=",
+    version = "v1.3.0",
+)
+go_deps.module(
+    path = "github.com/lucasb-eyer/go-colorful",
+    sum = "h1:R4dSotOR9KMtayYi1e77YzuveK+i7ruzyGqttikkLy0=",
+    version = "v1.3.0",
+)
+go_deps.module(
+    path = "github.com/mattn/go-localereader",
+    sum = "h1:8fBrzywKY7BI3czFoHkuzRoWE9C+EiG4R1k4Cjx5p88=",
+    version = "v0.0.1",
+)
+go_deps.module(
+    path = "github.com/minio/crc64nvme",
+    sum = "h1:eVfm2fAzLlxMdUGc0EEBGSMmPwmXD5XiNRpnu9J3bvg=",
+    version = "v1.1.1",
+)
+go_deps.module(
+    path = "github.com/minio/md5-simd",
+    sum = "h1:MzdKDxYpY2BT9XQFocsiZf/NKVtR7nkE4RoEpN+20RM=",
+    version = "v1.1.2",
+)
+go_deps.module(
+    path = "github.com/minio/minio-go/v7",
+    sum = "h1:EtGNKtlX20iL2yaYnxEigaIvj0G0GwSDnifnG8ClIdw=",
+    version = "v7.0.100",
+)
+go_deps.module(
+    path = "github.com/muesli/ansi",
+    sum = "h1:CJlz5H+gyd6CUWT45Oy4q24RdLyn7Md9Vj2/ldJBSIo=",
+    version = "v0.0.0-20230316100256-276c6243b2f6",
+)
+go_deps.module(
+    path = "github.com/muesli/cancelreader",
+    sum = "h1:3XuTXfFS2VjM+HTLZY9Ak0l6eUKfijIfMUZ4EgX0QYo=",
+    version = "v0.2.2",
+)
+go_deps.module(
+    path = "github.com/muesli/termenv",
+    sum = "h1:ZRfOIKPFDYQoDFF4Olj7/QJbW60Ol/kL1pU3VfY/Cnk=",
+    version = "v0.16.0",
+)
+go_deps.module(
+    path = "github.com/philhofer/fwd",
+    sum = "h1:RqIHx9QI14HlwKwm98g9Re5prTQ6LdeRQn+gXJFxsJM=",
+    version = "v1.2.0",
+)
+go_deps.module(
+    path = "github.com/rs/xid",
+    sum = "h1:7XoLgs4eV+QndskICGsho+ADou8ySMSjJKDIan90Nz0=",
+    version = "v1.6.0",
+)
+go_deps.module(
+    path = "github.com/tinylib/msgp",
+    sum = "h1:RSp0LW9oSxFut3KzESt5Voq4GVWyS+PSulT77roAqEA=",
+    version = "v1.6.1",
+)
+
 use_repo(
     go_deps,
     "cat_dario_mergo",
