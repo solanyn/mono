@@ -14,14 +14,15 @@ import (
 
 // Client wraps HTTP calls to mlx-audio server and kgateway.
 type Client struct {
-	AudioURL   string // mlx-audio server (default http://localhost:8000)
+	AudioURL   string // mlx-audio server (default http://127.0.0.1:8000)
 	GatewayURL string // kgateway (default https://gateway.goyangi.io)
+	APIKey     string // optional Bearer token for authenticated endpoints
 	HTTPClient *http.Client
 }
 
-func New(audioURL, gatewayURL string) *Client {
+func New(audioURL, gatewayURL, apiKey string) *Client {
 	if audioURL == "" {
-		audioURL = "http://localhost:8000"
+		audioURL = "http://127.0.0.1:8000"
 	}
 	if gatewayURL == "" {
 		gatewayURL = "https://gateway.goyangi.io"
@@ -29,8 +30,17 @@ func New(audioURL, gatewayURL string) *Client {
 	return &Client{
 		AudioURL:   audioURL,
 		GatewayURL: gatewayURL,
+		APIKey:     apiKey,
 		HTTPClient: &http.Client{},
 	}
+}
+
+// do executes an HTTP request, attaching the API key if configured.
+func (c *Client) do(req *http.Request) (*http.Response, error) {
+	if c.APIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.APIKey)
+	}
+	return c.HTTPClient.Do(req)
 }
 
 // VADSegment is a speaker segment from Sortformer.
@@ -56,7 +66,12 @@ func (c *Client) VAD(audioPath string, threshold float64) (*VADResult, error) {
 		return nil, err
 	}
 
-	resp, err := c.HTTPClient.Post(c.AudioURL+"/v1/audio/vad", ct, body)
+	req, err := http.NewRequest("POST", c.AudioURL+"/v1/audio/vad", body)
+	if err != nil {
+		return nil, fmt.Errorf("vad request: %w", err)
+	}
+	req.Header.Set("Content-Type", ct)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, fmt.Errorf("vad request: %w", err)
 	}
@@ -96,7 +111,12 @@ func (c *Client) Transcribe(audioPath string) (*TranscriptResult, error) {
 		return nil, err
 	}
 
-	resp, err := c.HTTPClient.Post(c.AudioURL+"/v1/audio/transcriptions", ct, body)
+	req, err := http.NewRequest("POST", c.AudioURL+"/v1/audio/transcriptions", body)
+	if err != nil {
+		return nil, fmt.Errorf("transcribe request: %w", err)
+	}
+	req.Header.Set("Content-Type", ct)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, fmt.Errorf("transcribe request: %w", err)
 	}
@@ -125,11 +145,12 @@ func (c *Client) Summarize(transcript string, template string) (string, error) {
 		},
 	})
 
-	resp, err := c.HTTPClient.Post(
-		c.GatewayURL+"/v1/chat/completions",
-		"application/json",
-		bytes.NewReader(reqBody),
-	)
+	req, err := http.NewRequest("POST", c.GatewayURL+"/v1/chat/completions", bytes.NewReader(reqBody))
+	if err != nil {
+		return "", fmt.Errorf("summarize request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.do(req)
 	if err != nil {
 		return "", fmt.Errorf("summarize request: %w", err)
 	}
