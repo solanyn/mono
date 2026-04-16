@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/solanyn/mono/scrib/audio"
-	"github.com/solanyn/mono/scrib/calendar"
 	"github.com/solanyn/mono/scrib/client"
 	"github.com/solanyn/mono/scrib/config"
 	"github.com/solanyn/mono/scrib/store"
@@ -431,16 +430,6 @@ func runTUI(cfg *config.Config, args []string) error {
 		defer db.Close()
 	}
 
-	// Fetch calendar events if configured
-	var events []calendar.Event
-	if cfg.Calendar.URL != "" {
-		token := cfg.CalendarToken()
-		cal := calendar.NewClient(cfg.Calendar.URL, cfg.Calendar.User, token)
-		if ev, err := cal.TodayEvents(); err == nil {
-			events = ev
-		}
-	}
-
 	return tui.Run(tui.Options{
 		Name:       name,
 		OutputPath: outPath,
@@ -450,7 +439,6 @@ func runTUI(cfg *config.Config, args []string) error {
 		Client:     c,
 		Template:   cfg.Summarise.Template,
 		DB:         db,
-		Events:     events,
 	})
 }
 

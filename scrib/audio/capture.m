@@ -7,6 +7,7 @@
 #import <AudioToolbox/AudioToolbox.h>
 #import <AVFoundation/AVFoundation.h>
 #include "capture.h"
+#include <stdatomic.h>
 
 // ─── System Audio (ScreenCaptureKit) ───────────────────────────────
 
@@ -208,7 +209,7 @@ static void stop_system_audio(void) {
 
 // ─── Public API ────────────────────────────────────────────────────
 
-static int gCaptureStatus = 0; // 0=both, 1=mic-only, -1=failed
+static _Atomic int gCaptureStatus = 0;
 
 int start_capture(int sample_rate) {
     gSampleRate = sample_rate;

@@ -18,44 +18,50 @@ func TestInitialLevelsZero(t *testing.T) {
 
 func TestExponentialSmoothing(t *testing.T) {
 	r := &Recorder{sampleRate: 16000}
+	r.mu.Lock()
+	r.recording = true
+	r.samples = make([]int16, 0, 16000*2)
+	r.mu.Unlock()
 
-	r.levelMu.Lock()
-	r.micLevel = 0.5
-	r.levelMu.Unlock()
-
-	newRMS := 1.0
-	expected := 0.3*newRMS + 0.7*0.5
-
-	r.levelMu.Lock()
-	r.micLevel = 0.3*newRMS + 0.7*r.micLevel
-	r.levelMu.Unlock()
-
-	got := r.MicLevel()
-	if math.Abs(got-expected) > 1e-10 {
-		t.Errorf("MicLevel after smoothing = %f, want %f", got, expected)
+	amplitude := int16(16384)
+	frames := 1600
+	buf := make([]int16, frames)
+	for i := range buf {
+		buf[i] = amplitude
 	}
 
-	r.levelMu.Lock()
-	r.micLevel = 0.3*0.0 + 0.7*r.micLevel
-	r.levelMu.Unlock()
+	r.onAudioGo(buf, frames, 1, true)
+
+	first := r.MicLevel()
+	if first <= 0 {
+		t.Fatalf("MicLevel after first chunk = %f, want > 0", first)
+	}
+
+	expectedRMS := float64(amplitude) / 32768.0
+	expectedSmoothed := 0.3 * expectedRMS
+	if math.Abs(first-expectedSmoothed) > 0.01 {
+		t.Errorf("MicLevel = %f, want ~%f", first, expectedSmoothed)
+	}
+
+	silent := make([]int16, frames)
+	r.onAudioGo(silent, frames, 1, true)
 
 	decayed := r.MicLevel()
-	if decayed >= expected {
-		t.Errorf("level should decay: got %f, previous %f", decayed, expected)
+	if decayed >= first {
+		t.Errorf("level should decay: got %f, previous %f", decayed, first)
 	}
-	expectedDecay := 0.7 * expected
-	if math.Abs(decayed-expectedDecay) > 1e-10 {
-		t.Errorf("decayed level = %f, want %f", decayed, expectedDecay)
+	expectedDecay := 0.7 * first
+	if math.Abs(decayed-expectedDecay) > 0.01 {
+		t.Errorf("decayed level = %f, want ~%f", decayed, expectedDecay)
 	}
 }
 
 func TestLevelsConcurrentAccess(t *testing.T) {
 	r := &Recorder{sampleRate: 16000}
-
-	r.levelMu.Lock()
-	r.micLevel = 0.5
-	r.sysLevel = 0.3
-	r.levelMu.Unlock()
+	r.mu.Lock()
+	r.recording = true
+	r.samples = make([]int16, 0, 16000*2)
+	r.mu.Unlock()
 
 	var wg sync.WaitGroup
 	for i := 0; i < 100; i++ {
@@ -70,13 +76,14 @@ func TestLevelsConcurrentAccess(t *testing.T) {
 		}()
 	}
 
+	buf := make([]int16, 160)
+	for i := range buf {
+		buf[i] = 1000
+	}
 	done := make(chan struct{})
 	go func() {
 		for i := 0; i < 100; i++ {
-			r.levelMu.Lock()
-			r.micLevel = 0.3*0.1 + 0.7*r.micLevel
-			r.sysLevel = 0.3*0.2 + 0.7*r.sysLevel
-			r.levelMu.Unlock()
+			r.onAudioGo(buf, 160, 1, true)
 		}
 		close(done)
 	}()

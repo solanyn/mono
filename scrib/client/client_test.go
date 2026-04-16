@@ -11,23 +11,23 @@ import (
 func TestSummarizeURL(t *testing.T) {
 	tests := []struct {
 		name       string
-		gatewayURL string
+		suffix     string
 		wantPath   string
 	}{
 		{
-			name:       "standard gateway URL",
-			gatewayURL: "https://gateway.goyangi.io/v1/opus",
-			wantPath:   "/v1/opus/chat/completions",
+			name:     "standard gateway URL",
+			suffix:   "/v1/opus",
+			wantPath: "/v1/opus/chat/completions",
 		},
 		{
-			name:       "trailing slash stripped",
-			gatewayURL: "", // will be replaced by test server
-			wantPath:   "/chat/completions",
+			name:     "trailing slash stripped",
+			suffix:   "/v1/opus/",
+			wantPath: "/v1/opus/chat/completions",
 		},
 		{
-			name:       "empty gateway URL",
-			gatewayURL: "",
-			wantPath:   "/chat/completions",
+			name:     "bare server URL",
+			suffix:   "",
+			wantPath: "/chat/completions",
 		},
 	}
 
@@ -44,18 +44,8 @@ func TestSummarizeURL(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			var gatewayURL string
-			switch tt.name {
-			case "standard gateway URL":
-				gatewayURL = srv.URL + "/v1/opus"
-			case "trailing slash stripped":
-				gatewayURL = srv.URL
-			case "empty gateway URL":
-				gatewayURL = srv.URL
-			}
-
 			c := &Client{
-				GatewayURL: gatewayURL,
+				GatewayURL: srv.URL + tt.suffix,
 				HTTPClient: srv.Client(),
 			}
 

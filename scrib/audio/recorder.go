@@ -39,13 +39,16 @@ func goAudioCallback(data *C.int16_t, frameCount C.int, channels C.int, isMic C.
 var globalRecorder *Recorder
 
 func (r *Recorder) onAudio(data *C.int16_t, frameCount, channels int, isMic bool) {
+	src := unsafe.Slice((*int16)(unsafe.Pointer(data)), frameCount*channels)
+	r.onAudioGo(src, frameCount, channels, isMic)
+}
+
+func (r *Recorder) onAudioGo(src []int16, frameCount, channels int, isMic bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.recording {
 		return
 	}
-
-	src := unsafe.Slice((*int16)(unsafe.Pointer(data)), frameCount*channels)
 
 	mono := make([]int16, frameCount)
 	var sumSq float64
@@ -72,9 +75,13 @@ func (r *Recorder) onAudio(data *C.int16_t, frameCount, channels int, isMic bool
 	}
 	r.levelMu.Unlock()
 
+	// Stereo interleaving layout:
+	// Even indices (0, 2, 4, ...) = left channel (mic)
+	// Odd indices  (1, 3, 5, ...) = right channel (system audio)
 	currentFrames := len(r.samples) / 2
 
 	if isMic {
+		// Write mic samples into left channel (even indices)
 		for i := 0; i < frameCount; i++ {
 			idx := (currentFrames + i) * 2
 			for idx+1 >= len(r.samples) {
@@ -83,6 +90,7 @@ func (r *Recorder) onAudio(data *C.int16_t, frameCount, channels int, isMic bool
 			r.samples[idx] = mono[i]
 		}
 	} else {
+		// Write system audio into right channel (odd indices)
 		for i := 0; i < frameCount; i++ {
 			idx := (currentFrames+i)*2 + 1
 			for idx >= len(r.samples) {
