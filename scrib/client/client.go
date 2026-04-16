@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Client wraps HTTP calls to mlx-audio server and kgateway.
@@ -151,7 +152,7 @@ func (c *Client) Summarize(transcript string, template string) (string, error) {
 		},
 	})
 
-	req, err := http.NewRequest("POST", c.GatewayURL+"/chat/completions", bytes.NewReader(reqBody))
+	req, err := http.NewRequest("POST", strings.TrimRight(c.GatewayURL, "/")+"/chat/completions", bytes.NewReader(reqBody))
 	if err != nil {
 		return "", fmt.Errorf("summarize request: %w", err)
 	}
