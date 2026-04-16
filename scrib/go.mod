@@ -9,7 +9,7 @@ require (
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/lib/pq v1.12.3
 	github.com/minio/minio-go/v7 v7.0.100
-	github.com/pelletier/go-toml v1.9.5
+	github.com/pelletier/go-toml/v2 v2.3.0
 	github.com/pelletier/go-toml/v2 v2.3.0
 	github.com/spf13/cobra v1.10.2
 	modernc.org/sqlite v1.48.2
