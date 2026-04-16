@@ -27,6 +27,7 @@ type SyncConfig struct {
 type Config struct {
 	GatewayURL    string          `toml:"gateway_url"`
 	AudioURL      string          `toml:"audio_url"`
+	APIKey        string          `toml:"api_key"`
 	OutputDir     string          `toml:"output_dir"`
 	ObsidianVault string          `toml:"obsidian_vault"`
 	SampleRate    int             `toml:"sample_rate"`
@@ -39,7 +40,7 @@ type Config struct {
 func defaults() *Config {
 	return &Config{
 		GatewayURL:   "https://gateway.goyangi.io",
-		AudioURL:     "http://localhost:8000",
+		AudioURL:     "http://127.0.0.1:8000",
 		OutputDir:    "~/meetings",
 		SampleRate:   16000,
 		Format:       "wav",
