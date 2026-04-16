@@ -1,9 +1,8 @@
-// Package tui provides the BubbleTea-based TUI for scrib.
-// Three phases: recording (live transcript), processing (pipeline), results (rendered markdown).
 package tui
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"strings"
 	"time"
@@ -13,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/solanyn/mono/scrib/audio"
+	"github.com/solanyn/mono/scrib/calendar"
 	"github.com/solanyn/mono/scrib/client"
 	"github.com/solanyn/mono/scrib/store"
 )
@@ -20,14 +20,13 @@ import (
 type phase int
 
 const (
-	phaseRecording phase = iota
+	phaseLaunch phase = iota
+	phaseRecording
+	phaseConfirm
 	phaseProcessing
 	phaseResults
 )
 
-const chunkInterval = 10 * time.Second
-
-// Options configures the TUI.
 type Options struct {
 	Name       string
 	OutputPath string
@@ -37,6 +36,7 @@ type Options struct {
 	Client     *client.Client
 	Template   string
 	DB         *store.DB
+	Events     []calendar.Event
 }
 
 type model struct {
@@ -48,22 +48,30 @@ type model struct {
 	startTime time.Time
 	elapsed   time.Duration
 
-	// recording phase — live transcription
+	// launch
+	eventItems []eventItem
+	cursor     int
+
+	// recording
 	transcript []transcriptLine
 	viewport   viewport.Model
-	lastFrame  int // frame offset for next chunk
+	lastChunk  time.Time
 
-	// processing phase
+	// processing
 	spinner spinner.Model
 	steps   []processStep
 	stepIdx int
 
-	// results phase
-	result    *client.AnnotateResult
-	resultVP  viewport.Model
-	meetingID int64
+	// results
+	result   *client.AnnotateResult
+	resultVP viewport.Model
 
 	err error
+}
+
+type eventItem struct {
+	event *calendar.Event // nil = ad hoc
+	label string
 }
 
 type transcriptLine struct {
@@ -78,12 +86,10 @@ type processStep struct {
 
 // messages
 type tickMsg time.Time
-type chunkTickMsg time.Time
-type chunkResultMsg struct {
-	ts   time.Duration
+type transcriptMsg struct {
 	text string
+	ts   time.Duration
 }
-type chunkErrMsg struct{ err error }
 type pipelineDoneMsg struct {
 	result *client.AnnotateResult
 	err    error
@@ -93,33 +99,65 @@ func tickCmd() tea.Cmd {
 	return tea.Tick(time.Second, func(t time.Time) tea.Msg { return tickMsg(t) })
 }
 
-func chunkTickCmd() tea.Cmd {
-	return tea.Tick(chunkInterval, func(t time.Time) tea.Msg { return chunkTickMsg(t) })
-}
+// styles
+var (
+	titleStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205"))
+	dimStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	checkStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+	selStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
+	nowStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
+	borderStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240"))
+	meterStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	waveStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+)
 
 func initialModel(opts Options) model {
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
 	sp.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
-	vp := viewport.New(80, 20)
-
-	return model{
-		opts:      opts,
-		phase:     phaseRecording,
-		startTime: time.Now(),
-		viewport:  vp,
-		spinner:   sp,
+	m := model{
+		opts:    opts,
+		spinner: sp,
 		steps: []processStep{
 			{label: "Saving audio"},
-			{label: "Speaker diarisation + transcription"},
+			{label: "Speaker diarisation"},
+			{label: "Transcription"},
 			{label: "Summarising"},
 		},
 	}
+
+	// Build event list
+	nowIdx := -1
+	for i, ev := range opts.Events {
+		label := fmt.Sprintf("%s–%s  %s", ev.Start.Format("15:04"), ev.End.Format("15:04"), ev.Summary)
+		if len(ev.Attendees) > 0 {
+			label += fmt.Sprintf("  (%d attendees)", len(ev.Attendees))
+		}
+		item := eventItem{event: &opts.Events[i], label: label}
+		m.eventItems = append(m.eventItems, item)
+		if ev.IsNow() && nowIdx < 0 {
+			nowIdx = i
+		}
+	}
+	m.eventItems = append(m.eventItems, eventItem{label: "Ad hoc recording"})
+
+	if nowIdx >= 0 {
+		m.cursor = nowIdx
+	}
+
+	// Skip launch if no events
+	if len(opts.Events) == 0 {
+		m.phase = phaseRecording
+	} else {
+		m.phase = phaseLaunch
+	}
+
+	return m
 }
 
 func (m model) Init() tea.Cmd {
-	return tea.Batch(tickCmd(), chunkTickCmd(), m.spinner.Tick)
+	return tea.Batch(tickCmd(), m.spinner.Tick)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -127,56 +165,33 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c":
-			if m.phase == phaseRecording {
-				m.phase = phaseProcessing
-				m.stepIdx = 0
-				return m, m.runPipeline()
-			}
-			if m.phase == phaseResults {
-				return m, tea.Quit
-			}
-		case "q":
-			if m.phase == phaseResults {
-				return m, tea.Quit
-			}
-		}
+		return m.handleKey(msg)
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		contentH := m.height - 4
-		m.viewport.Width = m.width - 4
-		m.viewport.Height = contentH
-		m.resultVP.Width = m.width - 4
-		m.resultVP.Height = contentH
+		h := max(m.height-4, 1)
+		w := max(m.width-4, 1)
+		m.viewport = viewport.New(w, h)
+		m.resultVP = viewport.New(w, h)
 
 	case tickMsg:
 		if m.phase == phaseRecording {
 			m.elapsed = time.Since(m.startTime)
+			// Live transcription every 10s
+			if m.recorder != nil && time.Since(m.lastChunk) >= 10*time.Second && m.recorder.FrameCount() > 0 {
+				m.lastChunk = time.Now()
+				cmds = append(cmds, m.transcribeChunk())
+			}
 		}
 		cmds = append(cmds, tickCmd())
 
-	case chunkTickMsg:
-		if m.phase == phaseRecording {
-			cmds = append(cmds, m.transcribeChunk(), chunkTickCmd())
-		}
-
-	case chunkResultMsg:
+	case transcriptMsg:
 		if msg.text != "" {
-			m.transcript = append(m.transcript, transcriptLine{
-				ts:   msg.ts,
-				text: msg.text,
-			})
+			m.transcript = append(m.transcript, transcriptLine{ts: msg.ts, text: msg.text})
+			m.viewport.SetContent(m.renderTranscript())
+			m.viewport.GotoBottom()
 		}
-
-	case chunkErrMsg:
-		// Silently skip failed chunks — don't crash the TUI
-		m.transcript = append(m.transcript, transcriptLine{
-			ts:   m.elapsed,
-			text: dimStyle.Render("[transcription failed]"),
-		})
 
 	case spinner.TickMsg:
 		var cmd tea.Cmd
@@ -190,14 +205,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.result = msg.result
 		m.phase = phaseResults
-		m.resultVP = viewport.New(m.width-4, m.height-4)
+		m.resultVP = viewport.New(max(m.width-4, 1), max(m.height-4, 1))
 		m.resultVP.SetContent(m.renderResults())
 	}
 
-	// Update viewport for current phase
 	if m.phase == phaseRecording {
-		m.viewport.SetContent(m.renderTranscript())
-		m.viewport.GotoBottom()
 		var cmd tea.Cmd
 		m.viewport, cmd = m.viewport.Update(msg)
 		cmds = append(cmds, cmd)
@@ -210,51 +222,107 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m *model) transcribeChunk() tea.Cmd {
-	fromFrame := m.lastFrame
-	samples := m.recorder.Snapshot(fromFrame)
-	if len(samples) < m.opts.SampleRate*2 { // less than 1 second of audio
-		return nil
+func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	key := msg.String()
+
+	switch m.phase {
+	case phaseLaunch:
+		switch key {
+		case "up", "k":
+			if m.cursor > 0 {
+				m.cursor--
+			}
+		case "down", "j":
+			if m.cursor < len(m.eventItems)-1 {
+				m.cursor++
+			}
+		case "enter":
+			sel := m.eventItems[m.cursor]
+			if sel.event != nil {
+				m.opts.Name = sanitizeName(sel.event.Summary)
+			}
+			m.phase = phaseRecording
+			m.startTime = time.Now()
+			m.lastChunk = time.Now()
+			return m, m.startRecording()
+		case "ctrl+c", "q":
+			return m, tea.Quit
+		}
+
+	case phaseRecording:
+		if key == "ctrl+c" {
+			m.phase = phaseConfirm
+		}
+
+	case phaseConfirm:
+		switch key {
+		case "p", "P":
+			m.phase = phaseProcessing
+			m.stepIdx = 0
+			return m, m.runPipeline()
+		case "s", "S":
+			return m, m.saveOnly()
+		case "d", "D":
+			if m.recorder != nil {
+				m.recorder.Stop()
+			}
+			return m, tea.Quit
+		case "ctrl+c":
+			if m.recorder != nil {
+				m.recorder.Stop()
+			}
+			return m, tea.Quit
+		}
+
+	case phaseResults:
+		if key == "q" || key == "ctrl+c" {
+			return m, tea.Quit
+		}
 	}
 
-	chunkTS := time.Duration(fromFrame/m.opts.SampleRate) * time.Second
-	m.lastFrame = m.recorder.FrameCount()
+	return m, nil
+}
 
+func (m model) startRecording() tea.Cmd {
+	return func() tea.Msg {
+		// recorder is started in Run() before tea.NewProgram
+		return tickMsg(time.Now())
+	}
+}
+
+func (m model) transcribeChunk() tea.Cmd {
+	snapshot := m.recorder.Snapshot(0)
+	elapsed := m.elapsed
+	sampleRate := m.opts.SampleRate
 	c := m.opts.Client
 
 	return func() tea.Msg {
-		// Write chunk to temp WAV
-		tmpPath, err := audio.WriteWAVTemp(samples, m.opts.SampleRate, 2)
+		tmp, err := audio.WriteWAVTemp(snapshot, sampleRate, 2)
 		if err != nil {
-			return chunkErrMsg{err: err}
+			return transcriptMsg{}
 		}
-		defer os.Remove(tmpPath)
+		defer os.Remove(tmp)
 
-		result, err := c.Transcribe(tmpPath)
+		result, err := c.Transcribe(tmp)
 		if err != nil {
-			return chunkErrMsg{err: err}
+			return transcriptMsg{}
 		}
-
-		text := strings.TrimSpace(result.Text)
-		return chunkResultMsg{ts: chunkTS, text: text}
+		return transcriptMsg{text: result.Text, ts: elapsed}
 	}
 }
 
 func (m model) runPipeline() tea.Cmd {
 	return func() tea.Msg {
-		// Step 0: save audio
 		samples := m.recorder.Stop()
 		if err := audio.WriteWAV(m.opts.OutputPath, samples, m.opts.SampleRate, 2); err != nil {
 			return pipelineDoneMsg{err: err}
 		}
 
-		// Steps 1-2: annotate (VAD + STT + summarise)
 		result, err := m.opts.Client.Annotate(m.opts.OutputPath, 0.5, m.opts.Template)
 		if err != nil {
 			return pipelineDoneMsg{err: err}
 		}
 
-		// Store in database
 		if m.opts.DB != nil {
 			dur := time.Duration(len(samples)/2/m.opts.SampleRate) * time.Second
 			meetingID, _ := m.opts.DB.InsertMeeting(&store.Meeting{
@@ -265,7 +333,6 @@ func (m model) runPipeline() tea.Cmd {
 				AudioPath:   m.opts.OutputPath,
 				NumSpeakers: result.RawVAD.NumSpeakers,
 			})
-
 			for _, seg := range result.Segments {
 				m.opts.DB.InsertSegment(&store.Segment{
 					MeetingID:    meetingID,
@@ -275,7 +342,6 @@ func (m model) runPipeline() tea.Cmd {
 					Text:         seg.Text,
 				})
 			}
-
 			m.opts.DB.InsertSummary(&store.Summary{
 				MeetingID: meetingID,
 				Template:  m.opts.Template,
@@ -287,35 +353,37 @@ func (m model) runPipeline() tea.Cmd {
 	}
 }
 
-// Styles
-var (
-	titleStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("205"))
+func (m model) saveOnly() tea.Cmd {
+	return func() tea.Msg {
+		samples := m.recorder.Stop()
+		audio.WriteWAV(m.opts.OutputPath, samples, m.opts.SampleRate, 2)
+		if m.opts.DB != nil {
+			dur := time.Duration(len(samples)/2/m.opts.SampleRate) * time.Second
+			m.opts.DB.InsertMeeting(&store.Meeting{
+				Name:       m.opts.Name,
+				RecordedAt: time.Now(),
+				DurationS:  dur.Seconds(),
+				Template:   m.opts.Template,
+				AudioPath:  m.opts.OutputPath,
+			})
+		}
+		return tea.Quit()
+	}
+}
 
-	recStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("196")).
-			Bold(true)
-
-	dimStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("241"))
-
-	checkStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("42"))
-
-	borderStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("240"))
-)
+// --- Views ---
 
 func (m model) View() string {
 	if m.err != nil {
 		return fmt.Sprintf("Error: %v\n", m.err)
 	}
-
 	switch m.phase {
+	case phaseLaunch:
+		return m.viewLaunch()
 	case phaseRecording:
 		return m.viewRecording()
+	case phaseConfirm:
+		return m.viewConfirm()
 	case phaseProcessing:
 		return m.viewProcessing()
 	case phaseResults:
@@ -324,25 +392,96 @@ func (m model) View() string {
 	return ""
 }
 
+func (m model) viewLaunch() string {
+	var sb strings.Builder
+	sb.WriteString(titleStyle.Render("scrib") + "  " + dimStyle.Render("select a meeting to record") + "\n\n")
+
+	for i, item := range m.eventItems {
+		prefix := "  "
+		style := lipgloss.NewStyle()
+		if i == m.cursor {
+			prefix = "▸ "
+			style = selStyle
+		}
+		label := item.label
+		if item.event != nil && item.event.IsNow() {
+			label = nowStyle.Render("NOW ") + label
+		}
+		sb.WriteString(prefix + style.Render(label) + "\n")
+	}
+
+	sb.WriteString("\n" + dimStyle.Render("  ↑/↓: navigate  enter: select  q: quit"))
+	return sb.String()
+}
+
 func (m model) viewRecording() string {
 	elapsed := fmt.Sprintf("%02d:%02d", int(m.elapsed.Minutes()), int(m.elapsed.Seconds())%60)
 	title := titleStyle.Render(fmt.Sprintf("─ %s ", m.opts.Name))
-	rec := recStyle.Render("● REC")
-	status := dimStyle.Render(fmt.Sprintf("  %s  %s  │  ctrl+c: stop & process", rec, elapsed))
+
+	var statusParts []string
+	statusParts = append(statusParts, dimStyle.Render(elapsed))
+
+	if m.recorder != nil {
+		micLvl := m.recorder.MicLevel()
+		sysLvl := m.recorder.SysLevel()
+		statusParts = append(statusParts, meterStyle.Render("mic")+renderMeter(micLvl))
+		statusParts = append(statusParts, meterStyle.Render("sys")+renderMeter(sysLvl))
+	}
+
+	statusParts = append(statusParts, dimStyle.Render("ctrl+c: stop"))
+	status := "  " + strings.Join(statusParts, dimStyle.Render("  │  "))
+
+	var deviceInfo string
+	if m.recorder != nil {
+		inputDev := audio.GetInputDeviceName()
+		outputDev := audio.GetOutputDeviceName()
+		deviceInfo = dimStyle.Render(fmt.Sprintf("  mic: %s  │  out: %s", inputDev, outputDev))
+	}
+
+	waveform := ""
+	if m.recorder != nil {
+		waveform = renderWaveform(m.recorder.MicLevel(), m.recorder.SysLevel(), max(m.width-6, 20))
+	}
 
 	content := borderStyle.
-		Width(m.width - 2).
-		Height(m.height - 4).
+		Width(max(m.width-2, 10)).
+		Height(max(m.height-6, 1)).
 		Render(m.viewport.View())
 
-	return fmt.Sprintf("%s\n%s\n%s", title, content, status)
+	return fmt.Sprintf("%s\n%s\n%s\n%s\n%s", title, content, waveform, status, deviceInfo)
+}
+
+func (m model) viewConfirm() string {
+	elapsed := fmt.Sprintf("%02d:%02d", int(m.elapsed.Minutes()), int(m.elapsed.Seconds())%60)
+	title := titleStyle.Render(fmt.Sprintf("─ %s ", m.opts.Name))
+
+	body := fmt.Sprintf(`
+  Recording stopped (%s)
+
+  What would you like to do?
+
+  %s  Process (VAD + STT + summarise)
+  %s  Save audio only
+  %s  Discard
+
+`, elapsed,
+		selStyle.Render("[P]"),
+		selStyle.Render("[S]"),
+		selStyle.Render("[D]"))
+
+	content := borderStyle.
+		Width(max(m.width-2, 10)).
+		Height(max(m.height-4, 1)).
+		Render(body)
+
+	return fmt.Sprintf("%s\n%s", title, content)
 }
 
 func (m model) viewProcessing() string {
 	title := titleStyle.Render(fmt.Sprintf("─ %s ", m.opts.Name))
 
 	var sb strings.Builder
-	sb.WriteString("\n  Processing full recording...\n\n")
+	sb.WriteString("\n  Processing...\n\n")
 	for i, step := range m.steps {
 		if step.done {
 			sb.WriteString(fmt.Sprintf("  %s %s\n", checkStyle.Render("✓"), step.label))
@@ -354,8 +493,8 @@ func (m model) viewProcessing() string {
 	}
 
 	content := borderStyle.
-		Width(m.width - 2).
-		Height(m.height - 4).
+		Width(max(m.width-2, 10)).
+		Height(max(m.height-4, 1)).
 		Render(sb.String())
 
 	return fmt.Sprintf("%s\n%s", title, content)
@@ -366,8 +505,8 @@ func (m model) viewResults() string {
 	status := dimStyle.Render("  ↑/↓: scroll  │  q: exit")
 
 	content := borderStyle.
-		Width(m.width - 2).
-		Height(m.height - 4).
+		Width(max(m.width-2, 10)).
+		Height(max(m.height-4, 1)).
 		Render(m.resultVP.View())
 
 	return fmt.Sprintf("%s\n%s\n%s", title, content, status)
@@ -375,7 +514,7 @@ func (m model) viewResults() string {
 
 func (m model) renderTranscript() string {
 	if len(m.transcript) == 0 {
-		return dimStyle.Render("\n  Listening... live transcript appears every 10s\n")
+		return dimStyle.Render("\n  Listening... transcript will appear here\n")
 	}
 	var sb strings.Builder
 	for _, line := range m.transcript {
@@ -390,15 +529,91 @@ func (m model) renderResults() string {
 	if m.result == nil {
 		return ""
 	}
-
 	var sb strings.Builder
-	dur := m.result.Duration
-	sb.WriteString(fmt.Sprintf("  Duration: %s | Speakers: %d\n", dur.Round(time.Second), m.result.RawVAD.NumSpeakers))
+	sb.WriteString(fmt.Sprintf("  Duration: %s | Speakers: %d\n", m.result.Duration.Round(time.Second), m.result.RawVAD.NumSpeakers))
 	sb.WriteString(fmt.Sprintf("  Audio: %s\n\n", m.opts.OutputPath))
 	sb.WriteString(m.result.Summary)
 	sb.WriteString("\n")
-
 	return sb.String()
+}
+
+func renderMeter(level float64) string {
+	const width = 8
+	blocks := []string{"░", "▒", "▓", "█"}
+	db := 20 * math.Log10(level+1e-10)
+	norm := (db + 60) / 60
+	if norm < 0 {
+		norm = 0
+	}
+	if norm > 1 {
+		norm = 1
+	}
+	filled := int(norm * width)
+	var sb strings.Builder
+	sb.WriteString(" ")
+	for i := 0; i < width; i++ {
+		if i < filled {
+			idx := int(norm * float64(len(blocks)-1))
+			sb.WriteString(meterStyle.Render(blocks[idx]))
+		} else {
+			sb.WriteString(dimStyle.Render("░"))
+		}
+	}
+	return sb.String()
+}
+
+func renderWaveform(micLevel, sysLevel float64, width int) string {
+	bars := []rune(" ▁▂▃▄▅▆▇")
+	half := width / 2
+
+	combined := (micLevel + sysLevel) / 2
+	db := 20 * math.Log10(combined+1e-10)
+	norm := (db + 60) / 60
+	if norm < 0 {
+		norm = 0
+	}
+	if norm > 1 {
+		norm = 1
+	}
+
+	var sb strings.Builder
+	sb.WriteString("  ")
+	for i := 0; i < width; i++ {
+		dist := float64(i-half) / float64(half)
+		if dist < 0 {
+			dist = -dist
+		}
+		amp := norm * (1 - dist*dist)
+		if amp < 0 {
+			amp = 0
+		}
+		idx := int(amp * float64(len(bars)-1))
+		if idx >= len(bars) {
+			idx = len(bars) - 1
+		}
+		sb.WriteRune(bars[idx])
+	}
+	return waveStyle.Render(sb.String())
+}
+
+func sanitizeName(s string) string {
+	s = strings.Map(func(r rune) rune {
+		if r == '/' || r == '\\' || r == ':' || r == '*' || r == '?' || r == '"' || r == '<' || r == '>' || r == '|' {
+			return '-'
+		}
+		return r
+	}, s)
+	if len(s) > 60 {
+		s = s[:60]
+	}
+	return time.Now().Format("2006-01-02") + "-" + strings.ToLower(strings.ReplaceAll(strings.TrimSpace(s), " ", "-"))
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 // Run starts the scrib TUI.
@@ -414,6 +629,8 @@ func Run(opts Options) error {
 
 	m := initialModel(opts)
 	m.recorder = rec
+	m.startTime = time.Now()
+	m.lastChunk = time.Now()
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
@@ -427,9 +644,9 @@ func Run(opts Options) error {
 		return fm.err
 	}
 
-	fmt.Printf("Saved: %s\n", opts.OutputPath)
-	mdPath := strings.TrimSuffix(opts.OutputPath, ".wav") + ".md"
-	fmt.Printf("Notes: %s\n", mdPath)
+	if fm.phase == phaseResults {
+		fmt.Printf("Saved: %s\n", opts.OutputPath)
+	}
 
 	return nil
 }

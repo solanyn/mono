@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/solanyn/mono/scrib/audio"
+	"github.com/solanyn/mono/scrib/calendar"
 	"github.com/solanyn/mono/scrib/client"
 	"github.com/solanyn/mono/scrib/config"
 	"github.com/solanyn/mono/scrib/store"
@@ -29,7 +30,7 @@ func main() {
 		Use:     "scrib [name]",
 		Short:   "Meeting audio capture & annotation",
 		Version: version,
-		Args:  cobra.MaximumNArgs(1),
+		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if template != "" {
 				cfg.Summarise.Template = template
@@ -169,7 +170,6 @@ func runRecord(cfg *config.Config, args []string, annotateAfter bool) error {
 	dur := time.Duration(len(samples)/2/cfg.SampleRate) * time.Second
 	fmt.Printf("Saved %s (%s)\n", outPath, dur)
 
-	// Store in database
 	db, err := openDB()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "warning: couldn't open db: %v\n", err)
@@ -201,7 +201,6 @@ func runAnnotate(cfg *config.Config, audioPath string) error {
 		return fmt.Errorf("annotate: %w", err)
 	}
 
-	// Store in database
 	db, dbErr := openDB()
 	var meetingID int64
 	if dbErr == nil {
@@ -216,7 +215,6 @@ func runAnnotate(cfg *config.Config, audioPath string) error {
 			NumSpeakers: result.RawVAD.NumSpeakers,
 		})
 
-		// Store segments
 		for _, seg := range result.Segments {
 			db.InsertSegment(&store.Segment{
 				MeetingID:    meetingID,
@@ -227,7 +225,6 @@ func runAnnotate(cfg *config.Config, audioPath string) error {
 			})
 		}
 
-		// Store summary
 		db.InsertSummary(&store.Summary{
 			MeetingID: meetingID,
 			Template:  cfg.Summarise.Template,
@@ -235,7 +232,6 @@ func runAnnotate(cfg *config.Config, audioPath string) error {
 		})
 	}
 
-	// Write markdown output
 	outPath := strings.TrimSuffix(audioPath, filepath.Ext(audioPath)) + ".md"
 	name := strings.TrimSuffix(filepath.Base(audioPath), filepath.Ext(audioPath))
 	now := time.Now().Format("2006-01-02 15:04")
@@ -255,8 +251,8 @@ func runAnnotate(cfg *config.Config, audioPath string) error {
 		fmt.Printf("  → Stored in db (meeting #%d)\n", meetingID)
 	}
 
-	if cfg.ObsidianVault != "" {
-		vaultDir := expandPath(cfg.ObsidianVault)
+	if cfg.Output.ObsidianVault != "" {
+		vaultDir := expandPath(cfg.Output.ObsidianVault)
 		os.MkdirAll(vaultDir, 0755)
 		vaultPath := filepath.Join(vaultDir, filepath.Base(outPath))
 		if err := os.WriteFile(vaultPath, []byte(sb.String()), 0644); err != nil {
@@ -393,14 +389,12 @@ func runShow(cfg *config.Config, idStr string) error {
 	fmt.Printf("Duration: %s | Speakers: %d | Template: %s\n", dur.Round(time.Second), meeting.NumSpeakers, meeting.Template)
 	fmt.Printf("Audio: %s\n\n", meeting.AudioPath)
 
-	// Show latest summary
 	summaries, _ := db.GetSummaries(id)
 	if len(summaries) > 0 {
 		fmt.Println(summaries[0].Content)
 		fmt.Println()
 	}
 
-	// Show transcript
 	segments, _ := db.GetSegments(id)
 	if len(segments) > 0 {
 		fmt.Println("## Transcript")
@@ -437,6 +431,16 @@ func runTUI(cfg *config.Config, args []string) error {
 		defer db.Close()
 	}
 
+	// Fetch calendar events if configured
+	var events []calendar.Event
+	if cfg.Calendar.URL != "" {
+		token := cfg.CalendarToken()
+		cal := calendar.NewClient(cfg.Calendar.URL, cfg.Calendar.User, token)
+		if ev, err := cal.TodayEvents(); err == nil {
+			events = ev
+		}
+	}
+
 	return tui.Run(tui.Options{
 		Name:       name,
 		OutputPath: outPath,
@@ -446,6 +450,7 @@ func runTUI(cfg *config.Config, args []string) error {
 		Client:     c,
 		Template:   cfg.Summarise.Template,
 		DB:         db,
+		Events:     events,
 	})
 }
 
@@ -468,7 +473,6 @@ func runSync(cfg *config.Config) error {
 
 	sc := sync.NewClient(cfg.Sync.ServerURL, clientID, db)
 
-	// Push first
 	fmt.Println("Pushing unsynced meetings...")
 	pushResult, err := sc.Push()
 	if err != nil {
@@ -480,7 +484,6 @@ func runSync(cfg *config.Config) error {
 		fmt.Println("  → Nothing to push")
 	}
 
-	// Then pull
 	fmt.Println("Pulling from server...")
 	pulled, err := sc.Pull()
 	if err != nil {

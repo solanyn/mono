@@ -14,4 +14,13 @@ void stop_capture(void);
 // Callback into Go — implemented in recorder.go
 extern void goAudioCallback(int16_t *data, int frameCount, int channels, int isMic);
 
+// Returns the name of the default input (mic) device. Caller must free().
+const char* get_input_device_name(void);
+
+// Returns the name of the default output (speakers) device. Caller must free().
+const char* get_output_device_name(void);
+
+// Capture status: 0=both streams ok, 1=mic-only (system audio failed), -1=failed
+int get_capture_status(void);
+
 #endif
