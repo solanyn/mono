@@ -191,7 +191,7 @@ func runRecord(cfg *config.Config, args []string, annotateAfter bool) error {
 }
 
 func runAnnotate(cfg *config.Config, audioPath string) error {
-	c := client.New(cfg.AudioURL, cfg.GatewayURL, cfg.APIKey)
+	c := client.New(cfg.AudioURL, cfg.GatewayURL, cfg.APIKey, cfg.STTModel)
 
 	fmt.Printf("Annotating %s...\n", audioPath)
 	fmt.Println("  → Running VAD + STT (concurrent)...")
@@ -430,7 +430,7 @@ func runTUI(cfg *config.Config, args []string) error {
 	}
 	outPath := filepath.Join(outDir, name+".wav")
 
-	c := client.New(cfg.AudioURL, cfg.GatewayURL, cfg.APIKey)
+	c := client.New(cfg.AudioURL, cfg.GatewayURL, cfg.APIKey, cfg.STTModel)
 
 	db, _ := openDB()
 	if db != nil {

@@ -28,6 +28,7 @@ type Config struct {
 	GatewayURL    string          `toml:"gateway_url"`
 	AudioURL      string          `toml:"audio_url"`
 	APIKey        string          `toml:"api_key"`
+	STTModel      string          `toml:"stt_model"`
 	OutputDir     string          `toml:"output_dir"`
 	ObsidianVault string          `toml:"obsidian_vault"`
 	SampleRate    int             `toml:"sample_rate"`
@@ -41,6 +42,7 @@ func defaults() *Config {
 	return &Config{
 		GatewayURL:   "https://gateway.goyangi.io",
 		AudioURL:     "http://127.0.0.1:8000",
+		STTModel:     "mlx-community/parakeet-tdt-0.6b-v3",
 		OutputDir:    "~/meetings",
 		SampleRate:   16000,
 		Format:       "wav",

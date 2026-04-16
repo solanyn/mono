@@ -17,20 +17,25 @@ type Client struct {
 	AudioURL   string // mlx-audio server (default http://127.0.0.1:8000)
 	GatewayURL string // kgateway (default https://gateway.goyangi.io)
 	APIKey     string // optional Bearer token for authenticated endpoints
+	STTModel   string // STT model name (default mlx-community/parakeet-tdt-0.6b-v3)
 	HTTPClient *http.Client
 }
 
-func New(audioURL, gatewayURL, apiKey string) *Client {
+func New(audioURL, gatewayURL, apiKey, sttModel string) *Client {
 	if audioURL == "" {
 		audioURL = "http://127.0.0.1:8000"
 	}
 	if gatewayURL == "" {
 		gatewayURL = "https://gateway.goyangi.io"
 	}
+	if sttModel == "" {
+		sttModel = "mlx-community/parakeet-tdt-0.6b-v3"
+	}
 	return &Client{
 		AudioURL:   audioURL,
 		GatewayURL: gatewayURL,
 		APIKey:     apiKey,
+		STTModel:   sttModel,
 		HTTPClient: &http.Client{},
 	}
 }
@@ -105,7 +110,7 @@ type TranscriptResult struct {
 // Transcribe runs STT on an audio file.
 func (c *Client) Transcribe(audioPath string) (*TranscriptResult, error) {
 	body, ct, err := c.multipartFile(audioPath, map[string]string{
-		"model":           "whisper-1",
+		"model":           c.STTModel,
 		"response_format": "verbose_json",
 	})
 	if err != nil {
