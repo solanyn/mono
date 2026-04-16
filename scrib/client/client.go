@@ -105,6 +105,7 @@ type TranscriptResult struct {
 // Transcribe runs STT on an audio file.
 func (c *Client) Transcribe(audioPath string) (*TranscriptResult, error) {
 	body, ct, err := c.multipartFile(audioPath, map[string]string{
+		"model":           "whisper-1",
 		"response_format": "verbose_json",
 	})
 	if err != nil {
