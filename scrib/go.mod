@@ -11,7 +11,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.100
 	github.com/pelletier/go-toml v1.9.5
 	github.com/spf13/cobra v1.8.1
-	modernc.org/sqlite v1.48.1
+	modernc.org/sqlite v1.48.2
 )
 
 require (
