@@ -30,9 +30,9 @@ jobs:
           disk-cache: ${{ github.workflow }}
           repository-cache: true
       - name: Build
-        run: bazel build //... --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }}
+        run: bazel build //... --config=ci
       - name: Test
-        run: bazel test //... --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }}
+        run: bazel test //... --config=ci
 
   push:
     runs-on: ubuntu-latest
@@ -67,6 +67,6 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           for target in //lake:push_ingest //lake:push_promote //lake:push_aggregate; do
-            bazel run "$target" --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }} -- --tag "$VERSION"
-            bazel run "$target" --config=ci --config=remote --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }} -- --tag latest
+            bazel run "$target" --config=ci -- --tag "$VERSION"
+            bazel run "$target" --config=ci -- --tag latest
           done

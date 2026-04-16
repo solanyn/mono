@@ -7,6 +7,7 @@
 #import <AudioToolbox/AudioToolbox.h>
 #import <AVFoundation/AVFoundation.h>
 #include "capture.h"
+#include <stdatomic.h>
 
 // ─── System Audio (ScreenCaptureKit) ───────────────────────────────
 
@@ -208,25 +209,80 @@ static void stop_system_audio(void) {
 
 // ─── Public API ────────────────────────────────────────────────────
 
+static _Atomic int gCaptureStatus = 0;
+
 int start_capture(int sample_rate) {
     gSampleRate = sample_rate;
 
-    int ret = start_system_audio(sample_rate);
-    if (ret != 0) {
-        NSLog(@"[meet] System audio capture failed (%d), continuing with mic only", ret);
+    int sysRet = start_system_audio(sample_rate);
+    if (sysRet != 0) {
+        NSLog(@"[meet] System audio capture failed (%d), continuing with mic only", sysRet);
     }
 
-    ret = start_mic(sample_rate);
-    if (ret != 0) {
-        NSLog(@"[meet] Mic capture failed (%d)", ret);
+    int micRet = start_mic(sample_rate);
+    if (micRet != 0) {
+        NSLog(@"[meet] Mic capture failed (%d)", micRet);
         stop_system_audio();
-        return ret;
+        gCaptureStatus = -1;
+        return micRet;
     }
 
+    gCaptureStatus = (sysRet != 0) ? 1 : 0;
     return 0;
 }
 
 void stop_capture(void) {
     stop_mic();
     stop_system_audio();
+}
+
+int get_capture_status(void) {
+    return gCaptureStatus;
+}
+
+static const char* get_device_name(AudioObjectID deviceID) {
+    if (deviceID == kAudioObjectUnknown) return strdup("Unknown");
+
+    AudioObjectPropertyAddress nameAddr = {
+        .mSelector = kAudioObjectPropertyName,
+        .mScope    = kAudioObjectPropertyScopeGlobal,
+        .mElement  = kAudioObjectPropertyElementMain,
+    };
+
+    CFStringRef cfName = NULL;
+    UInt32 size = sizeof(cfName);
+    OSStatus status = AudioObjectGetPropertyData(deviceID, &nameAddr, 0, NULL, &size, &cfName);
+    if (status != noErr || !cfName) return strdup("Unknown");
+
+    char buf[256];
+    if (!CFStringGetCString(cfName, buf, sizeof(buf), kCFStringEncodingUTF8)) {
+        CFRelease(cfName);
+        return strdup("Unknown");
+    }
+    CFRelease(cfName);
+    return strdup(buf);
+}
+
+const char* get_input_device_name(void) {
+    AudioObjectPropertyAddress addr = {
+        .mSelector = kAudioHardwarePropertyDefaultInputDevice,
+        .mScope    = kAudioObjectPropertyScopeGlobal,
+        .mElement  = kAudioObjectPropertyElementMain,
+    };
+    AudioObjectID deviceID = kAudioObjectUnknown;
+    UInt32 size = sizeof(deviceID);
+    AudioObjectGetPropertyData(kAudioObjectSystemObject, &addr, 0, NULL, &size, &deviceID);
+    return get_device_name(deviceID);
+}
+
+const char* get_output_device_name(void) {
+    AudioObjectPropertyAddress addr = {
+        .mSelector = kAudioHardwarePropertyDefaultOutputDevice,
+        .mScope    = kAudioObjectPropertyScopeGlobal,
+        .mElement  = kAudioObjectPropertyElementMain,
+    };
+    AudioObjectID deviceID = kAudioObjectUnknown;
+    UInt32 size = sizeof(deviceID);
+    AudioObjectGetPropertyData(kAudioObjectSystemObject, &addr, 0, NULL, &size, &deviceID);
+    return get_device_name(deviceID);
 }

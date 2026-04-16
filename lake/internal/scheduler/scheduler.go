@@ -110,6 +110,14 @@ func (s *Scheduler) Start() {
 		return ingest.IngestNSWTradesLicences(ctx, s.s3, s.cfg.BronzeBucket)
 	}))
 
+	s.cron.AddFunc(s.cfg.CronVicVG, s.wrapIngest("vic_vg", func(ctx context.Context) (ingest.Result, error) {
+		return ingest.IngestVicVG(ctx, s.s3, s.cfg.BronzeBucket)
+	}))
+
+	s.cron.AddFunc(s.cfg.CronSQM, s.wrapIngest("sqm_research", func(ctx context.Context) (ingest.Result, error) {
+		return ingest.IngestSQM(ctx, s.s3, s.cfg.BronzeBucket)
+	}))
+
 	s.cron.Start()
 	log.Println("scheduler: started")
 }

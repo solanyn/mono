@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Client wraps HTTP calls to mlx-audio server and kgateway.
@@ -26,7 +27,7 @@ func New(audioURL, gatewayURL, apiKey, sttModel string) *Client {
 		audioURL = "http://127.0.0.1:8000"
 	}
 	if gatewayURL == "" {
-		gatewayURL = "https://gateway.goyangi.io"
+		gatewayURL = "https://gateway.goyangi.io/v1/opus"
 	}
 	if sttModel == "" {
 		sttModel = "mlx-community/parakeet-tdt-0.6b-v3"
@@ -151,7 +152,7 @@ func (c *Client) Summarize(transcript string, template string) (string, error) {
 		},
 	})
 
-	req, err := http.NewRequest("POST", c.GatewayURL+"/v1/chat/completions", bytes.NewReader(reqBody))
+	req, err := http.NewRequest("POST", strings.TrimRight(c.GatewayURL, "/")+"/chat/completions", bytes.NewReader(reqBody))
 	if err != nil {
 		return "", fmt.Errorf("summarize request: %w", err)
 	}
