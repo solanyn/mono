@@ -229,3 +229,8 @@ cython_debug/
 # Astro build cache
 .astro/
 lake/ingest
+
+# Built binaries
+scrib/scrib
+meet/meet
+result
