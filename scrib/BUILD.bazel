@@ -49,10 +49,10 @@ go_library(
         ":audio_lib",
         ":client_lib",
         ":store_lib",
-        "@com_github_charmbracelet_bubbles//spinner",
-        "@com_github_charmbracelet_bubbles//viewport",
-        "@com_github_charmbracelet_bubbletea//:bubbletea",
-        "@com_github_charmbracelet_lipgloss//:lipgloss",
+        "@land_charm_bubbles_v2//spinner",
+        "@land_charm_bubbles_v2//viewport",
+        "@land_charm_bubbletea_v2//:bubbletea",
+        "@land_charm_lipgloss_v2//:lipgloss",
     ],
 )
 

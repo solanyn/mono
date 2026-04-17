@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/solanyn/mono/scrib/audio"
 	"github.com/solanyn/mono/scrib/client"
 	"github.com/solanyn/mono/scrib/store"
@@ -126,7 +126,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 
 	case tea.WindowSizeMsg:
@@ -134,8 +134,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		h := max(m.height-4, 1)
 		w := max(m.width-4, 1)
-		m.viewport = viewport.New(w, h)
-		m.resultVP = viewport.New(w, h)
+		m.viewport = viewport.New(viewport.WithWidth(w), viewport.WithHeight(h))
+		m.resultVP = viewport.New(viewport.WithWidth(w), viewport.WithHeight(h))
 
 	case tickMsg:
 		if m.phase == phaseRecording {
@@ -169,7 +169,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.result = msg.result
 		m.phase = phaseResults
-		m.resultVP = viewport.New(max(m.width-4, 1), max(m.height-4, 1))
+		m.resultVP = viewport.New(viewport.WithWidth(max(m.width-4, 1)), viewport.WithHeight(max(m.height-4, 1)))
 		m.resultVP.SetContent(m.renderResults())
 	}
 
@@ -186,7 +186,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	switch m.phase {
@@ -280,19 +280,20 @@ func (m model) runPipeline() tea.Cmd {
 
 // --- Views ---
 
-func (m model) View() string {
-	if m.err != nil {
-		return fmt.Sprintf("Error: %v\n", m.err)
+func (m model) View() tea.View {
+	var v tea.View
+	v.AltScreen = true
+	switch {
+	case m.err != nil:
+		v.SetContent(fmt.Sprintf("Error: %v\n", m.err))
+	case m.phase == phaseRecording:
+		v.SetContent(m.viewRecording())
+	case m.phase == phaseProcessing:
+		v.SetContent(m.viewProcessing())
+	case m.phase == phaseResults:
+		v.SetContent(m.viewResults())
 	}
-	switch m.phase {
-	case phaseRecording:
-		return m.viewRecording()
-	case phaseProcessing:
-		return m.viewProcessing()
-	case phaseResults:
-		return m.viewResults()
-	}
-	return ""
+	return v
 }
 
 func (m model) viewRecording() string {
@@ -467,7 +468,7 @@ func Run(opts Options) error {
 	m.startTime = time.Now()
 	m.lastChunk = time.Now()
 
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	p := tea.NewProgram(m)
 
 	finalModel, err := p.Run()
 	if err != nil {
