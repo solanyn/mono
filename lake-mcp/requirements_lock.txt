@@ -130,7 +130,7 @@ fsspec==2026.3.0
     #   s3fs
 genai-prices==0.0.56
     # via pydantic-ai-slim
-google-auth==2.49.1
+google-auth==2.49.2
     # via
     #   google-genai
     #   pydantic-ai-slim

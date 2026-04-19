@@ -79,7 +79,7 @@ filelock==3.25.2
     # via huggingface-hub
 fsspec==2026.2.0
     # via huggingface-hub
-google-auth==2.49.1
+google-auth==2.49.2
     # via pydantic-ai-slim
 griffe==2.0.2
     # via pydantic-ai-slim
