@@ -81,7 +81,7 @@ cohere==5.21.1
     # via pydantic-ai-slim
 colorama==0.4.6
     # via griffecli
-cryptography==46.0.6
+cryptography==46.0.7
     # via
     #   authlib
     #   google-auth
