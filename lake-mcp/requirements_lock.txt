@@ -86,7 +86,7 @@ cryptography==46.0.6
     #   authlib
     #   google-auth
     #   pyjwt
-cyclopts==4.10.1
+cyclopts==4.10.2
     # via fastmcp
 datalake==2.5.8
     # via lake-mcp (lake-mcp/pyproject.toml)
