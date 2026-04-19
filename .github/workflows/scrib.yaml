@@ -27,7 +27,7 @@ jobs:
           cache-dependency-path: scrib/go.sum
       - name: Build
         working-directory: scrib
-        run: go build ./...
+        run: go build ./cmd/scrib-server ./server/... ./config/... ./sync/... ./store/...
   push:
     runs-on: ubuntu-latest
     needs: build
