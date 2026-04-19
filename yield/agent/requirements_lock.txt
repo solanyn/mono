@@ -158,7 +158,7 @@ langgraph==1.0.10
     #   ag-ui-langgraph
     #   copilotkit
     #   langchain
-langgraph-checkpoint==4.0.1
+langgraph-checkpoint==4.0.2
     # via
     #   langgraph
     #   langgraph-prebuilt
