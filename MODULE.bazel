@@ -22,6 +22,7 @@ go_sdk.download(version = "1.25.0")
 
 go_deps = use_extension("@gazelle//:extensions.bzl", "go_deps")
 go_deps.from_file(go_mod = "//cronprint:go.mod")
+go_deps.from_file(go_mod = "//scrib:go.mod")
 go_deps.module(
     path = "charm.land/bubbles/v2",
     sum = "h1:YSnNh5cPYlYjPxRrzs5VEn3vwhtEn3jVGRBT3M7/I0g=",
