@@ -2,7 +2,7 @@
 #    uv pip compile requirements.txt -o requirements_lock.txt --python-version 3.12
 ag-ui-langgraph==0.0.33
     # via copilotkit
-ag-ui-protocol==0.1.15
+ag-ui-protocol==0.1.16
     # via ag-ui-langgraph
 annotated-doc==0.0.4
     # via typer
