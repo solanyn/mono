@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	toml "github.com/pelletier/go-toml"
+	toml "github.com/pelletier/go-toml/v2"
 )
 
 type CalendarConfig struct {
