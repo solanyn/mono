@@ -2,6 +2,7 @@
 package client
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -11,23 +12,27 @@ import (
 
 // DiarizedSegment is a transcript segment attributed to a speaker.
 type DiarizedSegment struct {
-	Speaker string  `json:"speaker"`
-	Start   float64 `json:"start"`
-	End     float64 `json:"end"`
-	Text    string  `json:"text"`
+	Speaker   string  `json:"speaker"`
+	Start     float64 `json:"start"`
+	End       float64 `json:"end"`
+	Text      string  `json:"text"`
+	Uncertain bool    `json:"uncertain,omitempty"`
 }
 
 // AnnotateResult holds the full annotated meeting output.
 type AnnotateResult struct {
-	Segments    []DiarizedSegment
-	Summary     string
-	RawVAD      *VADResult
+	Segments      []DiarizedSegment
+	Summary       string
+	SummaryErr    error
+	RawVAD        *VADResult
 	RawTranscript *TranscriptResult
-	Duration    time.Duration
+	Duration      time.Duration
 }
 
 // Annotate runs the full pipeline: VAD + STT (concurrent) → merge → summarize.
-func (c *Client) Annotate(audioPath string, threshold float64, template string) (*AnnotateResult, error) {
+// If VAD or STT fails, returns an error. If summary fails, the result is still
+// returned with SummaryErr set so callers can persist segments before retrying.
+func (c *Client) Annotate(ctx context.Context, audioPath string, threshold float64, template string) (*AnnotateResult, error) {
 	var (
 		vadResult *VADResult
 		sttResult *TranscriptResult
@@ -36,18 +41,20 @@ func (c *Client) Annotate(audioPath string, threshold float64, template string) 
 		wg        sync.WaitGroup
 	)
 
-	// Run VAD and STT concurrently
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		vadResult, vadErr = c.VAD(audioPath, threshold)
+		vadResult, vadErr = c.VAD(ctx, audioPath, threshold)
 	}()
 	go func() {
 		defer wg.Done()
-		sttResult, sttErr = c.Transcribe(audioPath)
+		sttResult, sttErr = c.Transcribe(ctx, audioPath)
 	}()
 	wg.Wait()
 
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
 	if vadErr != nil {
 		return nil, fmt.Errorf("vad: %w", vadErr)
 	}
@@ -55,27 +62,25 @@ func (c *Client) Annotate(audioPath string, threshold float64, template string) 
 		return nil, fmt.Errorf("stt: %w", sttErr)
 	}
 
-	// Merge speaker segments with transcript
 	segments := alignSpeakersToWords(vadResult, sttResult)
-
-	// Build diarised transcript text
-	transcript := formatTranscript(segments)
-
-	// Summarize
-	summary, err := c.Summarize(transcript, template)
-	if err != nil {
-		return nil, fmt.Errorf("summarize: %w", err)
-	}
-
 	dur := time.Duration(vadResult.DurationSeconds * float64(time.Second))
 
-	return &AnnotateResult{
+	result := &AnnotateResult{
 		Segments:      segments,
-		Summary:       summary,
 		RawVAD:        vadResult,
 		RawTranscript: sttResult,
 		Duration:      dur,
-	}, nil
+	}
+
+	transcript := formatTranscript(segments)
+	summary, err := c.Summarize(ctx, transcript, template)
+	if err != nil {
+		result.SummaryErr = fmt.Errorf("summarize: %w", err)
+		return result, nil
+	}
+	result.Summary = summary
+
+	return result, nil
 }
 
 // alignSpeakersToWords assigns each transcript word to a speaker based on
@@ -92,23 +97,23 @@ func alignSpeakersToWords(vad *VADResult, stt *TranscriptResult) []DiarizedSegme
 	}
 
 	type taggedWord struct {
-		word    string
-		start   float64
-		end     float64
-		speaker string
+		word      string
+		start     float64
+		end       float64
+		speaker   string
+		uncertain bool
 	}
 
 	tagged := make([]taggedWord, len(stt.Words))
 	for i, w := range stt.Words {
 		tagged[i] = taggedWord{word: w.Word, start: w.Start, end: w.End}
-		mid := (w.Start + w.End) / 2
+		wordDur := w.End - w.Start
 
-		// Find best overlapping speaker segment
 		bestOverlap := 0.0
 		bestSpeaker := "UNKNOWN"
 		for _, seg := range vad.Segments {
-			overlapStart := max(mid-0.01, seg.Start)
-			overlapEnd := min(mid+0.01, seg.End)
+			overlapStart := max(w.Start, seg.Start)
+			overlapEnd := min(w.End, seg.End)
 			if overlapEnd > overlapStart {
 				overlap := overlapEnd - overlapStart
 				if overlap > bestOverlap {
@@ -117,8 +122,9 @@ func alignSpeakersToWords(vad *VADResult, stt *TranscriptResult) []DiarizedSegme
 				}
 			}
 		}
-		// Fallback: find nearest segment
+
 		if bestSpeaker == "UNKNOWN" {
+			mid := (w.Start + w.End) / 2
 			minDist := 999999.0
 			for _, seg := range vad.Segments {
 				d := min(abs(mid-seg.Start), abs(mid-seg.End))
@@ -127,7 +133,11 @@ func alignSpeakersToWords(vad *VADResult, stt *TranscriptResult) []DiarizedSegme
 					bestSpeaker = seg.Speaker
 				}
 			}
+			tagged[i].uncertain = true
+		} else if wordDur > 0 && bestOverlap/wordDur < 0.5 {
+			tagged[i].uncertain = true
 		}
+
 		tagged[i].speaker = bestSpeaker
 	}
 
@@ -138,16 +148,20 @@ func alignSpeakersToWords(vad *VADResult, stt *TranscriptResult) []DiarizedSegme
 	}
 
 	cur := DiarizedSegment{
-		Speaker: tagged[0].speaker,
-		Start:   tagged[0].start,
-		End:     tagged[0].end,
-		Text:    tagged[0].word,
+		Speaker:   tagged[0].speaker,
+		Start:     tagged[0].start,
+		End:       tagged[0].end,
+		Text:      tagged[0].word,
+		Uncertain: tagged[0].uncertain,
 	}
 
 	for i := 1; i < len(tagged); i++ {
 		if tagged[i].speaker == cur.Speaker {
 			cur.End = tagged[i].end
 			cur.Text += " " + tagged[i].word
+			if tagged[i].uncertain {
+				cur.Uncertain = true
+			}
 		} else {
 			segments = append(segments, cur)
 			cur = DiarizedSegment{

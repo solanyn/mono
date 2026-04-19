@@ -17,7 +17,10 @@ func main() {
 		S3Bucket:    envOr("SCRIB_S3_BUCKET", "scrib"),
 		S3AccessKey: envOr("SCRIB_S3_ACCESS_KEY", ""),
 		S3SecretKey: envOr("SCRIB_S3_SECRET_KEY", ""),
-		S3UseSSL:    envOr("SCRIB_S3_USE_SSL", "true") == "true",
+		S3UseSSL:        envOr("SCRIB_S3_USE_SSL", "true") == "true",
+		AudioServiceURL: envOr("SCRIB_AUDIO_URL", "http://localhost:8001"),
+		STTModel:        envOr("SCRIB_STT_MODEL", "mlx-community/whisper-large-v3-turbo"),
+		VADThreshold:    envOr("SCRIB_VAD_THRESHOLD", "0.5"),
 	}
 
 	if cfg.DatabaseURL == "" {

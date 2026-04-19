@@ -11,15 +11,22 @@ import "C"
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"sync"
 	"unsafe"
 )
 
+type timedChunk struct {
+	samples   []int16
+	timestamp float64
+}
+
 type Recorder struct {
 	sampleRate int
 	mu         sync.Mutex
-	samples    []int16
+	micChunks  []timedChunk
+	sysChunks  []timedChunk
 	recording  bool
 
 	levelMu  sync.Mutex
@@ -32,18 +39,23 @@ func NewRecorder(sampleRate int) (*Recorder, error) {
 }
 
 //export goAudioCallback
-func goAudioCallback(data *C.int16_t, frameCount C.int, channels C.int, isMic C.int) {
-	globalRecorder.onAudio(data, int(frameCount), int(channels), int(isMic) != 0)
+func goAudioCallback(data *C.int16_t, frameCount C.int, channels C.int, isMic C.int, timestampSecs C.double) {
+	globalRecorder.onAudio(data, int(frameCount), int(channels), int(isMic) != 0, float64(timestampSecs))
 }
 
+// globalRecorder holds the active Recorder instance. Only one Recorder can be
+// active at a time because cgo callbacks (goAudioCallback) use this package-level
+// variable to route audio data. Start() panics if called while another recorder
+// is already active; Stop() clears the global to allow reuse.
 var globalRecorder *Recorder
+var globalMu sync.Mutex
 
-func (r *Recorder) onAudio(data *C.int16_t, frameCount, channels int, isMic bool) {
+func (r *Recorder) onAudio(data *C.int16_t, frameCount, channels int, isMic bool, timestamp float64) {
 	src := unsafe.Slice((*int16)(unsafe.Pointer(data)), frameCount*channels)
-	r.onAudioGo(src, frameCount, channels, isMic)
+	r.onAudioGo(src, frameCount, channels, isMic, timestamp)
 }
 
-func (r *Recorder) onAudioGo(src []int16, frameCount, channels int, isMic bool) {
+func (r *Recorder) onAudioGo(src []int16, frameCount, channels int, isMic bool, timestamp float64) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.recording {
@@ -75,29 +87,92 @@ func (r *Recorder) onAudioGo(src []int16, frameCount, channels int, isMic bool) 
 	}
 	r.levelMu.Unlock()
 
-	// Stereo interleaving layout:
-	// Even indices (0, 2, 4, ...) = left channel (mic)
-	// Odd indices  (1, 3, 5, ...) = right channel (system audio)
-	currentFrames := len(r.samples) / 2
-
+	chunk := timedChunk{samples: mono, timestamp: timestamp}
 	if isMic {
-		// Write mic samples into left channel (even indices)
-		for i := 0; i < frameCount; i++ {
-			idx := (currentFrames + i) * 2
-			for idx+1 >= len(r.samples) {
-				r.samples = append(r.samples, 0, 0)
-			}
-			r.samples[idx] = mono[i]
-		}
+		r.micChunks = append(r.micChunks, chunk)
 	} else {
-		// Write system audio into right channel (odd indices)
-		for i := 0; i < frameCount; i++ {
-			idx := (currentFrames+i)*2 + 1
-			for idx >= len(r.samples) {
-				r.samples = append(r.samples, 0, 0)
-			}
-			r.samples[idx] = mono[i]
+		r.sysChunks = append(r.sysChunks, chunk)
+	}
+}
+
+const driftWarningThreshold = 0.050
+
+func (r *Recorder) interleave() []int16 {
+	if len(r.micChunks) == 0 && len(r.sysChunks) == 0 {
+		return nil
+	}
+
+	sr := float64(r.sampleRate)
+
+	t0 := math.Inf(1)
+	tEnd := math.Inf(-1)
+	for _, c := range r.micChunks {
+		if c.timestamp < t0 {
+			t0 = c.timestamp
 		}
+		end := c.timestamp + float64(len(c.samples))/sr
+		if end > tEnd {
+			tEnd = end
+		}
+	}
+	for _, c := range r.sysChunks {
+		if c.timestamp < t0 {
+			t0 = c.timestamp
+		}
+		end := c.timestamp + float64(len(c.samples))/sr
+		if end > tEnd {
+			tEnd = end
+		}
+	}
+
+	totalFrames := int(math.Round((tEnd - t0) * sr))
+	if totalFrames <= 0 {
+		return nil
+	}
+
+	out := make([]int16, totalFrames*2)
+
+	for _, c := range r.micChunks {
+		offset := int(math.Round((c.timestamp - t0) * sr))
+		for i, s := range c.samples {
+			idx := (offset + i) * 2
+			if idx >= 0 && idx < len(out) {
+				out[idx] = s
+			}
+		}
+	}
+
+	for _, c := range r.sysChunks {
+		offset := int(math.Round((c.timestamp - t0) * sr))
+		for i, s := range c.samples {
+			idx := (offset+i)*2 + 1
+			if idx >= 0 && idx < len(out) {
+				out[idx] = s
+			}
+		}
+	}
+
+	r.checkDrift()
+
+	return out
+}
+
+func (r *Recorder) checkDrift() {
+	if len(r.micChunks) == 0 || len(r.sysChunks) == 0 {
+		return
+	}
+
+	sr := float64(r.sampleRate)
+
+	micEnd := r.micChunks[len(r.micChunks)-1].timestamp +
+		float64(len(r.micChunks[len(r.micChunks)-1].samples))/sr
+	sysEnd := r.sysChunks[len(r.sysChunks)-1].timestamp +
+		float64(len(r.sysChunks[len(r.sysChunks)-1].samples))/sr
+
+	drift := math.Abs(micEnd - sysEnd)
+	if drift > driftWarningThreshold {
+		log.Printf("[scrib] audio channel drift detected: %.1fms (mic end=%.3fs, sys end=%.3fs)",
+			drift*1000, micEnd, sysEnd)
 	}
 }
 
@@ -114,14 +189,25 @@ func (r *Recorder) SysLevel() float64 {
 }
 
 func (r *Recorder) Start() error {
+	globalMu.Lock()
+	if globalRecorder != nil {
+		globalMu.Unlock()
+		panic("audio: Start() called while another recorder is active; call Stop() first")
+	}
 	globalRecorder = r
+	globalMu.Unlock()
+
 	r.mu.Lock()
 	r.recording = true
-	r.samples = make([]int16, 0, r.sampleRate*2*60)
+	r.micChunks = nil
+	r.sysChunks = nil
 	r.mu.Unlock()
 
 	ret := C.start_capture(C.int(r.sampleRate))
 	if ret != 0 {
+		globalMu.Lock()
+		globalRecorder = nil
+		globalMu.Unlock()
 		return fmt.Errorf("start_capture failed: %d", ret)
 	}
 	return nil
@@ -130,10 +216,16 @@ func (r *Recorder) Start() error {
 func (r *Recorder) Stop() []int16 {
 	C.stop_capture()
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	r.recording = false
-	out := r.samples
-	r.samples = nil
+	out := r.interleave()
+	r.micChunks = nil
+	r.sysChunks = nil
+	r.mu.Unlock()
+
+	globalMu.Lock()
+	globalRecorder = nil
+	globalMu.Unlock()
+
 	return out
 }
 
@@ -143,19 +235,51 @@ func (r *Recorder) Snapshot(fromFrame int) []int16 {
 	if !r.recording {
 		return nil
 	}
+	all := r.interleave()
 	fromIdx := fromFrame * 2
-	if fromIdx >= len(r.samples) {
+	if fromIdx >= len(all) {
 		return nil
 	}
-	out := make([]int16, len(r.samples)-fromIdx)
-	copy(out, r.samples[fromIdx:])
+	out := make([]int16, len(all)-fromIdx)
+	copy(out, all[fromIdx:])
 	return out
 }
 
 func (r *Recorder) FrameCount() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return len(r.samples) / 2
+	total := 0
+	for _, c := range r.micChunks {
+		total += len(c.samples)
+	}
+	for _, c := range r.sysChunks {
+		total += len(c.samples)
+	}
+	if total == 0 {
+		return 0
+	}
+	sr := float64(r.sampleRate)
+	t0 := math.Inf(1)
+	tEnd := math.Inf(-1)
+	for _, c := range r.micChunks {
+		if c.timestamp < t0 {
+			t0 = c.timestamp
+		}
+		end := c.timestamp + float64(len(c.samples))/sr
+		if end > tEnd {
+			tEnd = end
+		}
+	}
+	for _, c := range r.sysChunks {
+		if c.timestamp < t0 {
+			t0 = c.timestamp
+		}
+		end := c.timestamp + float64(len(c.samples))/sr
+		if end > tEnd {
+			tEnd = end
+		}
+	}
+	return int(math.Round((tEnd - t0) * sr))
 }
 
 func GetInputDeviceName() string {

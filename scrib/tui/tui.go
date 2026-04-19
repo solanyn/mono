@@ -1,8 +1,11 @@
 package tui
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"math"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -30,6 +33,7 @@ type Options struct {
 	SampleRate int
 	AudioURL   string
 	GatewayURL string
+	ServerURL  string
 	Client     *client.Client
 	Template   string
 	DB         *store.DB
@@ -56,10 +60,15 @@ type model struct {
 	stepIdx int
 
 	// results
-	result   *client.AnnotateResult
+	result   *pipelineResult
 	resultVP viewport.Model
 
 	err error
+}
+
+type pipelineResult struct {
+	UUID     string
+	Duration time.Duration
 }
 
 type transcriptLine struct {
@@ -79,7 +88,7 @@ type transcriptMsg struct {
 	ts   time.Duration
 }
 type pipelineDoneMsg struct {
-	result *client.AnnotateResult
+	result *pipelineResult
 	err    error
 }
 
@@ -109,9 +118,8 @@ func initialModel(opts Options) model {
 		spinner: sp,
 		steps: []processStep{
 			{label: "Saving audio"},
-			{label: "Speaker diarisation"},
-			{label: "Transcription"},
-			{label: "Summarising"},
+			{label: "Uploading to server"},
+			{label: "Requesting processing"},
 		},
 	}
 
@@ -228,7 +236,7 @@ func (m model) transcribeChunk(snapshot []int16) tea.Cmd {
 		}
 		defer os.Remove(tmp)
 
-		result, err := c.Transcribe(tmp)
+		result, err := c.Transcribe(context.Background(), tmp)
 		if err != nil {
 			return transcriptMsg{}
 		}
@@ -243,39 +251,75 @@ func (m model) runPipeline() tea.Cmd {
 			return pipelineDoneMsg{err: err}
 		}
 
-		result, err := m.opts.Client.Annotate(m.opts.OutputPath, 0.5, m.opts.Template)
-		if err != nil {
-			return pipelineDoneMsg{err: err}
-		}
+		dur := time.Duration(len(samples)/2/m.opts.SampleRate) * time.Second
 
+		var meetingUUID string
 		if m.opts.DB != nil {
-			dur := time.Duration(len(samples)/2/m.opts.SampleRate) * time.Second
-			meetingID, _ := m.opts.DB.InsertMeeting(&store.Meeting{
-				Name:        m.opts.Name,
-				RecordedAt:  time.Now(),
-				DurationS:   dur.Seconds(),
-				Template:    m.opts.Template,
-				AudioPath:   m.opts.OutputPath,
-				NumSpeakers: result.RawVAD.NumSpeakers,
-			})
-			for _, seg := range result.Segments {
-				m.opts.DB.InsertSegment(&store.Segment{
-					MeetingID:    meetingID,
-					SpeakerLabel: seg.Speaker,
-					StartS:       seg.Start,
-					EndS:         seg.End,
-					Text:         seg.Text,
-				})
+			meeting := &store.Meeting{
+				Name:       m.opts.Name,
+				RecordedAt: time.Now(),
+				DurationS:  dur.Seconds(),
+				Template:   m.opts.Template,
+				AudioPath:  m.opts.OutputPath,
 			}
-			m.opts.DB.InsertSummary(&store.Summary{
-				MeetingID: meetingID,
-				Template:  m.opts.Template,
-				Content:   result.Summary,
-			})
+			m.opts.DB.InsertMeeting(meeting)
+			meetingUUID = meeting.UUID
 		}
 
-		return pipelineDoneMsg{result: result}
+		if m.opts.ServerURL != "" && meetingUUID != "" {
+			if err := uploadAudio(m.opts.ServerURL, meetingUUID, m.opts.OutputPath); err != nil {
+				return pipelineDoneMsg{err: fmt.Errorf("upload audio: %w", err)}
+			}
+
+			if err := requestProcess(m.opts.ServerURL, meetingUUID); err != nil {
+				return pipelineDoneMsg{err: fmt.Errorf("request processing: %w", err)}
+			}
+		}
+
+		return pipelineDoneMsg{result: &pipelineResult{UUID: meetingUUID, Duration: dur}}
 	}
+}
+
+func uploadAudio(serverURL, uuid, audioPath string) error {
+	f, err := os.Open(audioPath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	stat, _ := f.Stat()
+	req, err := http.NewRequest("POST", serverURL+"/v1/audio/"+uuid, f)
+	if err != nil {
+		return err
+	}
+	req.ContentLength = stat.Size()
+	req.Header.Set("Content-Type", "audio/wav")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("upload failed (%d): %s", resp.StatusCode, b)
+	}
+	return nil
+}
+
+func requestProcess(serverURL, uuid string) error {
+	resp, err := http.Post(serverURL+"/v1/process/"+uuid, "", nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusAccepted {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("process request failed (%d): %s", resp.StatusCode, b)
+	}
+	return nil
 }
 
 // --- Views ---
@@ -386,9 +430,14 @@ func (m model) renderResults() string {
 		return ""
 	}
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("  Duration: %s | Speakers: %d\n", m.result.Duration.Round(time.Second), m.result.RawVAD.NumSpeakers))
-	sb.WriteString(fmt.Sprintf("  Audio: %s\n\n", m.opts.OutputPath))
-	sb.WriteString(m.result.Summary)
+	sb.WriteString(fmt.Sprintf("  Duration: %s\n", m.result.Duration.Round(time.Second)))
+	sb.WriteString(fmt.Sprintf("  Audio: %s\n", m.opts.OutputPath))
+	if m.result.UUID != "" {
+		sb.WriteString(fmt.Sprintf("  Meeting: %s\n", m.result.UUID))
+		if m.opts.ServerURL != "" {
+			sb.WriteString("\n  Processing on server...\n")
+		}
+	}
 	sb.WriteString("\n")
 	return sb.String()
 }

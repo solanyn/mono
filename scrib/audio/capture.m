@@ -50,7 +50,10 @@
         pcm[i] = (int16_t)(sample * 32767.0f);
     }
 
-    goAudioCallback(pcm, frameCount, channels, 0);
+    CMTime pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
+    double timestampSecs = CMTimeGetSeconds(pts);
+
+    goAudioCallback(pcm, frameCount, channels, 0, timestampSecs);
     free(pcm);
 }
 
@@ -78,7 +81,9 @@ static void micCallback(void *userData,
     int16_t *data = (int16_t *)buffer->mAudioData;
     int frameCount = (int)(buffer->mAudioDataByteSize / sizeof(int16_t));
 
-    goAudioCallback(data, frameCount, 1, 1);
+    double timestampSecs = startTime->mSampleTime / (double)gSampleRate;
+
+    goAudioCallback(data, frameCount, 1, 1, timestampSecs);
 
     // Re-enqueue buffer
     AudioQueueEnqueueBuffer(queue, buffer, 0, NULL);

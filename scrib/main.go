@@ -1,7 +1,11 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -121,7 +125,29 @@ func main() {
 		},
 	}
 
-	rootCmd.AddCommand(recordCmd, annotateCmd, historyCmd, searchCmd, speakersCmd, showCmd, syncCmd)
+	resummarizeCmd := &cobra.Command{
+		Use:   "resummarize <meeting_id>",
+		Short: "Retry summary for a meeting that has segments but no summary",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if template != "" {
+				cfg.Summarise.Template = template
+			}
+			return runResummarize(cfg, args[0])
+		},
+	}
+	resummarizeCmd.Flags().StringVarP(&template, "template", "t", "", "Summary template (standup, 1on1, planning)")
+
+	transcribeCmd := &cobra.Command{
+		Use:   "transcribe <uuid>",
+		Short: "Trigger server-side transcription and print results",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runTranscribe(cfg, args[0])
+		},
+	}
+
+	rootCmd.AddCommand(recordCmd, annotateCmd, historyCmd, searchCmd, speakersCmd, showCmd, syncCmd, resummarizeCmd, transcribeCmd)
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
@@ -190,12 +216,12 @@ func runRecord(cfg *config.Config, args []string, annotateAfter bool) error {
 }
 
 func runAnnotate(cfg *config.Config, audioPath string) error {
-	c := client.New(cfg.AudioURL, cfg.GatewayURL, cfg.APIKey, cfg.STTModel)
+	c := client.New(cfg.AudioURL, cfg.GatewayURL, cfg.APIKey, cfg.STTModel, cfg.Summarise.Model)
 
 	fmt.Printf("Annotating %s...\n", audioPath)
 	fmt.Println("  → Running VAD + STT (concurrent)...")
 
-	result, err := c.Annotate(audioPath, 0.5, cfg.Summarise.Template)
+	result, err := c.Annotate(context.Background(), audioPath, 0.5, cfg.Summarise.Template)
 	if err != nil {
 		return fmt.Errorf("annotate: %w", err)
 	}
@@ -224,43 +250,105 @@ func runAnnotate(cfg *config.Config, audioPath string) error {
 			})
 		}
 
-		db.InsertSummary(&store.Summary{
-			MeetingID: meetingID,
-			Template:  cfg.Summarise.Template,
-			Content:   result.Summary,
-		})
-	}
-
-	outPath := strings.TrimSuffix(audioPath, filepath.Ext(audioPath)) + ".md"
-	name := strings.TrimSuffix(filepath.Base(audioPath), filepath.Ext(audioPath))
-	now := time.Now().Format("2006-01-02 15:04")
-
-	var sb strings.Builder
-	fmt.Fprintf(&sb, "# %s — %s\n\n", name, now)
-	sb.WriteString(result.Summary)
-	sb.WriteString("\n")
-
-	if err := os.WriteFile(outPath, []byte(sb.String()), 0644); err != nil {
-		return fmt.Errorf("write output: %w", err)
+		if result.SummaryErr != nil {
+			fmt.Fprintf(os.Stderr, "warning: summary failed (segments saved): %v\n", result.SummaryErr)
+			fmt.Printf("  → Stored segments in db (meeting #%d) — run 'scrib resummarize %d' to retry\n", meetingID, meetingID)
+		} else {
+			db.InsertSummary(&store.Summary{
+				MeetingID: meetingID,
+				Template:  cfg.Summarise.Template,
+				Content:   result.Summary,
+			})
+		}
 	}
 
 	fmt.Printf("  → %d speakers, %s duration\n", result.RawVAD.NumSpeakers, result.Duration)
-	fmt.Printf("  → Saved to %s\n", outPath)
+
+	if result.Summary != "" {
+		outPath := strings.TrimSuffix(audioPath, filepath.Ext(audioPath)) + ".md"
+		name := strings.TrimSuffix(filepath.Base(audioPath), filepath.Ext(audioPath))
+		now := time.Now().Format("2006-01-02 15:04")
+
+		var sb strings.Builder
+		fmt.Fprintf(&sb, "# %s — %s\n\n", name, now)
+		sb.WriteString(result.Summary)
+		sb.WriteString("\n")
+
+		if err := os.WriteFile(outPath, []byte(sb.String()), 0644); err != nil {
+			return fmt.Errorf("write output: %w", err)
+		}
+		fmt.Printf("  → Saved to %s\n", outPath)
+
+		if cfg.Output.ObsidianVault != "" {
+			vaultDir := expandPath(cfg.Output.ObsidianVault)
+			os.MkdirAll(vaultDir, 0755)
+			vaultPath := filepath.Join(vaultDir, filepath.Base(outPath))
+			if err := os.WriteFile(vaultPath, []byte(sb.String()), 0644); err != nil {
+				fmt.Fprintf(os.Stderr, "warning: couldn't write to vault: %v\n", err)
+			} else {
+				fmt.Printf("  → Synced to %s\n", vaultPath)
+			}
+		}
+	}
+
 	if meetingID > 0 {
 		fmt.Printf("  → Stored in db (meeting #%d)\n", meetingID)
 	}
 
-	if cfg.Output.ObsidianVault != "" {
-		vaultDir := expandPath(cfg.Output.ObsidianVault)
-		os.MkdirAll(vaultDir, 0755)
-		vaultPath := filepath.Join(vaultDir, filepath.Base(outPath))
-		if err := os.WriteFile(vaultPath, []byte(sb.String()), 0644); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: couldn't write to vault: %v\n", err)
-		} else {
-			fmt.Printf("  → Synced to %s\n", vaultPath)
-		}
+	return nil
+}
+
+func runResummarize(cfg *config.Config, idStr string) error {
+	var id int64
+	fmt.Sscanf(idStr, "%d", &id)
+	if id <= 0 {
+		return fmt.Errorf("invalid meeting ID: %s", idStr)
 	}
 
+	db, err := openDB()
+	if err != nil {
+		return fmt.Errorf("open db: %w", err)
+	}
+	defer db.Close()
+
+	meeting, err := db.GetMeeting(id)
+	if err != nil {
+		return fmt.Errorf("get meeting: %w", err)
+	}
+
+	segments, err := db.GetSegments(id)
+	if err != nil {
+		return fmt.Errorf("get segments: %w", err)
+	}
+	if len(segments) == 0 {
+		return fmt.Errorf("meeting #%d has no segments", id)
+	}
+
+	transcript := store.FormatTranscript(segments)
+
+	tmpl := cfg.Summarise.Template
+	if meeting.Template != "" {
+		tmpl = meeting.Template
+	}
+
+	c := client.New(cfg.AudioURL, cfg.GatewayURL, cfg.APIKey, cfg.STTModel, cfg.Summarise.Model)
+	fmt.Printf("Re-summarizing meeting #%d (%s)...\n", id, meeting.Name)
+
+	summary, err := c.Summarize(context.Background(), transcript, tmpl)
+	if err != nil {
+		return fmt.Errorf("summarize: %w", err)
+	}
+
+	if _, err := db.InsertSummary(&store.Summary{
+		MeetingID: id,
+		Template:  tmpl,
+		Content:   summary,
+	}); err != nil {
+		return fmt.Errorf("insert summary: %w", err)
+	}
+
+	fmt.Println(summary)
+	fmt.Printf("  → Summary stored for meeting #%d\n", id)
 	return nil
 }
 
@@ -423,7 +511,7 @@ func runTUI(cfg *config.Config, args []string) error {
 	}
 	outPath := filepath.Join(outDir, name+".wav")
 
-	c := client.New(cfg.AudioURL, cfg.GatewayURL, cfg.APIKey, cfg.STTModel)
+	c := client.New(cfg.AudioURL, cfg.GatewayURL, cfg.APIKey, cfg.STTModel, cfg.Summarise.Model)
 
 	db, _ := openDB()
 	if db != nil {
@@ -436,6 +524,7 @@ func runTUI(cfg *config.Config, args []string) error {
 		SampleRate: cfg.SampleRate,
 		AudioURL:   cfg.AudioURL,
 		GatewayURL: cfg.GatewayURL,
+		ServerURL:  cfg.Sync.ServerURL,
 		Client:     c,
 		Template:   cfg.Summarise.Template,
 		DB:         db,
@@ -484,4 +573,99 @@ func runSync(cfg *config.Config) error {
 	}
 
 	return nil
+}
+
+func runTranscribe(cfg *config.Config, uuid string) error {
+	serverURL := cfg.Sync.ServerURL
+	if serverURL == "" {
+		return fmt.Errorf("sync.server_url not configured in ~/.config/scrib/config.toml")
+	}
+
+	meeting, err := fetchMeeting(serverURL, uuid)
+	if err != nil {
+		return fmt.Errorf("fetch meeting: %w", err)
+	}
+
+	status, _ := meeting["status"].(string)
+
+	if status != "done" {
+		if status != "processing" {
+			resp, err := http.Post(serverURL+"/v1/process/"+uuid, "", nil)
+			if err != nil {
+				return fmt.Errorf("trigger processing: %w", err)
+			}
+			resp.Body.Close()
+			if resp.StatusCode != http.StatusAccepted {
+				return fmt.Errorf("process request failed (%d)", resp.StatusCode)
+			}
+			fmt.Println("Processing started...")
+		} else {
+			fmt.Println("Already processing...")
+		}
+
+		deadline := time.After(5 * time.Minute)
+		ticker := time.NewTicker(2 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-deadline:
+				return fmt.Errorf("timed out waiting for processing (5m)")
+			case <-ticker.C:
+				meeting, err = fetchMeeting(serverURL, uuid)
+				if err != nil {
+					return fmt.Errorf("poll meeting: %w", err)
+				}
+				status, _ = meeting["status"].(string)
+				if status == "done" {
+					goto done
+				}
+				if status == "error" {
+					errMsg, _ := meeting["error"].(string)
+					return fmt.Errorf("processing failed: %s", errMsg)
+				}
+			}
+		}
+	}
+done:
+
+	segments, _ := meeting["segments"].([]any)
+	if len(segments) == 0 {
+		fmt.Println("No segments found.")
+		return nil
+	}
+
+	for _, raw := range segments {
+		seg, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		speaker, _ := seg["speaker"].(string)
+		startS, _ := seg["start"].(float64)
+		text, _ := seg["text"].(string)
+		mins := int(startS) / 60
+		secs := int(startS) % 60
+		fmt.Printf("[%02d:%02d] %s: %s\n", mins, secs, speaker, text)
+	}
+
+	return nil
+}
+
+func fetchMeeting(serverURL, uuid string) (map[string]any, error) {
+	resp, err := http.Get(serverURL + "/v1/meetings/" + uuid)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("server returned %d: %s", resp.StatusCode, b)
+	}
+
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return result, nil
 }

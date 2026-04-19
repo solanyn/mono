@@ -45,29 +45,61 @@ func TestDefaultSampleRate(t *testing.T) {
 	}
 }
 
-func TestBackwardCompatOutputDir(t *testing.T) {
+func TestMigrateLegacyOutputDir(t *testing.T) {
 	cfg := defaults()
 	cfg.OutputDir = "~/old-meetings"
-	cfg.Output.Dir = "~/meetings"
+	cfg.Output.Dir = ""
 
-	if cfg.OutputDir != "" && cfg.Output.Dir == "~/meetings" {
-		cfg.Output.Dir = cfg.OutputDir
-	}
+	migrateDeprecatedFields(cfg)
 
 	if cfg.Output.Dir != "~/old-meetings" {
 		t.Errorf("Output.Dir = %q, want %q", cfg.Output.Dir, "~/old-meetings")
 	}
+	if cfg.OutputDir != "" {
+		t.Errorf("OutputDir should be cleared after migration, got %q", cfg.OutputDir)
+	}
 }
 
-func TestBackwardCompatObsidianVault(t *testing.T) {
+func TestMigrateLegacyObsidianVault(t *testing.T) {
 	cfg := defaults()
 	cfg.ObsidianVault = "~/vault"
 
-	if cfg.ObsidianVault != "" && cfg.Output.ObsidianVault == "" {
-		cfg.Output.ObsidianVault = cfg.ObsidianVault
-	}
+	migrateDeprecatedFields(cfg)
 
 	if cfg.Output.ObsidianVault != "~/vault" {
 		t.Errorf("Output.ObsidianVault = %q, want %q", cfg.Output.ObsidianVault, "~/vault")
+	}
+	if cfg.ObsidianVault != "" {
+		t.Errorf("ObsidianVault should be cleared after migration, got %q", cfg.ObsidianVault)
+	}
+}
+
+func TestNestedConfigUnchanged(t *testing.T) {
+	cfg := defaults()
+	cfg.Output.Dir = "~/my-meetings"
+	cfg.Output.ObsidianVault = "~/my-vault"
+
+	migrateDeprecatedFields(cfg)
+
+	if cfg.Output.Dir != "~/my-meetings" {
+		t.Errorf("Output.Dir = %q, want %q", cfg.Output.Dir, "~/my-meetings")
+	}
+	if cfg.Output.ObsidianVault != "~/my-vault" {
+		t.Errorf("Output.ObsidianVault = %q, want %q", cfg.Output.ObsidianVault, "~/my-vault")
+	}
+}
+
+func TestConflictingValuesNestedWins(t *testing.T) {
+	cfg := defaults()
+	cfg.OutputDir = "~/old"
+	cfg.Output.Dir = "~/new"
+
+	migrateDeprecatedFields(cfg)
+
+	if cfg.Output.Dir != "~/new" {
+		t.Errorf("Output.Dir = %q, want %q (nested should win)", cfg.Output.Dir, "~/new")
+	}
+	if cfg.OutputDir != "" {
+		t.Errorf("OutputDir should be cleared after migration, got %q", cfg.OutputDir)
 	}
 }

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -37,15 +38,15 @@ type SyncConfig struct {
 }
 
 type Config struct {
-	GatewayURL    string          `toml:"gateway_url"`
-	AudioURL      string          `toml:"audio_url"`
-	APIKey        string          `toml:"api_key"`
-	STTModel      string          `toml:"stt_model"`
-	SampleRate    int             `toml:"sample_rate"`
-	Format        string          `toml:"format"`
-	InputDevice   string          `toml:"input_device"`
-	OutputDir     string          `toml:"output_dir"`
-	ObsidianVault string          `toml:"obsidian_vault"`
+	GatewayURL string          `toml:"gateway_url"`
+	AudioURL   string          `toml:"audio_url"`
+	APIKey     string          `toml:"api_key"`
+	STTModel   string          `toml:"stt_model"`
+	SampleRate int             `toml:"sample_rate"`
+	Format     string          `toml:"format"`
+	InputDevice   string       `toml:"input_device"`
+	OutputDir     string       `toml:"output_dir"`
+	ObsidianVault string       `toml:"obsidian_vault"`
 	Output        OutputConfig    `toml:"output"`
 	Calendar      CalendarConfig  `toml:"calendar"`
 	Scribe        ScribeConfig    `toml:"scribe"`
@@ -85,6 +86,8 @@ func Load() *Config {
 		toml.Unmarshal(data, cfg)
 	}
 
+	migrateDeprecatedFields(cfg)
+
 	// Env overrides
 	if v := os.Getenv("SCRIB_GATEWAY_URL"); v != "" {
 		cfg.GatewayURL = v
@@ -103,6 +106,9 @@ func Load() *Config {
 	}
 	if v := os.Getenv("SCRIB_CALENDAR_USER"); v != "" {
 		cfg.Calendar.User = v
+	}
+	if v := os.Getenv("SCRIB_INPUT_DEVICE"); v != "" {
+		cfg.InputDevice = v
 	}
 
 	if cfg.SampleRate <= 0 {
@@ -138,4 +144,25 @@ func (c *Config) ExpandedOutputDir() string {
 		dir = filepath.Join(home, dir[2:])
 	}
 	return dir
+}
+
+func migrateDeprecatedFields(cfg *Config) {
+	if cfg.OutputDir != "" {
+		if cfg.Output.Dir == "" || cfg.Output.Dir == "~/meetings" {
+			log.Printf("config: migrating deprecated top-level output_dir to [output] dir")
+			cfg.Output.Dir = cfg.OutputDir
+		} else if cfg.OutputDir != cfg.Output.Dir {
+			log.Printf("config: both output_dir and [output] dir set with different values; using [output] dir=%q", cfg.Output.Dir)
+		}
+		cfg.OutputDir = ""
+	}
+	if cfg.ObsidianVault != "" {
+		if cfg.Output.ObsidianVault == "" {
+			log.Printf("config: migrating deprecated top-level obsidian_vault to [output] obsidian_vault")
+			cfg.Output.ObsidianVault = cfg.ObsidianVault
+		} else if cfg.ObsidianVault != cfg.Output.ObsidianVault {
+			log.Printf("config: both obsidian_vault and [output] obsidian_vault set with different values; using [output] obsidian_vault=%q", cfg.Output.ObsidianVault)
+		}
+		cfg.ObsidianVault = ""
+	}
 }

@@ -27,8 +27,11 @@ type Config struct {
 	S3Endpoint  string
 	S3Bucket    string
 	S3AccessKey string
-	S3SecretKey string
-	S3UseSSL    bool
+	S3SecretKey    string
+	S3UseSSL       bool
+	AudioServiceURL string
+	STTModel        string
+	VADThreshold    string
 }
 
 // Server is the scrib sync server.
@@ -88,6 +91,8 @@ func (s *Server) routes() chi.Router {
 
 		r.Post("/audio/{uuid}", s.handleUploadAudio)
 		r.Get("/audio/{uuid}", s.handleDownloadAudio)
+
+		r.Post("/process/{uuid}", s.handleProcess)
 	})
 
 	return r
@@ -147,6 +152,10 @@ func (s *Server) migrate() error {
 		CREATE INDEX IF NOT EXISTS idx_meetings_recorded ON meetings(recorded_at DESC);
 		CREATE INDEX IF NOT EXISTS idx_segments_meeting ON segments(meeting_id);
 		CREATE INDEX IF NOT EXISTS idx_summaries_meeting ON summaries(meeting_id);
+
+		ALTER TABLE meetings ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending';
+		ALTER TABLE meetings ADD COLUMN IF NOT EXISTS error TEXT;
+		ALTER TABLE meetings ADD COLUMN IF NOT EXISTS processed_at TIMESTAMPTZ;
 	`)
 	return err
 }
@@ -408,10 +417,11 @@ func (s *Server) handleGetMeeting(w http.ResponseWriter, r *http.Request) {
 	var recordedAt time.Time
 	var durationS float64
 	var numSpeakers int
+	var status, meetingErr *string
 	err := s.db.QueryRow(
-		`SELECT name, recorded_at, duration_s, template, num_speakers
+		`SELECT name, recorded_at, duration_s, template, num_speakers, status, error
 		 FROM meetings WHERE uuid = $1`, uuid,
-	).Scan(&name, &recordedAt, &durationS, &template, &numSpeakers)
+	).Scan(&name, &recordedAt, &durationS, &template, &numSpeakers, &status, &meetingErr)
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -457,6 +467,7 @@ func (s *Server) handleGetMeeting(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]any{
 		"uuid": uuid, "name": name, "recorded_at": recordedAt,
 		"duration_s": durationS, "template": template, "num_speakers": numSpeakers,
+		"status": status, "error": meetingErr,
 		"segments": segments, "summaries": summaries,
 	})
 }
@@ -535,4 +546,24 @@ func (s *Server) handleCreateSpeaker(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{"uuid": sp.UUID, "name": sp.Name})
+}
+
+func (s *Server) handleProcess(w http.ResponseWriter, r *http.Request) {
+	uuid := chi.URLParam(r, "uuid")
+	if uuid == "" {
+		http.Error(w, "uuid required", http.StatusBadRequest)
+		return
+	}
+
+	var exists bool
+	err := s.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM meetings WHERE uuid = $1)`, uuid).Scan(&exists)
+	if err != nil || !exists {
+		http.Error(w, "meeting not found", http.StatusNotFound)
+		return
+	}
+
+	go s.processMeeting(uuid)
+
+	w.WriteHeader(http.StatusAccepted)
+	json.NewEncoder(w).Encode(map[string]string{"status": "processing", "uuid": uuid})
 }

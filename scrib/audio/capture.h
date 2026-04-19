@@ -12,7 +12,8 @@ int start_capture(int sample_rate);
 void stop_capture(void);
 
 // Callback into Go — implemented in recorder.go
-extern void goAudioCallback(int16_t *data, int frameCount, int channels, int isMic);
+// timestampSecs is the presentation timestamp in seconds (host time).
+extern void goAudioCallback(int16_t *data, int frameCount, int channels, int isMic, double timestampSecs);
 
 // Returns the name of the default input (mic) device. Caller must free().
 const char* get_input_device_name(void);
