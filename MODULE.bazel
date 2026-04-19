@@ -22,7 +22,6 @@ go_sdk.download(version = "1.25.0")
 
 go_deps = use_extension("@gazelle//:extensions.bzl", "go_deps")
 go_deps.from_file(go_mod = "//cronprint:go.mod")
-go_deps.from_file(go_mod = "//scrib:go.mod")
 go_deps.module(
     path = "charm.land/bubbles/v2",
     sum = "h1:YSnNh5cPYlYjPxRrzs5VEn3vwhtEn3jVGRBT3M7/I0g=",
@@ -1768,6 +1767,31 @@ go_deps.module(
     sum = "h1:KqQDr4vIlxwfYh0Ed/uJGVgX+CHAkahrgabg6Q8GYxc=",
     version = "v1.0.1",
 )
+go_deps.module(
+    path = "github.com/minio/minio-go/v7",
+    sum = "h1:ShkWi8Tyj9RtU57OQB2HIXKz4bFgtVib0bbT1sbtLI8=",
+    version = "v7.0.100",
+)
+go_deps.module(
+    path = "github.com/minio/crc64nvme",
+    sum = "h1:8dwx/Pz49suywbO+auHCBpCtlW1OfpcLN7wYgVR6wAI=",
+    version = "v1.1.1",
+)
+go_deps.module(
+    path = "github.com/minio/md5-simd",
+    sum = "h1:Gdi1DZK69+ZVMoNHRXJyNcxrMA4dSxoYHZSQbirFg34=",
+    version = "v1.1.2",
+)
+go_deps.module(
+    path = "github.com/go-ini/ini",
+    sum = "h1:z6ZrTEZqSWOTyH2FlglNbNgARyHG8oLW9gMELqKr06A=",
+    version = "v1.67.0",
+)
+go_deps.module(
+    path = "github.com/lib/pq",
+    sum = "h1:tTWxr2YLKwIvK90ZXEw8GP7UFHtcbTtty8zsI+YjrfQ=",
+    version = "v1.12.3",
+)
 use_repo(
     go_deps,
     "cat_dario_mergo",
@@ -1941,6 +1965,10 @@ use_repo(
     "com_github_miekg_pkcs11",
     "com_github_minio_asm2plan9s",
     "com_github_minio_c2goasm",
+    "com_github_minio_crc64nvme",
+    "com_github_minio_md5_simd",
+    "com_github_minio_minio_go_v7",
+    "com_github_go_ini_ini",
     "com_github_mitchellh_hashstructure_v2",
     "com_github_mmcdole_gofeed",
     "com_github_mmcdole_goxpp",
