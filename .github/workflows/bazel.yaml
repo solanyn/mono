@@ -98,7 +98,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: "22"
+          node-version: "24"
       - name: Deploy to Cloudflare Pages
         run: npx wrangler@latest pages deploy bazel-bin/website/dist --project-name=goyangi --branch=main --commit-dirty=true
         env:
@@ -123,7 +123,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: "22"
+          node-version: "24"
       - name: Deploy preview to Cloudflare Pages
         id: deploy
         run: |
