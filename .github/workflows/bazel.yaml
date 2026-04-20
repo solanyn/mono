@@ -271,11 +271,18 @@ jobs:
         run: |
           echo "arm64=$(sha256sum /tmp/scrib/scrib-darwin-arm64 | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
           echo "amd64=$(sha256sum /tmp/scrib/scrib-darwin-amd64 | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - name: Generate app token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          repositories: homebrew-tap
       - name: Checkout homebrew-tap
         uses: actions/checkout@v4
         with:
           repository: solanyn/homebrew-tap
-          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           path: homebrew-tap
       - name: Update formula
         env:
