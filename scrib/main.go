@@ -31,14 +31,14 @@ func main() {
 
 	rootCmd := &cobra.Command{
 		Use:     "scrib [name]",
-		Short:   "Meeting audio capture & annotation",
+		Short:   "Record meeting audio (default: start recording)",
 		Version: version,
 		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if template != "" {
 				cfg.Summarise.Template = template
 			}
-			return runTUI(cfg, args)
+			return runRecord(cfg, args, false)
 		},
 	}
 
