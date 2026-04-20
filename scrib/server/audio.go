@@ -16,7 +16,7 @@ import (
 
 const (
 	audioHTTPTimeout = 10 * time.Minute
-	chunkDuration    = 5 * time.Minute
+	chunkDuration    = 2 * time.Minute
 )
 
 var audioClient = &http.Client{Timeout: audioHTTPTimeout}
