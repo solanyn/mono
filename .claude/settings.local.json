@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "Bash(bazel query:*)",
+      "Bash(bazel build:*)",
+      "Bash(chmod:*)",
+      "Bash(grep:*)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(./tools/build-linux.sh build:*)",
+      "Bash(bazelisk build:*)",
+      "Bash(bazel run:*)"
+    ],
+    "deny": []
+  }
+}

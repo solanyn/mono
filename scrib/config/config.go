@@ -73,6 +73,9 @@ func defaults() *Config {
 			Model:    "auto",
 			Template: "standup",
 		},
+		Sync: SyncConfig{
+			ServerURL: "https://scrib.goyangi.io",
+		},
 	}
 }
 
