@@ -1,0 +1,346 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Scrib Server API",
+    "description": "Meeting audio capture, transcription, diarisation, and search.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {"url": "https://scrib.goyangi.io"}
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health check",
+        "operationId": "healthCheck",
+        "responses": {
+          "200": {
+            "description": "Server is healthy",
+            "content": {
+              "text/plain": {
+                "schema": {"type": "string", "example": "ok"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/meetings": {
+      "get": {
+        "summary": "List meetings",
+        "operationId": "listMeetings",
+        "parameters": [
+          {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 20}},
+          {"name": "offset", "in": "query", "schema": {"type": "integer", "default": 0}}
+        ],
+        "responses": {
+          "200": {
+            "description": "Array of meetings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {"$ref": "#/components/schemas/MeetingSummary"}
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a meeting",
+        "operationId": "createMeeting",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/CreateMeetingRequest"}
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Meeting created",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/CreateMeetingResponse"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/meetings/{uuid}": {
+      "get": {
+        "summary": "Get meeting details",
+        "operationId": "getMeeting",
+        "parameters": [
+          {"name": "uuid", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "Meeting with segments and summaries",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Meeting"}
+              }
+            }
+          },
+          "404": {"description": "Meeting not found"}
+        }
+      },
+      "delete": {
+        "summary": "Delete a meeting",
+        "operationId": "deleteMeeting",
+        "parameters": [
+          {"name": "uuid", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}
+        ],
+        "responses": {
+          "204": {"description": "Meeting deleted"},
+          "404": {"description": "Meeting not found"}
+        }
+      }
+    },
+    "/v1/audio/{uuid}": {
+      "get": {
+        "summary": "Download meeting audio",
+        "operationId": "downloadAudio",
+        "parameters": [
+          {"name": "uuid", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "WAV audio file",
+            "content": {
+              "audio/wav": {
+                "schema": {"type": "string", "format": "binary"}
+              }
+            }
+          },
+          "404": {"description": "Audio not found"}
+        }
+      },
+      "post": {
+        "summary": "Upload meeting audio",
+        "operationId": "uploadAudio",
+        "parameters": [
+          {"name": "uuid", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "audio/wav": {
+              "schema": {"type": "string", "format": "binary"}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Audio uploaded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "blob_key": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/process/{uuid}": {
+      "post": {
+        "summary": "Trigger server-side processing (transcription + diarisation)",
+        "operationId": "processAudio",
+        "parameters": [
+          {"name": "uuid", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}
+        ],
+        "responses": {
+          "202": {
+            "description": "Processing started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {"type": "string", "example": "processing"},
+                    "uuid": {"type": "string", "format": "uuid"}
+                  }
+                }
+              }
+            }
+          },
+          "404": {"description": "Meeting not found"}
+        }
+      }
+    },
+    "/v1/speakers": {
+      "get": {
+        "summary": "List speakers",
+        "operationId": "listSpeakers",
+        "responses": {
+          "200": {
+            "description": "Array of speakers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {"$ref": "#/components/schemas/Speaker"}
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a speaker",
+        "operationId": "createSpeaker",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/CreateSpeakerRequest"}
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Speaker created",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Speaker"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/search": {
+      "get": {
+        "summary": "Full-text search across transcripts",
+        "operationId": "searchSegments",
+        "parameters": [
+          {"name": "q", "in": "query", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {"$ref": "#/components/schemas/SearchResult"}
+                }
+              }
+            }
+          },
+          "400": {"description": "Missing query parameter"}
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "MeetingSummary": {
+        "type": "object",
+        "properties": {
+          "uuid": {"type": "string", "format": "uuid"},
+          "name": {"type": "string"},
+          "recorded_at": {"type": "string", "format": "date-time"},
+          "duration_s": {"type": "number"},
+          "template": {"type": "string"},
+          "num_speakers": {"type": "integer"},
+          "status": {"type": "string", "enum": ["pending", "processing", "done", "error"]}
+        }
+      },
+      "Meeting": {
+        "type": "object",
+        "properties": {
+          "uuid": {"type": "string", "format": "uuid"},
+          "name": {"type": "string"},
+          "recorded_at": {"type": "string", "format": "date-time"},
+          "duration_s": {"type": "number"},
+          "template": {"type": "string"},
+          "num_speakers": {"type": "integer"},
+          "status": {"type": "string", "enum": ["pending", "processing", "done", "error"]},
+          "error": {"type": "string", "nullable": true},
+          "segments": {
+            "type": "array",
+            "items": {"$ref": "#/components/schemas/Segment"}
+          },
+          "summaries": {
+            "type": "array",
+            "items": {"$ref": "#/components/schemas/Summary"}
+          }
+        }
+      },
+      "Segment": {
+        "type": "object",
+        "properties": {
+          "uuid": {"type": "string", "format": "uuid"},
+          "speaker": {"type": "string"},
+          "start": {"type": "number", "description": "Start time in seconds"},
+          "end": {"type": "number", "description": "End time in seconds"},
+          "text": {"type": "string"}
+        }
+      },
+      "Summary": {
+        "type": "object",
+        "properties": {
+          "uuid": {"type": "string", "format": "uuid"},
+          "template": {"type": "string"},
+          "content": {"type": "string"}
+        }
+      },
+      "Speaker": {
+        "type": "object",
+        "properties": {
+          "uuid": {"type": "string", "format": "uuid"},
+          "name": {"type": "string"}
+        }
+      },
+      "CreateMeetingRequest": {
+        "type": "object",
+        "required": ["name", "recorded_at"],
+        "properties": {
+          "name": {"type": "string"},
+          "recorded_at": {"type": "string", "format": "date-time"},
+          "duration_s": {"type": "number"},
+          "template": {"type": "string", "default": "standup"}
+        }
+      },
+      "CreateMeetingResponse": {
+        "type": "object",
+        "properties": {
+          "uuid": {"type": "string", "format": "uuid"},
+          "name": {"type": "string"},
+          "status": {"type": "string"}
+        }
+      },
+      "CreateSpeakerRequest": {
+        "type": "object",
+        "required": ["uuid", "name"],
+        "properties": {
+          "uuid": {"type": "string", "format": "uuid"},
+          "name": {"type": "string"}
+        }
+      },
+      "SearchResult": {
+        "type": "object",
+        "properties": {
+          "segment_uuid": {"type": "string", "format": "uuid"},
+          "speaker": {"type": "string"},
+          "start": {"type": "number"},
+          "end": {"type": "number"},
+          "text": {"type": "string"},
+          "meeting_uuid": {"type": "string", "format": "uuid"},
+          "meeting_name": {"type": "string"},
+          "recorded_at": {"type": "string", "format": "date-time"}
+        }
+      }
+    }
+  }
+}

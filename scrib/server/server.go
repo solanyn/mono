@@ -4,6 +4,7 @@ package server
 import (
 	"context"
 	"database/sql"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -19,6 +20,9 @@ import (
 
 	_ "github.com/lib/pq"
 )
+
+//go:embed openapi.json
+var openapiSpec []byte
 
 // Config holds server configuration.
 type Config struct {
@@ -77,6 +81,11 @@ func (s *Server) routes() chi.Router {
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
+	})
+
+	r.Get("/openapi.json", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(openapiSpec)
 	})
 
 	r.Route("/v1", func(r chi.Router) {
