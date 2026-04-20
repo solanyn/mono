@@ -241,3 +241,58 @@ jobs:
           files: |
             scrib/scrib-darwin-arm64
             scrib/scrib-darwin-amd64
+
+  bump-homebrew-scrib:
+    runs-on: ubuntu-latest
+    needs: release-scrib-client
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout mono
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Generate version
+        id: version
+        run: |
+          VERSION=$(date -u +%Y.%m).$(git rev-list --count HEAD)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Wait for release assets
+        run: sleep 30
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="v${{ steps.version.outputs.version }}"
+          gh release download "$VERSION" -R ${{ github.repository }} -p 'scrib-darwin-*' -D /tmp/scrib
+      - name: Compute SHA256
+        id: sha
+        run: |
+          echo "arm64=$(sha256sum /tmp/scrib/scrib-darwin-arm64 | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "amd64=$(sha256sum /tmp/scrib/scrib-darwin-amd64 | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - name: Checkout homebrew-tap
+        uses: actions/checkout@v4
+        with:
+          repository: solanyn/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+      - name: Update formula
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          REPO: ${{ github.repository }}
+          SHA_ARM64: ${{ steps.sha.outputs.arm64 }}
+          SHA_AMD64: ${{ steps.sha.outputs.amd64 }}
+        run: |
+          sed -i "s|version \".*\"|version \"${VERSION}\"|" homebrew-tap/Formula/scrib.rb
+          sed -i "s|download/v[^/]*/scrib-darwin|download/v${VERSION}/scrib-darwin|g" homebrew-tap/Formula/scrib.rb
+          sed -i "/arm64/{n;s|sha256 \".*\"|sha256 \"${SHA_ARM64}\"|;}" homebrew-tap/Formula/scrib.rb
+          sed -i "/amd64/{n;s|sha256 \".*\"|sha256 \"${SHA_AMD64}\"|;}" homebrew-tap/Formula/scrib.rb
+      - name: Push formula update
+        working-directory: homebrew-tap
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/scrib.rb
+          git commit -m "bump scrib to ${{ steps.version.outputs.version }}"
+          git push
