@@ -27,28 +27,11 @@ go_library(
 )
 
 go_library(
-    name = "client_lib",
-    srcs = glob(["client/*.go"]),
-    importpath = "github.com/solanyn/mono/scrib/client",
-)
-
-go_library(
-    name = "store_lib",
-    srcs = glob(["store/*.go"]),
-    importpath = "github.com/solanyn/mono/scrib/store",
-    deps = [
-        "@org_modernc_sqlite//:sqlite",
-    ],
-)
-
-go_library(
     name = "tui_lib",
     srcs = glob(["tui/*.go"]),
     importpath = "github.com/solanyn/mono/scrib/tui",
     deps = [
         ":audio_lib",
-        ":client_lib",
-        ":store_lib",
         "@land_charm_bubbles_v2//spinner",
         "@land_charm_bubbles_v2//viewport",
         "@land_charm_bubbletea_v2//:bubbletea",
@@ -57,17 +40,9 @@ go_library(
 )
 
 go_library(
-    name = "sync_lib",
-    srcs = glob(["sync/*.go"]),
-    importpath = "github.com/solanyn/mono/scrib/sync",
-    deps = [
-        ":store_lib",
-    ],
-)
-
-go_library(
     name = "server_lib",
     srcs = glob(["server/*.go"]),
+    embedsrcs = ["server/openapi.json"],
     importpath = "github.com/solanyn/mono/scrib/server",
     deps = [
         "@com_github_go_chi_chi_v5//:chi",
@@ -84,10 +59,7 @@ go_library(
     importpath = "github.com/solanyn/mono/scrib",
     deps = [
         ":audio_lib",
-        ":client_lib",
         ":config_lib",
-        ":store_lib",
-        ":sync_lib",
         ":tui_lib",
         "@com_github_spf13_cobra//:cobra",
     ],
