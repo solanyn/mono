@@ -21,5 +21,3 @@ build:remote --remote_local_fallback
 
 try-import %workspace%/user.bazelrc
 
-# Static linking for container images (no glibc dependency)
-build:ci --@rules_go//go/config:pure

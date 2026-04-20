@@ -2196,6 +2196,15 @@ oci.pull(
         "linux/arm64/v8",
     ],
 )
+
+oci.pull(
+    name = "distroless_base",
+    digest = "sha256:aeb2e6aa676c55b201822f3b88c01c8a10b0a72ac1b2bdac8f5958e2eb2e71e9",
+    image = "gcr.io/distroless/base-debian12",
+    platforms = [
+        "linux/amd64",
+    ],
+)
 oci.pull(
     name = "python_slim",
     digest = "sha256:d168b8d9eb761f4d3fe305ebd04aeb7e7f2de0297cec5fb2f8f6403244621664",
@@ -2203,4 +2212,4 @@ oci.pull(
     platforms = ["linux/amd64"],
     tag = "3.13-slim",
 )
-use_repo(oci, "distroless_static", "distroless_static_linux_amd64", "distroless_static_linux_arm64_v8", "python_slim", "python_slim_linux_amd64")
+use_repo(oci, "distroless_base", "distroless_base_linux_amd64", "distroless_static", "distroless_static_linux_amd64", "distroless_static_linux_arm64_v8", "python_slim", "python_slim_linux_amd64")
