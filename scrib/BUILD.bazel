@@ -5,7 +5,7 @@ go_library(
     srcs = glob(["config/*.go"]),
     importpath = "github.com/solanyn/mono/scrib/config",
     deps = [
-        "@com_github_pelletier_go_toml//:go-toml",
+        "@com_github_pelletier_go_toml_v2//:go-toml",
     ],
 )
 

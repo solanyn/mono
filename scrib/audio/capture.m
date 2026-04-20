@@ -11,6 +11,8 @@
 
 // ─── System Audio (ScreenCaptureKit) ───────────────────────────────
 
+static _Atomic double sysAudioStartTime = -1.0;
+
 @interface SystemAudioDelegate : NSObject <SCStreamOutput, SCStreamDelegate>
 @end
 
@@ -52,6 +54,14 @@
 
     CMTime pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
     double timestampSecs = CMTimeGetSeconds(pts);
+
+    double expected = __c11_atomic_load(&sysAudioStartTime, __ATOMIC_RELAXED);
+    if (expected < 0.0) {
+        __c11_atomic_store(&sysAudioStartTime, timestampSecs, __ATOMIC_RELAXED);
+        timestampSecs = 0.0;
+    } else {
+        timestampSecs -= expected;
+    }
 
     goAudioCallback(pcm, frameCount, channels, 0, timestampSecs);
     free(pcm);
@@ -210,6 +220,7 @@ static void stop_system_audio(void) {
         scStream = nil;
         scDelegate = nil;
     }
+    __c11_atomic_store(&sysAudioStartTime, -1.0, __ATOMIC_RELAXED);
 }
 
 // ─── Public API ────────────────────────────────────────────────────

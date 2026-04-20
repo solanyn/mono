@@ -200,13 +200,37 @@ func runRecord(cfg *config.Config, args []string, annotateAfter bool) error {
 		fmt.Fprintf(os.Stderr, "warning: couldn't open db: %v\n", err)
 	} else {
 		defer db.Close()
-		db.InsertMeeting(&store.Meeting{
+		meeting := &store.Meeting{
 			Name:       name,
 			RecordedAt: time.Now(),
 			DurationS:  dur.Seconds(),
 			Template:   cfg.Summarise.Template,
 			AudioPath:  outPath,
-		})
+		}
+		db.InsertMeeting(meeting)
+
+		if cfg.Sync.ServerURL != "" {
+			fmt.Println("Uploading to server... (done in background)")
+			go func() {
+				clientID := cfg.Sync.ClientID
+				if clientID == "" {
+					hostname, _ := os.Hostname()
+					clientID = hostname
+				}
+				sc := sync.NewClient(cfg.Sync.ServerURL, clientID, db)
+				if _, err := sc.Push(); err != nil {
+					fmt.Fprintf(os.Stderr, "warning: sync push: %v\n", err)
+					return
+				}
+				resp, err := http.Post(cfg.Sync.ServerURL+"/v1/process/"+meeting.UUID, "", nil)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "warning: trigger processing: %v\n", err)
+					return
+				}
+				resp.Body.Close()
+			}()
+			time.Sleep(100 * time.Millisecond)
+		}
 	}
 
 	if annotateAfter {
