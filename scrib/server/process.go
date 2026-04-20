@@ -66,7 +66,7 @@ func (s *Server) processMeeting(meetingUUID string) {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		vadResult, vadErr = s.vadChunked(ctx, audioBytes, blobKey.String, s.cfg.VADThreshold)
+		vadResult, vadErr = s.vad(ctx, bytes.NewReader(audioBytes), blobKey.String, s.cfg.VADThreshold)
 	}()
 	go func() {
 		defer wg.Done()
