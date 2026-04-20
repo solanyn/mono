@@ -273,7 +273,7 @@ jobs:
           echo "amd64=$(sha256sum /tmp/scrib/scrib-darwin-amd64 | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
       - name: Generate app token
         id: app-token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ secrets.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
