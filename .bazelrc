@@ -20,3 +20,6 @@ build:remote --remote_timeout=10m
 build:remote --remote_local_fallback
 
 try-import %workspace%/user.bazelrc
+
+# Static linking for container images (no glibc dependency)
+build:ci --@io_bazel_rules_go//go/config:pure
