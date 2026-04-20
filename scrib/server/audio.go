@@ -262,46 +262,8 @@ func (s *Server) vadChunked(ctx context.Context, audioData []byte, filename stri
 		return nil, fmt.Errorf("downmix: %w", err)
 	}
 
-	chunkSecs := chunkDuration.Seconds()
-	chunks, err := splitWAVChunks(audioData, chunkSecs)
-	if err != nil {
-		return nil, fmt.Errorf("split wav: %w", err)
-	}
-
-	h, _ := parseWAVHeader(audioData)
-	blockAlign := int(h.NumChannels) * int(h.BitsPerSample) / 8
-	bytesPerSec := float64(h.SampleRate) * float64(blockAlign)
-
-	var allSegments []VADSegment
-	totalDuration := float64(h.DataSize) / bytesPerSec
-	var numSpeakers int
-
-	for i, chunk := range chunks {
-		timeOffset := float64(i) * chunkSecs
-		log.Printf("vad chunk %d/%d (offset %.0fs, %d bytes)", i+1, len(chunks), timeOffset, len(chunk))
-
-		result, err := s.vad(ctx, bytes.NewReader(chunk), filename, threshold)
-		if err != nil {
-			return nil, fmt.Errorf("vad chunk %d: %w", i+1, err)
-		}
-
-		for _, seg := range result.Segments {
-			allSegments = append(allSegments, VADSegment{
-				Speaker: seg.Speaker,
-				Start:   seg.Start + timeOffset,
-				End:     seg.End + timeOffset,
-			})
-		}
-		if result.NumSpeakers > numSpeakers {
-			numSpeakers = result.NumSpeakers
-		}
-	}
-
-	return &VADResult{
-		Segments:        allSegments,
-		NumSpeakers:     numSpeakers,
-		DurationSeconds: totalDuration,
-	}, nil
+	log.Printf("vad: sending %d bytes (mono) to %s", len(audioData), s.cfg.AudioServiceURL)
+	return s.vad(ctx, bytes.NewReader(audioData), filename, threshold)
 }
 
 func multipartFromReader(r io.Reader, filename string, fields map[string]string) (io.Reader, string, error) {
