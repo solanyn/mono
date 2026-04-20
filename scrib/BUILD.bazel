@@ -112,6 +112,7 @@ go_library(
 go_binary(
     name = "scrib-server",
     embed = [":server_cmd_lib"],
+    pure = "on",
     visibility = ["//visibility:public"],
 )
 
