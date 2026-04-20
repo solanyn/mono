@@ -1,81 +1,25 @@
 package config
 
 import (
-	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	toml "github.com/pelletier/go-toml/v2"
 )
 
-type CalendarConfig struct {
-	URL      string `toml:"url"`
-	User     string `toml:"user"`
-	TokenCmd string `toml:"token_cmd"`
-}
-
-type OutputConfig struct {
-	Dir           string `toml:"dir"`
-	ObsidianVault string `toml:"obsidian_vault"`
-}
-
-type ScribeConfig struct {
-	NoiseRemoval bool `toml:"noise_removal"`
-	AutoScroll   bool `toml:"auto_scroll"`
-	NotesWidth   int  `toml:"notes_width"`
-}
-
-type SummariseConfig struct {
-	Model    string `toml:"model"`
-	Template string `toml:"template"`
-}
-
-type SyncConfig struct {
-	ServerURL string `toml:"server_url"`
-	ClientID  string `toml:"client_id"`
-}
-
 type Config struct {
-	GatewayURL string          `toml:"gateway_url"`
-	AudioURL   string          `toml:"audio_url"`
-	APIKey     string          `toml:"api_key"`
-	STTModel   string          `toml:"stt_model"`
-	SampleRate int             `toml:"sample_rate"`
-	Format     string          `toml:"format"`
-	InputDevice   string       `toml:"input_device"`
-	OutputDir     string       `toml:"output_dir"`
-	ObsidianVault string       `toml:"obsidian_vault"`
-	Output        OutputConfig    `toml:"output"`
-	Calendar      CalendarConfig  `toml:"calendar"`
-	Scribe        ScribeConfig    `toml:"scribe"`
-	Summarise     SummariseConfig `toml:"summarise"`
-	Sync          SyncConfig      `toml:"sync"`
+	ServerURL   string `toml:"server_url"`
+	SampleRate  int    `toml:"sample_rate"`
+	OutputDir   string `toml:"output_dir"`
+	InputDevice string `toml:"input_device"`
 }
 
 func defaults() *Config {
 	return &Config{
-		GatewayURL: "https://gateway.goyangi.io/v1/opus",
-		AudioURL:   "http://127.0.0.1:8000",
-		STTModel:   "mlx-community/parakeet-tdt-0.6b-v3",
+		ServerURL:  "https://scrib.goyangi.io",
 		SampleRate: 16000,
-		Format:     "wav",
-		Output: OutputConfig{
-			Dir: "~/meetings",
-		},
-		Scribe: ScribeConfig{
-			NoiseRemoval: true,
-			AutoScroll:   true,
-			NotesWidth:   30,
-		},
-		Summarise: SummariseConfig{
-			Model:    "auto",
-			Template: "standup",
-		},
-		Sync: SyncConfig{
-			ServerURL: "https://scrib.goyangi.io",
-		},
+		OutputDir:  "~/meetings",
 	}
 }
 
@@ -89,26 +33,11 @@ func Load() *Config {
 		toml.Unmarshal(data, cfg)
 	}
 
-	migrateDeprecatedFields(cfg)
-
-	// Env overrides
-	if v := os.Getenv("SCRIB_GATEWAY_URL"); v != "" {
-		cfg.GatewayURL = v
-	}
-	if v := os.Getenv("SCRIB_AUDIO_URL"); v != "" {
-		cfg.AudioURL = v
+	if v := os.Getenv("SCRIB_SERVER_URL"); v != "" {
+		cfg.ServerURL = v
 	}
 	if v := os.Getenv("SCRIB_OUTPUT_DIR"); v != "" {
-		cfg.Output.Dir = v
-	}
-	if v := os.Getenv("SCRIB_OBSIDIAN_VAULT"); v != "" {
-		cfg.Output.ObsidianVault = v
-	}
-	if v := os.Getenv("SCRIB_CALENDAR_URL"); v != "" {
-		cfg.Calendar.URL = v
-	}
-	if v := os.Getenv("SCRIB_CALENDAR_USER"); v != "" {
-		cfg.Calendar.User = v
+		cfg.OutputDir = v
 	}
 	if v := os.Getenv("SCRIB_INPUT_DEVICE"); v != "" {
 		cfg.InputDevice = v
@@ -120,52 +49,11 @@ func Load() *Config {
 	return cfg
 }
 
-// CalendarToken returns the calendar auth token.
-// Precedence: SCRIB_CALENDAR_TOKEN env > token_cmd config > empty.
-func (c *Config) CalendarToken() string {
-	if v := os.Getenv("SCRIB_CALENDAR_TOKEN"); v != "" {
-		return v
-	}
-	if c.Calendar.TokenCmd != "" {
-		out, err := exec.Command("sh", "-c", c.Calendar.TokenCmd).Output()
-		if err == nil {
-			return strings.TrimSpace(string(out))
-		}
-	}
-	return ""
-}
-
-// GatewayAPIKey returns the gateway API key from env.
-func (c *Config) GatewayAPIKey() string {
-	return os.Getenv("SCRIB_GATEWAY_API_KEY")
-}
-
 func (c *Config) ExpandedOutputDir() string {
-	dir := c.Output.Dir
+	dir := c.OutputDir
 	if strings.HasPrefix(dir, "~/") {
 		home, _ := os.UserHomeDir()
 		dir = filepath.Join(home, dir[2:])
 	}
 	return dir
-}
-
-func migrateDeprecatedFields(cfg *Config) {
-	if cfg.OutputDir != "" {
-		if cfg.Output.Dir == "" || cfg.Output.Dir == "~/meetings" {
-			log.Printf("config: migrating deprecated top-level output_dir to [output] dir")
-			cfg.Output.Dir = cfg.OutputDir
-		} else if cfg.OutputDir != cfg.Output.Dir {
-			log.Printf("config: both output_dir and [output] dir set with different values; using [output] dir=%q", cfg.Output.Dir)
-		}
-		cfg.OutputDir = ""
-	}
-	if cfg.ObsidianVault != "" {
-		if cfg.Output.ObsidianVault == "" {
-			log.Printf("config: migrating deprecated top-level obsidian_vault to [output] obsidian_vault")
-			cfg.Output.ObsidianVault = cfg.ObsidianVault
-		} else if cfg.ObsidianVault != cfg.Output.ObsidianVault {
-			log.Printf("config: both obsidian_vault and [output] obsidian_vault set with different values; using [output] obsidian_vault=%q", cfg.Output.ObsidianVault)
-		}
-		cfg.ObsidianVault = ""
-	}
 }

@@ -1,4 +1,4 @@
-# scrib — Meeting Audio Capture & Annotation
+# scrib — Meeting Audio Capture
 
 ## Architecture
 
@@ -7,9 +7,6 @@
 - `tui/` — Bubble Tea TUI for recording UI
 - `main.go` — CLI entry point (cobra). Bare `scrib` = start recording
 - `config/` — TOML config (`~/.config/scrib/config.toml`)
-- `store/` — SQLite local database
-- `sync/` — Upload WAV to S3, sync metadata with server
-- `client/` — HTTP client for annotation API (STT, VAD, summarize)
 
 **Server** (`cmd/scrib-server/`):
 - `server/server.go` — HTTP server, Postgres, S3, migrations
@@ -18,10 +15,10 @@
 
 ## Key Design Decisions
 
-- Client is dumb recorder. Server does all processing (transcription, diarisation)
-- WAV uploaded to S3 (Garage). Server pulls from S3 for processing
-- No streaming STT for v1 — batch upload of complete WAV
-- Summarization handled by Hawow (AI assistant), not scrib — has full team/project context
+- Client is a thin recorder. Server does all processing (transcription, diarisation, summarization)
+- On stop: convert stereo→mono, POST to server, trigger processing
+- WAV uploaded directly via HTTP. Server stores in S3 (Garage)
+- No local database or sync protocol — just record + upload
 - `audio/` requires macOS (ScreenCaptureKit/CoreAudio) — cannot cross-compile or build on Linux
 
 ## Build
@@ -42,14 +39,9 @@ bazel run //scrib:push_server
 
 `~/.config/scrib/config.toml`:
 ```toml
-[database]
-path = "~/.local/share/scrib/scrib.db"
-
-[sync]
 server_url = "https://scrib.goyangi.io"
-
-[summarise]
-api_url = "https://gateway.goyangi.io/v1/opus"
+sample_rate = 16000
+output_dir = "~/meetings"
 ```
 
 ## Test
@@ -66,11 +58,15 @@ go test ./...
 
 ## CLI Commands
 
-- `scrib` / `scrib record` — Start recording (default)
-- `scrib annotate <file>` — Diarise + summarise a recording
-- `scrib transcribe <uuid>` — Trigger server-side processing, poll + print transcript
-- `scrib history` — List meetings
-- `scrib show <id>` — Show meeting details + transcript
-- `scrib search <query>` — Full-text search transcripts
-- `scrib speakers` — List known speakers
-- `scrib sync` — Sync to/from server
+- `scrib [name]` / `scrib record [name]` — Record + upload (default)
+- `scrib standup [name]` — Record with standup template
+- `scrib standup3 [name]` — Record with standup3 template
+- `scrib status <uuid>` — Show meeting status + segments
+- `scrib list` — List recent meetings from server
+- `scrib show <uuid>` — Show full transcript
+
+## Upload Flow
+
+1. `POST /v1/meetings` — create meeting, get UUID
+2. `POST /v1/audio/{uuid}` — upload mono WAV
+3. `POST /v1/process/{uuid}` — trigger server-side processing
