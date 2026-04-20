@@ -189,6 +189,45 @@ func buildWAVChunk(h *wavHeader, pcmData []byte) []byte {
 	return buf
 }
 
+func stereoToMono(data []byte) ([]byte, error) {
+	h, err := parseWAVHeader(data)
+	if err != nil {
+		return nil, err
+	}
+	if h.NumChannels == 1 {
+		return data, nil
+	}
+	if h.NumChannels != 2 || h.BitsPerSample != 16 {
+		return nil, fmt.Errorf("unsupported format: %d channels, %d bits", h.NumChannels, h.BitsPerSample)
+	}
+
+	pcmStart := h.DataOffset
+	pcmEnd := pcmStart + h.DataSize
+	if pcmEnd > len(data) {
+		pcmEnd = len(data)
+	}
+	stereoData := data[pcmStart:pcmEnd]
+
+	frameSize := 4
+	numFrames := len(stereoData) / frameSize
+	monoData := make([]byte, numFrames*2)
+
+	for i := 0; i < numFrames; i++ {
+		off := i * frameSize
+		l := int16(binary.LittleEndian.Uint16(stereoData[off : off+2]))
+		r := int16(binary.LittleEndian.Uint16(stereoData[off+2 : off+4]))
+		m := int16((int32(l) + int32(r)) / 2)
+		binary.LittleEndian.PutUint16(monoData[i*2:i*2+2], uint16(m))
+	}
+
+	monoHeader := &wavHeader{
+		SampleRate:    h.SampleRate,
+		NumChannels:   1,
+		BitsPerSample: 16,
+	}
+	return buildWAVChunk(monoHeader, monoData), nil
+}
+
 func splitWAVChunks(data []byte, chunkSecs float64) ([][]byte, error) {
 	h, err := parseWAVHeader(data)
 	if err != nil {
@@ -218,6 +257,11 @@ func splitWAVChunks(data []byte, chunkSecs float64) ([][]byte, error) {
 }
 
 func (s *Server) vadChunked(ctx context.Context, audioData []byte, filename string, threshold string) (*VADResult, error) {
+	audioData, err := stereoToMono(audioData)
+	if err != nil {
+		return nil, fmt.Errorf("downmix: %w", err)
+	}
+
 	chunkSecs := chunkDuration.Seconds()
 	chunks, err := splitWAVChunks(audioData, chunkSecs)
 	if err != nil {
