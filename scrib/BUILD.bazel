@@ -112,7 +112,7 @@ go_library(
 go_binary(
     name = "scrib-server",
     embed = [":server_cmd_lib"],
-    pure = "on",
+    cgo = False,
     visibility = ["//visibility:public"],
 )
 
@@ -127,7 +127,7 @@ pkg_tar(
 
 oci_image(
     name = "server_image",
-    base = "@distroless_base_linux_amd64",
+    base = "@distroless_static_linux_amd64",
     entrypoint = ["/scrib-server_/scrib-server"],
     tars = [":server_layer"],
 )
