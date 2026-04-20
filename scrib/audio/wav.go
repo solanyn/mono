@@ -41,6 +41,15 @@ func WriteWAV(path string, samples []int16, sampleRate, channels int) error {
 	return binary.Write(f, binary.LittleEndian, samples)
 }
 
+func StereoToMono(samples []int16) []int16 {
+	frames := len(samples) / 2
+	mono := make([]int16, frames)
+	for i := 0; i < frames; i++ {
+		mono[i] = int16((int32(samples[i*2]) + int32(samples[i*2+1])) / 2)
+	}
+	return mono
+}
+
 // WriteWAVTemp writes samples to a temporary WAV file and returns the path.
 func WriteWAVTemp(samples []int16, sampleRate, channels int) (string, error) {
 	f, err := os.CreateTemp("", "scrib-chunk-*.wav")

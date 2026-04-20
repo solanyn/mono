@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"os/signal"
@@ -174,17 +175,35 @@ func runRecord(cfg *config.Config, args []string, annotateAfter bool) error {
 		return fmt.Errorf("init recorder: %w", err)
 	}
 
-	fmt.Printf("Recording to %s\n", outPath)
-	fmt.Println("Press Ctrl+C to stop...")
-
 	if err := rec.Start(); err != nil {
 		return fmt.Errorf("start recording: %w", err)
 	}
 
+	fmt.Printf("Recording to %s\n", outPath)
+
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-	<-sig
 
+	startTime := time.Now()
+	ticker := time.NewTicker(150 * time.Millisecond)
+	defer ticker.Stop()
+
+	fmt.Print("\033[?25l")
+	defer fmt.Print("\033[?25h")
+
+	renderRecordingStatus(rec, startTime)
+
+loop:
+	for {
+		select {
+		case <-sig:
+			break loop
+		case <-ticker.C:
+			renderRecordingStatus(rec, startTime)
+		}
+	}
+
+	fmt.Print("\r\033[2K\033[A\033[2K\033[A\033[2K")
 	fmt.Println("\nStopping...")
 	samples := rec.Stop()
 
@@ -210,26 +229,33 @@ func runRecord(cfg *config.Config, args []string, annotateAfter bool) error {
 		db.InsertMeeting(meeting)
 
 		if cfg.Sync.ServerURL != "" {
-			fmt.Println("Uploading to server... (done in background)")
-			go func() {
-				clientID := cfg.Sync.ClientID
-				if clientID == "" {
-					hostname, _ := os.Hostname()
-					clientID = hostname
-				}
-				sc := sync.NewClient(cfg.Sync.ServerURL, clientID, db)
-				if _, err := sc.Push(); err != nil {
-					fmt.Fprintf(os.Stderr, "warning: sync push: %v\n", err)
-					return
-				}
-				resp, err := http.Post(cfg.Sync.ServerURL+"/v1/process/"+meeting.UUID, "", nil)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "warning: trigger processing: %v\n", err)
-					return
-				}
-				resp.Body.Close()
-			}()
-			time.Sleep(100 * time.Millisecond)
+			monoSamples := audio.StereoToMono(samples)
+			monoPath, monoErr := audio.WriteWAVTemp(monoSamples, cfg.SampleRate, 1)
+			if monoErr != nil {
+				fmt.Fprintf(os.Stderr, "warning: mono conversion failed: %v\n", monoErr)
+			} else {
+				fmt.Println("Uploading mono to server... (done in background)")
+				go func() {
+					defer os.Remove(monoPath)
+					clientID := cfg.Sync.ClientID
+					if clientID == "" {
+						hostname, _ := os.Hostname()
+						clientID = hostname
+					}
+					sc := sync.NewClient(cfg.Sync.ServerURL, clientID, db)
+					if _, err := sc.Push(); err != nil {
+						fmt.Fprintf(os.Stderr, "warning: sync push: %v\n", err)
+						return
+					}
+					resp, err := http.Post(cfg.Sync.ServerURL+"/v1/process/"+meeting.UUID, "", nil)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "warning: trigger processing: %v\n", err)
+						return
+					}
+					resp.Body.Close()
+				}()
+				time.Sleep(100 * time.Millisecond)
+			}
 		}
 	}
 
@@ -521,6 +547,76 @@ func expandPath(p string) string {
 		return filepath.Join(home, p[2:])
 	}
 	return p
+}
+
+func renderRecordingStatus(rec *audio.Recorder, startTime time.Time) {
+	elapsed := time.Since(startTime)
+	mins := int(elapsed.Minutes())
+	secs := int(elapsed.Seconds()) % 60
+
+	micLvl := rec.MicLevel()
+	sysLvl := rec.SysLevel()
+
+	fmt.Print("\033[2K\r")
+	fmt.Printf("  %02d:%02d  mic %s  sys %s  (Ctrl+C to stop)\n", mins, secs, levelBar(micLvl), levelBar(sysLvl))
+	fmt.Print("\033[2K")
+	fmt.Printf("         %s", waveBar(micLvl, sysLvl, 40))
+	fmt.Print("\033[A\r")
+}
+
+func levelBar(level float64) string {
+	const width = 10
+	db := 20 * math.Log10(level+1e-10)
+	norm := (db + 60) / 60
+	if norm < 0 {
+		norm = 0
+	}
+	if norm > 1 {
+		norm = 1
+	}
+	filled := int(norm * width)
+	var sb strings.Builder
+	sb.WriteString("[")
+	for i := 0; i < width; i++ {
+		if i < filled {
+			sb.WriteString("\u2588")
+		} else {
+			sb.WriteString("\u2591")
+		}
+	}
+	sb.WriteString("]")
+	return sb.String()
+}
+
+func waveBar(micLvl, sysLvl float64, width int) string {
+	bars := []rune(" \u2581\u2582\u2583\u2584\u2585\u2586\u2587")
+	combined := (micLvl + sysLvl) / 2
+	db := 20 * math.Log10(combined+1e-10)
+	norm := (db + 60) / 60
+	if norm < 0 {
+		norm = 0
+	}
+	if norm > 1 {
+		norm = 1
+	}
+	half := width / 2
+	var sb strings.Builder
+	for i := 0; i < width; i++ {
+		dist := float64(i-half) / float64(half)
+		if dist < 0 {
+			dist = -dist
+		}
+		amp := norm * (1 - dist*dist)
+		if amp < 0 {
+			amp = 0
+		}
+		idx := int(amp * float64(len(bars)-1))
+		if idx >= len(bars) {
+			idx = len(bars) - 1
+		}
+		sb.WriteRune(bars[idx])
+	}
+	return sb.String()
 }
 
 func runTUI(cfg *config.Config, args []string) error {

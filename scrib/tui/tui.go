@@ -267,7 +267,14 @@ func (m model) runPipeline() tea.Cmd {
 		}
 
 		if m.opts.ServerURL != "" && meetingUUID != "" {
-			if err := uploadAudio(m.opts.ServerURL, meetingUUID, m.opts.OutputPath); err != nil {
+			monoSamples := audio.StereoToMono(samples)
+			monoPath, err := audio.WriteWAVTemp(monoSamples, m.opts.SampleRate, 1)
+			if err != nil {
+				return pipelineDoneMsg{err: fmt.Errorf("mono conversion: %w", err)}
+			}
+			defer os.Remove(monoPath)
+
+			if err := uploadAudio(m.opts.ServerURL, meetingUUID, monoPath); err != nil {
 				return pipelineDoneMsg{err: fmt.Errorf("upload audio: %w", err)}
 			}
 
