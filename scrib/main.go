@@ -10,8 +10,6 @@ import (
 	"path/filepath"
 	"time"
 
-	cryptorand "crypto/rand"
-
 	"github.com/solanyn/mono/scrib/audio"
 	"github.com/solanyn/mono/scrib/config"
 	"github.com/solanyn/mono/scrib/tui"
@@ -123,32 +121,16 @@ func makeUploadFn(cfg *config.Config) tui.UploadFunc {
 	}
 }
 
-func newUUID() string {
-	b := make([]byte, 16)
-	cryptorand.Read(b)
-	b[6] = (b[6] & 0x0f) | 0x40
-	b[8] = (b[8] & 0x3f) | 0x80
-	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
-}
-
 func uploadMeeting(serverURL, name string, duration time.Duration, template string) (string, error) {
-	uuid := newUUID()
-	payload := map[string]any{
-		"client_id": "scrib-client",
-		"meetings": []map[string]any{{
-			"uuid":         uuid,
-			"name":         name,
-			"recorded_at":  time.Now().Format(time.RFC3339),
-			"duration_s":   duration.Seconds(),
-			"template":     template,
-			"num_speakers": 0,
-			"segments":     []any{},
-			"summaries":    []any{},
-		}},
+	body := map[string]any{
+		"name":        name,
+		"recorded_at": time.Now().Format(time.RFC3339),
+		"duration_s":  duration.Seconds(),
+		"template":    template,
 	}
-	data, _ := json.Marshal(payload)
+	data, _ := json.Marshal(body)
 
-	resp, err := http.Post(serverURL+"/v1/sync/push", "application/json", bytes.NewReader(data))
+	resp, err := http.Post(serverURL+"/v1/meetings", "application/json", bytes.NewReader(data))
 	if err != nil {
 		return "", err
 	}
@@ -159,7 +141,13 @@ func uploadMeeting(serverURL, name string, duration time.Duration, template stri
 		return "", fmt.Errorf("server returned %d: %s", resp.StatusCode, b)
 	}
 
-	return uuid, nil
+	var result struct {
+		UUID string `json:"uuid"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+	return result.UUID, nil
 }
 
 func uploadAudio(serverURL, uuid, audioPath string) error {

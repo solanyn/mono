@@ -262,8 +262,61 @@ func (s *Server) vadChunked(ctx context.Context, audioData []byte, filename stri
 		return nil, fmt.Errorf("downmix: %w", err)
 	}
 
-	log.Printf("vad: sending %d bytes (mono) to %s", len(audioData), s.cfg.AudioServiceURL)
-	return s.vad(ctx, bytes.NewReader(audioData), filename, threshold)
+	chunks, err := splitWAVChunks(audioData, chunkDuration.Seconds())
+	if err != nil {
+		return nil, fmt.Errorf("split: %w", err)
+	}
+
+	if len(chunks) <= 1 {
+		log.Printf("vad: sending %d bytes (mono, single chunk) to %s", len(audioData), s.cfg.AudioServiceURL)
+		return s.vad(ctx, bytes.NewReader(audioData), filename, threshold)
+	}
+
+	log.Printf("vad: sending %d bytes (mono) in %d chunks to %s", len(audioData), len(chunks), s.cfg.AudioServiceURL)
+
+	h, err := parseWAVHeader(audioData)
+	if err != nil {
+		return nil, fmt.Errorf("parse header: %w", err)
+	}
+
+	blockAlign := int(h.NumChannels) * int(h.BitsPerSample) / 8
+	bytesPerSec := float64(h.SampleRate) * float64(blockAlign)
+
+	var allSegments []VADSegment
+	speakerSet := map[string]bool{}
+	var totalDuration float64
+
+	for i, chunk := range chunks {
+		chunkOffset := float64(i) * chunkDuration.Seconds()
+		chunkName := fmt.Sprintf("%s.chunk%d", filename, i)
+
+		result, err := s.vad(ctx, bytes.NewReader(chunk), chunkName, threshold)
+		if err != nil {
+			return nil, fmt.Errorf("vad chunk %d: %w", i, err)
+		}
+
+		for _, seg := range result.Segments {
+			allSegments = append(allSegments, VADSegment{
+				Speaker: seg.Speaker,
+				Start:   seg.Start + chunkOffset,
+				End:     seg.End + chunkOffset,
+			})
+			speakerSet[seg.Speaker] = true
+		}
+	}
+
+	// Calculate total duration from WAV data
+	pcmBytes := h.DataSize
+	if pcmBytes <= 0 {
+		pcmBytes = len(audioData) - h.DataOffset
+	}
+	totalDuration = float64(pcmBytes) / bytesPerSec
+
+	return &VADResult{
+		Segments:        allSegments,
+		NumSpeakers:     len(speakerSet),
+		DurationSeconds: totalDuration,
+	}, nil
 }
 
 func multipartFromReader(r io.Reader, filename string, fields map[string]string) (io.Reader, string, error) {

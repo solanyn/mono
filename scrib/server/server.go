@@ -93,6 +93,7 @@ func (s *Server) routes() chi.Router {
 		r.Get("/sync/pull", s.handlePull)
 
 		r.Get("/meetings", s.handleListMeetings)
+		r.Post("/meetings", s.handleCreateMeeting)
 		r.Get("/meetings/{uuid}", s.handleGetMeeting)
 		r.Get("/search", s.handleSearch)
 		r.Get("/speakers", s.handleListSpeakers)
@@ -417,6 +418,48 @@ func (s *Server) handleListMeetings(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	json.NewEncoder(w).Encode(meetings)
+}
+
+func (s *Server) handleCreateMeeting(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Name       string  `json:"name"`
+		RecordedAt string  `json:"recorded_at"`
+		DurationS  float64 `json:"duration_s"`
+		Template   string  `json:"template"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	if body.Name == "" {
+		http.Error(w, "name required", http.StatusBadRequest)
+		return
+	}
+	if body.Template == "" {
+		body.Template = "standup"
+	}
+
+	recordedAt := time.Now()
+	if body.RecordedAt != "" {
+		if t, err := time.Parse(time.RFC3339, body.RecordedAt); err == nil {
+			recordedAt = t
+		}
+	}
+
+	var uuid string
+	err := s.db.QueryRow(
+		`INSERT INTO meetings (uuid, name, recorded_at, duration_s, template)
+		 VALUES (gen_random_uuid()::text, $1, $2, $3, $4)
+		 RETURNING uuid`,
+		body.Name, recordedAt, body.DurationS, body.Template,
+	).Scan(&uuid)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("create meeting: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{"uuid": uuid})
 }
 
 func (s *Server) handleGetMeeting(w http.ResponseWriter, r *http.Request) {
