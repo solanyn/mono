@@ -295,7 +295,20 @@ func (s *Server) vadChunked(ctx context.Context, audioData []byte, filename stri
 		chunkOffset := float64(i) * chunkDuration.Seconds()
 		chunkName := fmt.Sprintf("%s.chunk%d", filename, i)
 
-		result, err := s.vad(ctx, bytes.NewReader(chunk), chunkName, threshold)
+		// Retry with backoff — mlx-audio single worker can drop connections between requests
+		var result *VADResult
+		var err error
+		for attempt := 0; attempt < 3; attempt++ {
+			if attempt > 0 {
+				wait := time.Duration(attempt) * 2 * time.Second
+				log.Printf("vad: chunk %d attempt %d, waiting %v", i, attempt+1, wait)
+				time.Sleep(wait)
+			}
+			result, err = s.vad(ctx, bytes.NewReader(chunk), chunkName, threshold)
+			if err == nil {
+				break
+			}
+		}
 		if err != nil {
 			return nil, fmt.Errorf("vad chunk %d: %w", i, err)
 		}
