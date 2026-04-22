@@ -3,6 +3,8 @@ package tui
 import (
 	"fmt"
 	"math"
+	"os"
+	"os/signal"
 	"strings"
 	"time"
 
@@ -364,7 +366,13 @@ func Run(opts Options, uploadFn UploadFunc) error {
 	m.recorder = rec
 	m.startTime = time.Now()
 
-	p := tea.NewProgram(m, tea.WithoutSignalHandler())
+	// Ignore SIGINT at the process level so Ctrl+C doesn't kill us.
+	// The terminal still sends the ctrl+c escape sequence through stdin,
+	// which bubbletea reads as a KeyPressMsg and routes to handleKey.
+	signal.Ignore(os.Interrupt)
+	defer signal.Reset(os.Interrupt)
+
+	p := tea.NewProgram(m)
 
 	finalModel, err := p.Run()
 	if err != nil {
