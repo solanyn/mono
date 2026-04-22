@@ -14,6 +14,7 @@ import (
 	"log"
 	"math"
 	"sync"
+	"time"
 	"unsafe"
 )
 
@@ -28,6 +29,9 @@ type Recorder struct {
 	micChunks  []timedChunk
 	sysChunks  []timedChunk
 	recording  bool
+	startTime  time.Time    // wall-clock start for backlog detection
+	sysAnchor  float64      // first accepted system audio PTS (after warmup)
+	sysReady   bool         // true once backlog flush period is over
 
 	levelMu  sync.Mutex
 	micLevel float64
@@ -60,6 +64,27 @@ func (r *Recorder) onAudioGo(src []int16, frameCount, channels int, isMic bool, 
 	defer r.mu.Unlock()
 	if !r.recording {
 		return
+	}
+
+	// Discard stale system audio backlog from ScreenCaptureKit.
+	// SCK delivers buffered audio from before recording started — the
+	// C layer normalizes PTS relative to the first callback, so backlog
+	// spans 0..N seconds delivered in milliseconds. We flush for 1s of
+	// wall-clock time, then re-anchor PTS to the first real chunk.
+	if !isMic {
+		elapsed := time.Since(r.startTime).Seconds()
+		if !r.sysReady {
+			if elapsed < 1.0 {
+				// Still in warmup — discard backlog
+				return
+			}
+			// Warmup done — anchor to this chunk's PTS
+			r.sysReady = true
+			r.sysAnchor = timestamp
+			log.Printf("[scrib] system audio anchored at PTS=%.3fs (wall=%.3fs), backlog discarded", timestamp, elapsed)
+		}
+		// Re-base system audio timestamps to match wall-clock
+		timestamp = timestamp - r.sysAnchor + 1.0 // +1.0 accounts for warmup period
 	}
 
 	mono := make([]int16, frameCount)
@@ -199,6 +224,9 @@ func (r *Recorder) Start() error {
 
 	r.mu.Lock()
 	r.recording = true
+	r.startTime = time.Now()
+	r.sysAnchor = 0
+	r.sysReady = false
 	r.micChunks = nil
 	r.sysChunks = nil
 	r.mu.Unlock()
