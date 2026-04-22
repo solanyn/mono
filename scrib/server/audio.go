@@ -19,7 +19,12 @@ const (
 	chunkDuration    = 2 * time.Minute
 )
 
-var audioClient = &http.Client{Timeout: audioHTTPTimeout}
+var audioClient = &http.Client{
+	Timeout: audioHTTPTimeout,
+	Transport: &http.Transport{
+		DisableKeepAlives: true, // mlx-audio (uvicorn) closes connections after multipart POSTs
+	},
+}
 
 type VADSegment struct {
 	Speaker string  `json:"speaker"`
