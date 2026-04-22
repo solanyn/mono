@@ -8,7 +8,6 @@ import (
 	"log"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/minio/minio-go/v7"
@@ -60,19 +59,27 @@ func (s *Server) processMeeting(meetingUUID string) {
 		sttResult *TranscriptResult
 		vadErr    error
 		sttErr    error
-		wg        sync.WaitGroup
 	)
 
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		vadResult, vadErr = s.vadChunked(ctx, audioBytes, blobKey.String, s.cfg.VADThreshold)
-	}()
-	go func() {
-		defer wg.Done()
+	// Sequential: mlx-audio is single-worker, parallel requests cause EOF
+	vadResult, vadErr = s.vadChunked(ctx, audioBytes, blobKey.String, s.cfg.VADThreshold)
+	if vadErr != nil {
+		s.setMeetingError(ctx, meetingUUID, fmt.Errorf("vad: %w", vadErr))
+		return
+	}
+
+	// STT with retry
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			wait := time.Duration(attempt) * 2 * time.Second
+			log.Printf("stt: attempt %d, waiting %v", attempt+1, wait)
+			time.Sleep(wait)
+		}
 		sttResult, sttErr = s.transcribe(ctx, bytes.NewReader(audioBytes), blobKey.String)
-	}()
-	wg.Wait()
+		if sttErr == nil {
+			break
+		}
+	}
 
 	if vadErr != nil {
 		s.setMeetingError(ctx, meetingUUID, fmt.Errorf("vad: %w", vadErr))
