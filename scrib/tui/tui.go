@@ -364,7 +364,7 @@ func Run(opts Options, uploadFn UploadFunc) error {
 	m.recorder = rec
 	m.startTime = time.Now()
 
-	p := tea.NewProgram(m)
+	p := tea.NewProgram(m, tea.WithoutSignalHandler())
 
 	finalModel, err := p.Run()
 	if err != nil {
