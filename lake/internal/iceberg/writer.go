@@ -2,7 +2,6 @@ package iceberg
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -83,8 +82,7 @@ func (w *Writer) AppendBronze(ctx context.Context, tableName string, rows []map[
 	for i, row := range rows {
 		sources[i] = source
 		ingestedAt[i] = ts
-		payload, _ := json.Marshal(row)
-		payloads[i] = string(payload)
+		payloads[i] = row["_raw_payload"].(string)
 		batchIDs[i] = batchID
 	}
 
@@ -140,8 +138,7 @@ func (w *Writer) AppendSilver(ctx context.Context, tableName string, rows []map[
 	for i, row := range rows {
 		sources[i] = source
 		ingestedAt[i] = ts
-		payload, _ := json.Marshal(row)
-		payloads[i] = string(payload)
+		payloads[i] = row["_raw_payload"].(string)
 		batchIDs[i] = batchID
 	}
 
