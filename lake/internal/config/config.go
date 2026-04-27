@@ -46,6 +46,7 @@ type Config struct {
 
 	CronVicVG string
 	CronSQM   string
+	CronBank  string
 
 	IcebergCatalogURI string
 }
@@ -95,6 +96,7 @@ func Load() Config {
 
 		CronVicVG: envOr("CRON_VIC_VG", "0 2 * * 0"),   // Weekly Sunday 2am
 		CronSQM:   envOr("CRON_SQM", "0 4 * * 1"),       // Weekly Monday 4am
+		CronBank: envOr("CRON_BANK", "*/5 * * * *"),  // Every 5 min - check for new OFX files
 
 		IcebergCatalogURI: envOr("ICEBERG_CATALOG_URI", "http://lakekeeper.storage.svc.cluster.local:8181/catalog"),
 	}
