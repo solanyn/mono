@@ -118,6 +118,10 @@ func (s *Scheduler) Start() {
 		return ingest.IngestSQM(ctx, s.s3, s.cfg.BronzeBucket)
 	}))
 
+	s.cron.AddFunc(s.cfg.CronBank, s.wrapIngest("bank", func(ctx context.Context) (ingest.Result, error) {
+		return ingest.IngestBank(ctx, s.s3, s.cfg.BronzeBucket)
+	}))
+
 	s.cron.Start()
 	log.Println("scheduler: started")
 }
