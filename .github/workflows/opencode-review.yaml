@@ -1,0 +1,52 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: OpenCode Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write
+
+jobs:
+  review:
+    name: OpenCode Review
+    runs-on: mono-runner
+    steps:
+      - name: Generate Token
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3.1.1
+        id: app-token
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Run OpenCode Review
+        uses: anomalyco/opencode/github@latest
+        env:
+          OPENAI_API_KEY: ${{ secrets.AGENTGATEWAY_API_KEY }}
+          OPENAI_BASE_URL: http://agentgateway.network.svc.cluster.local:8080/v1/opus
+        with:
+          model: openai/claude-opus-4-0520
+          use_github_token: true
+          prompt: |
+            Review this pull request focusing on code correctness:
+            - Check for bugs, logic errors, and edge cases
+            - Verify error handling and resource cleanup
+            - Flag any secrets, credentials, or tokens that should not be committed
+            - Check Go code for proper error wrapping, context propagation, and goroutine safety
+            - Check TypeScript/React code for type safety and hook correctness
+            - Verify Bazel BUILD files match source changes (new deps, new targets)
+            Only comment if you find actual issues. Do not comment on style or formatting.
