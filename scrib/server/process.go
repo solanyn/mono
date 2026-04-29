@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"sort"
 	"strings"
@@ -21,8 +23,35 @@ type DiarizedSegment struct {
 	Uncertain bool    `json:"uncertain,omitempty"`
 }
 
-func (s *Server) processMeeting(meetingUUID string) {
-	ctx := context.Background()
+// retry runs fn up to attempts times with exponential backoff (base, base*2, base*4, ...).
+// It aborts immediately if ctx is cancelled.
+func retry(ctx context.Context, attempts int, base time.Duration, label string, fn func(context.Context) error) error {
+	var err error
+	for i := 0; i < attempts; i++ {
+		if i > 0 {
+			wait := base << (i - 1)
+			log.Printf("%s: attempt %d after %v (prev err: %v)", label, i+1, wait, err)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(wait):
+			}
+		}
+		if err = fn(ctx); err == nil {
+			return nil
+		}
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return err
+		}
+	}
+	return err
+}
+
+func (s *Server) processMeeting(parent context.Context, meetingUUID string) {
+	// Give each meeting its own derived context so it observes server shutdown
+	// but can't be starved on a single hung upstream request.
+	ctx, cancel := context.WithTimeout(parent, 30*time.Minute)
+	defer cancel()
 
 	var meetingID int
 	var blobKey sql.NullString
@@ -38,105 +67,160 @@ func (s *Server) processMeeting(meetingUUID string) {
 		return
 	}
 
-	s.db.ExecContext(ctx, `UPDATE meetings SET status = 'processing' WHERE uuid = $1`, meetingUUID)
-
-	obj, err := s.s3.GetObject(ctx, s.cfg.S3Bucket, blobKey.String, minio.GetObjectOptions{})
-	if err != nil {
-		s.setMeetingError(ctx, meetingUUID, fmt.Errorf("s3 get: %w", err))
-		return
+	if _, err := s.db.ExecContext(ctx, `UPDATE meetings SET status = 'processing', error = NULL WHERE uuid = $1`, meetingUUID); err != nil {
+		log.Printf("mark processing %s: %v", meetingUUID, err)
 	}
-	var audioBuf bytes.Buffer
-	if _, err := audioBuf.ReadFrom(obj); err != nil {
-		obj.Close()
-		s.setMeetingError(ctx, meetingUUID, fmt.Errorf("s3 read: %w", err))
-		return
-	}
-	obj.Close()
-	audioBytes := audioBuf.Bytes()
 
 	var (
-		vadResult *VADResult
-		sttResult *TranscriptResult
-		vadErr    error
-		sttErr    error
+		segments    []DiarizedSegment
+		numSpeakers int
+		duration    float64
 	)
 
-	// Sequential: mlx-audio is single-worker, parallel requests cause EOF
-	vadResult, vadErr = s.vadChunked(ctx, audioBytes, blobKey.String, s.cfg.VADThreshold)
-	if vadErr != nil {
-		s.setMeetingError(ctx, meetingUUID, fmt.Errorf("vad: %w", vadErr))
+	if s.cfg.AudioProcessURL != "" {
+		segments, numSpeakers, duration, err = s.runPipelineProcess(ctx, blobKey.String)
+	} else {
+		segments, numSpeakers, duration, err = s.runPipelineLegacy(ctx, blobKey.String)
+	}
+	if err != nil {
+		s.setMeetingError(ctx, meetingUUID, err)
 		return
 	}
 
-	// STT with retry
-	for attempt := 0; attempt < 3; attempt++ {
-		if attempt > 0 {
-			wait := time.Duration(attempt) * 2 * time.Second
-			log.Printf("stt: attempt %d, waiting %v", attempt+1, wait)
-			time.Sleep(wait)
+	if err := s.writeMeetingResults(ctx, meetingID, meetingUUID, segments, numSpeakers, duration); err != nil {
+		s.setMeetingError(ctx, meetingUUID, err)
+		return
+	}
+
+	log.Printf("processed meeting %s: %d segments, %d speakers", meetingUUID, len(segments), numSpeakers)
+}
+
+// runPipelineProcess streams the audio from S3 into scrib-audio's single-shot
+// /v1/audio/process endpoint and returns aligned diarised segments directly.
+func (s *Server) runPipelineProcess(ctx context.Context, blobKey string) ([]DiarizedSegment, int, float64, error) {
+	var result *ProcessResult
+	err := retry(ctx, 3, 2*time.Second, "process", func(ctx context.Context) error {
+		obj, err := s.s3.GetObject(ctx, s.cfg.S3Bucket, blobKey, minio.GetObjectOptions{})
+		if err != nil {
+			return fmt.Errorf("s3 get: %w", err)
 		}
-		sttResult, sttErr = s.transcribe(ctx, bytes.NewReader(audioBytes), blobKey.String)
-		if sttErr == nil {
-			break
+		defer obj.Close()
+
+		r, err := s.processAudio(ctx, obj, blobKey, s.cfg.VADThreshold, s.cfg.MergeGap)
+		if err != nil {
+			return err
 		}
+		result = r
+		return nil
+	})
+	if err != nil {
+		return nil, 0, 0, fmt.Errorf("process: %w", err)
 	}
 
-	if vadErr != nil {
-		s.setMeetingError(ctx, meetingUUID, fmt.Errorf("vad: %w", vadErr))
-		return
+	segs := make([]DiarizedSegment, 0, len(result.Segments))
+	for _, s := range result.Segments {
+		segs = append(segs, DiarizedSegment{
+			Speaker:   s.Speaker,
+			Start:     s.Start,
+			End:       s.End,
+			Text:      s.Text,
+			Uncertain: s.Uncertain,
+		})
 	}
-	if sttErr != nil {
-		s.setMeetingError(ctx, meetingUUID, fmt.Errorf("stt: %w", sttErr))
-		return
+	return segs, result.NumSpeakers, result.DurationSeconds, nil
+}
+
+// runPipelineLegacy is the pre-scrib-audio flow: VAD + STT + in-Go align.
+// Retained so the server still functions when AudioProcessURL is unset (eg.
+// talking to bare mlx-audio). New deployments should prefer AudioProcessURL.
+func (s *Server) runPipelineLegacy(ctx context.Context, blobKey string) ([]DiarizedSegment, int, float64, error) {
+	obj, err := s.s3.GetObject(ctx, s.cfg.S3Bucket, blobKey, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, 0, 0, fmt.Errorf("s3 get: %w", err)
+	}
+	audioBytes, err := io.ReadAll(obj)
+	obj.Close()
+	if err != nil {
+		return nil, 0, 0, fmt.Errorf("s3 read: %w", err)
 	}
 
-	segments := alignSpeakersToWords(vadResult, sttResult)
+	var vadResult *VADResult
+	if err := retry(ctx, 3, 2*time.Second, "vad", func(ctx context.Context) error {
+		r, err := s.vadChunked(ctx, audioBytes, blobKey, s.cfg.VADThreshold)
+		if err != nil {
+			return err
+		}
+		vadResult = r
+		return nil
+	}); err != nil {
+		return nil, 0, 0, fmt.Errorf("vad: %w", err)
+	}
 
+	var sttResult *TranscriptResult
+	if err := retry(ctx, 3, 2*time.Second, "stt", func(ctx context.Context) error {
+		r, err := s.transcribe(ctx, bytes.NewReader(audioBytes), blobKey)
+		if err != nil {
+			return err
+		}
+		sttResult = r
+		return nil
+	}); err != nil {
+		return nil, 0, 0, fmt.Errorf("stt: %w", err)
+	}
+
+	segs := alignSpeakersToWords(vadResult, sttResult)
+	return segs, vadResult.NumSpeakers, vadResult.DurationSeconds, nil
+}
+
+func (s *Server) writeMeetingResults(ctx context.Context, meetingID int, meetingUUID string, segments []DiarizedSegment, numSpeakers int, duration float64) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		s.setMeetingError(ctx, meetingUUID, fmt.Errorf("begin tx: %w", err))
-		return
+		return fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
-	tx.ExecContext(ctx, `DELETE FROM segments WHERE meeting_id = $1`, meetingID)
+	if _, err := tx.ExecContext(ctx, `DELETE FROM segments WHERE meeting_id = $1`, meetingID); err != nil {
+		return fmt.Errorf("clear segments: %w", err)
+	}
 
 	for _, seg := range segments {
-		_, err := tx.ExecContext(ctx,
+		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO segments (uuid, meeting_id, speaker_label, start_s, end_s, text)
 			 VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5)`,
 			meetingID, seg.Speaker, seg.Start, seg.End, seg.Text,
-		)
-		if err != nil {
-			s.setMeetingError(ctx, meetingUUID, fmt.Errorf("insert segment: %w", err))
-			return
+		); err != nil {
+			return fmt.Errorf("insert segment: %w", err)
 		}
 	}
 
-	now := time.Now()
-	_, err = tx.ExecContext(ctx,
+	if _, err := tx.ExecContext(ctx,
 		`UPDATE meetings SET status = 'done', num_speakers = $1, duration_s = $2, processed_at = $3, error = NULL WHERE uuid = $4`,
-		vadResult.NumSpeakers, vadResult.DurationSeconds, now, meetingUUID,
-	)
-	if err != nil {
-		s.setMeetingError(ctx, meetingUUID, fmt.Errorf("update meeting: %w", err))
-		return
+		numSpeakers, duration, time.Now(), meetingUUID,
+	); err != nil {
+		return fmt.Errorf("update meeting: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
-		s.setMeetingError(ctx, meetingUUID, fmt.Errorf("commit: %w", err))
-		return
+		return fmt.Errorf("commit: %w", err)
 	}
-
-	log.Printf("processed meeting %s: %d segments, %d speakers", meetingUUID, len(segments), vadResult.NumSpeakers)
+	return nil
 }
 
 func (s *Server) setMeetingError(ctx context.Context, uuid string, err error) {
 	log.Printf("process error for %s: %v", uuid, err)
-	s.db.ExecContext(ctx,
+	// If ctx is already done, fall back to a short-lived context so we can still
+	// persist the failure status.
+	if ctx.Err() != nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+	}
+	if _, dbErr := s.db.ExecContext(ctx,
 		`UPDATE meetings SET status = 'error', error = $1 WHERE uuid = $2`,
 		err.Error(), uuid,
-	)
+	); dbErr != nil {
+		log.Printf("persist error for %s: %v", uuid, dbErr)
+	}
 }
 
 func alignSpeakersToWords(vad *VADResult, stt *TranscriptResult) []DiarizedSegment {

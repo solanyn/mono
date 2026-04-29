@@ -49,6 +49,64 @@ type TranscriptResult struct {
 	Words []TranscriptWord `json:"words,omitempty"`
 }
 
+// ProcessResult mirrors scrib-audio's /v1/audio/process response.
+// One server-side round-trip replaces the per-endpoint VAD + STT + client-side align dance.
+type ProcessSegment struct {
+	Speaker   string  `json:"speaker"`
+	Start     float64 `json:"start"`
+	End       float64 `json:"end"`
+	Text      string  `json:"text"`
+	Uncertain bool    `json:"uncertain,omitempty"`
+}
+
+type ProcessResult struct {
+	Segments        []ProcessSegment `json:"segments"`
+	NumSpeakers     int              `json:"num_speakers"`
+	DurationSeconds float64          `json:"duration_seconds"`
+	TranscriptText  string           `json:"transcript_text"`
+}
+
+// processAudio calls scrib-audio's single-shot pipeline endpoint. Streams the
+// request body so we don't buffer another copy of the WAV beyond what the
+// multipart writer needs.
+func (s *Server) processAudio(ctx context.Context, audioData io.Reader, filename string, threshold string, mergeGap string) (*ProcessResult, error) {
+	url := s.cfg.AudioProcessURL
+	if url == "" {
+		return nil, fmt.Errorf("audio process URL not configured")
+	}
+
+	body, ct, err := multipartFromReader(audioData, filename, map[string]string{
+		"threshold": threshold,
+		"merge_gap": mergeGap,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url+"/v1/audio/process", body)
+	if err != nil {
+		return nil, fmt.Errorf("process request: %w", err)
+	}
+	req.Header.Set("Content-Type", ct)
+
+	resp, err := audioClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("process request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, 8192))
+		return nil, fmt.Errorf("process %d: %s", resp.StatusCode, b)
+	}
+
+	var result ProcessResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("process decode: %w", err)
+	}
+	return &result, nil
+}
+
 func (s *Server) vad(ctx context.Context, audioData io.Reader, filename string, threshold string) (*VADResult, error) {
 	body, ct, err := multipartFromReader(audioData, filename, map[string]string{
 		"threshold": threshold,
