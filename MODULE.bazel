@@ -15,6 +15,7 @@ bazel_dep(name = "rules_nodejs", version = "6.7.4")
 bazel_dep(name = "rules_oci", version = "2.3.0")
 bazel_dep(name = "rules_pkg", version = "1.2.0")
 bazel_dep(name = "rules_python", version = "1.9.0")
+bazel_dep(name = "rules_uv", version = "0.89.0")
 
 # go
 go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")

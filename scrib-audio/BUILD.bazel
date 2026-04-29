@@ -1,6 +1,22 @@
 load("@rules_python//python:py_binary.bzl", "py_binary")
 load("@rules_python//python:py_library.bzl", "py_library")
 load("@rules_python//python:py_test.bzl", "py_test")
+load("@rules_uv//uv:pip.bzl", "pip_compile")
+load("@rules_uv//uv:venv.bzl", "create_venv")
+
+pip_compile(
+    name = "generate_requirements_txt",
+    requirements_in = "pyproject.toml",
+    requirements_txt = "requirements_lock.txt",
+    python_platform = "aarch64-apple-darwin",
+    target_compatible_with = ["@platforms//os:macos"],
+)
+
+create_venv(
+    name = "create_venv",
+    requirements_txt = "requirements_lock.txt",
+    target_compatible_with = ["@platforms//os:macos"],
+)
 
 py_library(
     name = "scrib_audio_lib",
@@ -11,6 +27,7 @@ py_library(
         "@scrib_audio_pypi//fastapi",
         "@scrib_audio_pypi//uvicorn",
         "@scrib_audio_pypi//mlx_audio",
+        "@scrib_audio_pypi//senko",
         "@scrib_audio_pypi//soundfile",
         "@scrib_audio_pypi//numpy",
         "@scrib_audio_pypi//python_multipart",
