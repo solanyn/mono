@@ -1,0 +1,38 @@
+load("@rules_python//python:py_binary.bzl", "py_binary")
+load("@rules_python//python:py_library.bzl", "py_library")
+load("@rules_python//python:py_test.bzl", "py_test")
+
+py_library(
+    name = "scrib_audio_lib",
+    srcs = glob(["src/scrib_audio/**/*.py"]),
+    imports = ["src"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@scrib_audio_pypi//fastapi",
+        "@scrib_audio_pypi//uvicorn",
+        "@scrib_audio_pypi//mlx_audio",
+        "@scrib_audio_pypi//soundfile",
+        "@scrib_audio_pypi//numpy",
+        "@scrib_audio_pypi//python_multipart",
+    ],
+)
+
+py_binary(
+    name = "scrib-audio",
+    srcs = ["src/scrib_audio/__main__.py"],
+    imports = ["src"],
+    main = "src/scrib_audio/__main__.py",
+    visibility = ["//visibility:public"],
+    deps = [":scrib_audio_lib"],
+    target_compatible_with = ["@platforms//os:macos"],
+)
+
+py_test(
+    name = "test_align",
+    srcs = ["tests/test_align.py"],
+    deps = [
+        ":scrib_audio_lib",
+        "@scrib_audio_pypi//pytest",
+    ],
+    args = ["-v"],
+)
