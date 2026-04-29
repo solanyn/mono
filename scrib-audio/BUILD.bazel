@@ -22,6 +22,7 @@ py_library(
     name = "scrib_audio_lib",
     srcs = glob(["src/scrib_audio/**/*.py"]),
     imports = ["src"],
+    target_compatible_with = ["@platforms//os:macos"],
     visibility = ["//visibility:public"],
     deps = [
         "@scrib_audio_pypi//fastapi",
@@ -52,4 +53,5 @@ py_test(
         "@scrib_audio_pypi//pytest",
     ],
     args = ["-v"],
+    target_compatible_with = ["@platforms//os:macos"],
 )
