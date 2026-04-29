@@ -15,6 +15,7 @@ bazel_dep(name = "rules_nodejs", version = "6.7.4")
 bazel_dep(name = "rules_oci", version = "2.3.0")
 bazel_dep(name = "rules_pkg", version = "1.2.0")
 bazel_dep(name = "rules_python", version = "1.9.0")
+bazel_dep(name = "rules_uv", version = "0.89.2")
 
 # go
 go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
@@ -2171,7 +2172,12 @@ pip.parse(
     python_version = "3.12",
     requirements_lock = "//lake-mcp:requirements_lock.txt",
 )
-use_repo(pip, "lake_pypi", "pypi")
+pip.parse(
+    hub_name = "scrib_audio_pypi",
+    python_version = "3.12",
+    requirements_lock = "//scrib-audio:requirements_lock.txt",
+)
+use_repo(pip, "lake_pypi", "pypi", "scrib_audio_pypi")
 
 # js
 node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node", dev_dependency = True)

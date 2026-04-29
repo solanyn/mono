@@ -69,7 +69,7 @@ static _Atomic double sysAudioStartTime = -1.0;
 
 - (void)stream:(SCStream *)stream didStopWithError:(NSError *)error {
     if (error) {
-        NSLog(@"[meet] SCStream stopped with error: %@", error);
+        NSLog(@"[scrib] SCStream stopped with error: %@", error);
     }
 }
 
@@ -112,7 +112,7 @@ static int start_mic(int sampleRate) {
 
     OSStatus status = AudioQueueNewInput(&fmt, micCallback, NULL, NULL, NULL, 0, &micQueue);
     if (status != noErr) {
-        NSLog(@"[meet] AudioQueueNewInput failed: %d", (int)status);
+        NSLog(@"[scrib] AudioQueueNewInput failed: %d", (int)status);
         return -1;
     }
 
@@ -126,7 +126,7 @@ static int start_mic(int sampleRate) {
 
     status = AudioQueueStart(micQueue, NULL);
     if (status != noErr) {
-        NSLog(@"[meet] AudioQueueStart (mic) failed: %d", (int)status);
+        NSLog(@"[scrib] AudioQueueStart (mic) failed: %d", (int)status);
         return -2;
     }
 
@@ -152,15 +152,19 @@ static int start_system_audio(int sampleRate) {
 
     [SCShareableContent getShareableContentWithCompletionHandler:^(SCShareableContent *content, NSError *error) {
         if (error || !content) {
-            NSLog(@"[meet] getShareableContent failed: %@", error);
-            result = -1;
+            // SCStreamErrorUserDeclined (-3801) means the user has not granted
+            // Screen Recording permission. Surface it with a distinct status
+            // so the client can show a tccutil hint instead of a generic failure.
+            BOOL permissionDenied = error && [error.domain isEqualToString:@"com.apple.ScreenCaptureKit.SCStreamErrorDomain"] && error.code == -3801;
+            NSLog(@"[scrib] getShareableContent failed: %@", error);
+            result = permissionDenied ? -10 : -1;
             dispatch_semaphore_signal(sem);
             return;
         }
 
         // We need a display for the content filter, but we only want audio
         if (content.displays.count == 0) {
-            NSLog(@"[meet] No displays found");
+            NSLog(@"[scrib] No displays found");
             result = -2;
             dispatch_semaphore_signal(sem);
             return;
@@ -179,10 +183,14 @@ static int start_system_audio(int sampleRate) {
         config.channelCount = 2;
         config.sampleRate = sampleRate;
 
-        // Disable video capture — audio only
+        // SCK requires a video config even for audio-only capture. We don't
+        // register a video output (only SCStreamOutputTypeAudio below), so no
+        // frames reach us, but the stream still allocates pixel buffers. Pin
+        // to the documented 2x2 minimum and a 1 fps frame interval to keep
+        // that allocation trivial.
         config.width = 2;
         config.height = 2;
-        config.minimumFrameInterval = CMTimeMake(1, 1); // 1 fps minimum
+        config.minimumFrameInterval = CMTimeMake(1, 1);
         config.showsCursor = NO;
 
         scDelegate = [[SystemAudioDelegate alloc] init];
@@ -191,7 +199,7 @@ static int start_system_audio(int sampleRate) {
         NSError *addErr = nil;
         [scStream addStreamOutput:scDelegate type:SCStreamOutputTypeAudio sampleHandlerQueue:dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0) error:&addErr];
         if (addErr) {
-            NSLog(@"[meet] addStreamOutput failed: %@", addErr);
+            NSLog(@"[scrib] addStreamOutput failed: %@", addErr);
             result = -3;
             dispatch_semaphore_signal(sem);
             return;
@@ -199,7 +207,7 @@ static int start_system_audio(int sampleRate) {
 
         [scStream startCaptureWithCompletionHandler:^(NSError *startErr) {
             if (startErr) {
-                NSLog(@"[meet] startCapture failed: %@", startErr);
+                NSLog(@"[scrib] startCapture failed: %@", startErr);
                 result = -4;
             }
             dispatch_semaphore_signal(sem);
@@ -232,18 +240,31 @@ int start_capture(int sample_rate) {
 
     int sysRet = start_system_audio(sample_rate);
     if (sysRet != 0) {
-        NSLog(@"[meet] System audio capture failed (%d), continuing with mic only", sysRet);
+        if (sysRet == -10) {
+            NSLog(@"[scrib] System audio capture denied by Screen Recording permission; run: tccutil reset ScreenCapture");
+        } else {
+            NSLog(@"[scrib] System audio capture failed (%d), continuing with mic only", sysRet);
+        }
     }
 
     int micRet = start_mic(sample_rate);
     if (micRet != 0) {
-        NSLog(@"[meet] Mic capture failed (%d)", micRet);
+        NSLog(@"[scrib] Mic capture failed (%d)", micRet);
         stop_system_audio();
         gCaptureStatus = -1;
         return micRet;
     }
 
-    gCaptureStatus = (sysRet != 0) ? 1 : 0;
+    // 0 = both streams ok
+    // 1 = mic only, system audio failed for a generic reason
+    // 2 = mic only, system audio denied by Screen Recording permission
+    if (sysRet == 0) {
+        gCaptureStatus = 0;
+    } else if (sysRet == -10) {
+        gCaptureStatus = 2;
+    } else {
+        gCaptureStatus = 1;
+    }
     return 0;
 }
 

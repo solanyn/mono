@@ -1,8 +1,8 @@
-load("@rules_go//go:def.bzl", "go_binary", "go_library")
+load("@rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
 
 go_library(
     name = "config_lib",
-    srcs = glob(["config/*.go"]),
+    srcs = glob(["config/*.go"], exclude = ["config/*_test.go"]),
     importpath = "github.com/solanyn/mono/scrib/config",
     deps = [
         "@com_github_pelletier_go_toml_v2//:go-toml",
@@ -11,27 +11,35 @@ go_library(
 
 go_library(
     name = "audio_lib",
-    srcs = glob(["audio/*.go", "audio/*.m", "audio/*.h"]),
+    srcs = glob(
+        ["audio/*.go", "audio/*.m", "audio/*.h"],
+        exclude = ["audio/*_test.go"],
+    ),
     cgo = True,
-    clinkopts = [
-        "-framework ScreenCaptureKit",
-        "-framework CoreMedia",
-        "-framework CoreAudio",
-        "-framework AudioToolbox",
-        "-framework Foundation",
-        "-framework AVFoundation",
-    ],
-    copts = ["-x objective-c"],
     importpath = "github.com/solanyn/mono/scrib/audio",
     target_compatible_with = ["@platforms//os:macos"],
 )
 
+go_test(
+    name = "audio_test",
+    srcs = glob(["audio/*_test.go"]),
+    embed = [":audio_lib"],
+    target_compatible_with = ["@platforms//os:macos"],
+)
+
+go_library(
+    name = "client_lib",
+    srcs = glob(["client/*.go"], exclude = ["client/*_test.go"]),
+    importpath = "github.com/solanyn/mono/scrib/client",
+)
+
 go_library(
     name = "tui_lib",
-    srcs = glob(["tui/*.go"]),
+    srcs = glob(["tui/*.go"], exclude = ["tui/*_test.go"]),
     importpath = "github.com/solanyn/mono/scrib/tui",
     deps = [
         ":audio_lib",
+        ":client_lib",
         "@land_charm_bubbles_v2//spinner",
         "@land_charm_bubbles_v2//viewport",
         "@land_charm_bubbletea_v2//:bubbletea",
@@ -41,7 +49,7 @@ go_library(
 
 go_library(
     name = "server_lib",
-    srcs = glob(["server/*.go"]),
+    srcs = glob(["server/*.go"], exclude = ["server/*_test.go"]),
     embedsrcs = ["server/openapi.json"],
     importpath = "github.com/solanyn/mono/scrib/server",
     deps = [
@@ -59,6 +67,7 @@ go_library(
     importpath = "github.com/solanyn/mono/scrib",
     deps = [
         ":audio_lib",
+        ":client_lib",
         ":config_lib",
         ":tui_lib",
         "@com_github_spf13_cobra//:cobra",

@@ -208,14 +208,10 @@ func TestDriftDetection(t *testing.T) {
 }
 
 func TestSingletonDoubleStartPanics(t *testing.T) {
-	globalMu.Lock()
-	globalRecorder = &Recorder{sampleRate: 16000}
-	globalMu.Unlock()
+	globalRecorder.Store(&Recorder{sampleRate: 16000})
 
 	defer func() {
-		globalMu.Lock()
-		globalRecorder = nil
-		globalMu.Unlock()
+		globalRecorder.Store(nil)
 
 		r := recover()
 		if r == nil {
@@ -228,35 +224,22 @@ func TestSingletonDoubleStartPanics(t *testing.T) {
 	}()
 
 	r2 := &Recorder{sampleRate: 16000}
-	globalMu.Lock()
-	if globalRecorder != nil {
-		globalMu.Unlock()
+	if !globalRecorder.CompareAndSwap(nil, r2) {
 		panic("audio: Start() called while another recorder is active; call Stop() first")
 	}
-	globalRecorder = r2
-	globalMu.Unlock()
 }
 
 func TestSingletonStopThenStartOK(t *testing.T) {
-	globalMu.Lock()
-	globalRecorder = &Recorder{sampleRate: 16000}
-	globalMu.Unlock()
+	globalRecorder.Store(&Recorder{sampleRate: 16000})
+	globalRecorder.Store(nil)
 
-	globalMu.Lock()
-	globalRecorder = nil
-	globalMu.Unlock()
-
-	globalMu.Lock()
-	if globalRecorder != nil {
-		globalMu.Unlock()
+	if globalRecorder.Load() != nil {
 		t.Fatal("expected globalRecorder to be nil after stop")
 	}
-	globalRecorder = &Recorder{sampleRate: 16000}
-	globalMu.Unlock()
-
-	globalMu.Lock()
-	globalRecorder = nil
-	globalMu.Unlock()
+	if !globalRecorder.CompareAndSwap(nil, &Recorder{sampleRate: 16000}) {
+		t.Fatal("expected CAS to succeed after stop")
+	}
+	globalRecorder.Store(nil)
 }
 
 func contains(s, substr string) bool {

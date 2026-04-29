@@ -14,6 +14,7 @@ import (
 	"log"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unsafe"
 )
@@ -29,9 +30,12 @@ type Recorder struct {
 	micChunks  []timedChunk
 	sysChunks  []timedChunk
 	recording  bool
-	startTime  time.Time    // wall-clock start for backlog detection
-	sysAnchor  float64      // first accepted system audio PTS (after warmup)
-	sysReady   bool         // true once backlog flush period is over
+	startTime  time.Time // wall-clock start for backlog detection
+	sysAnchor  float64   // first accepted system audio PTS (after warmup)
+	sysReady   bool      // true once backlog flush period is over
+
+	// Rate-limit drift logging so long meetings don't spam stderr.
+	lastDriftLog time.Time
 
 	levelMu  sync.Mutex
 	micLevel float64
@@ -44,15 +48,23 @@ func NewRecorder(sampleRate int) (*Recorder, error) {
 
 //export goAudioCallback
 func goAudioCallback(data *C.int16_t, frameCount C.int, channels C.int, isMic C.int, timestampSecs C.double) {
-	globalRecorder.onAudio(data, int(frameCount), int(channels), int(isMic) != 0, float64(timestampSecs))
+	// Lock-free load: the callback runs off an Obj-C thread and must not
+	// block on a mutex held by Start/Stop. atomic.Pointer guarantees the
+	// read is race-free and returns nil after Stop() has cleared it — in
+	// which case a late SCK callback is safely ignored.
+	r := globalRecorder.Load()
+	if r == nil {
+		return
+	}
+	r.onAudio(data, int(frameCount), int(channels), int(isMic) != 0, float64(timestampSecs))
 }
 
 // globalRecorder holds the active Recorder instance. Only one Recorder can be
-// active at a time because cgo callbacks (goAudioCallback) use this package-level
-// variable to route audio data. Start() panics if called while another recorder
-// is already active; Stop() clears the global to allow reuse.
-var globalRecorder *Recorder
-var globalMu sync.Mutex
+// active at a time because cgo callbacks (goAudioCallback) route through this
+// package-level pointer. Start() CompareAndSwap's to claim ownership; Stop()
+// clears the pointer so any late SCK callback after stop_capture returns is
+// dropped instead of dereferencing a torn-down recorder.
+var globalRecorder atomic.Pointer[Recorder]
 
 func (r *Recorder) onAudio(data *C.int16_t, frameCount, channels int, isMic bool, timestamp float64) {
 	src := unsafe.Slice((*int16)(unsafe.Pointer(data)), frameCount*channels)
@@ -75,16 +87,13 @@ func (r *Recorder) onAudioGo(src []int16, frameCount, channels int, isMic bool, 
 		elapsed := time.Since(r.startTime).Seconds()
 		if !r.sysReady {
 			if elapsed < 1.0 {
-				// Still in warmup — discard backlog
 				return
 			}
-			// Warmup done — anchor to this chunk's PTS
 			r.sysReady = true
 			r.sysAnchor = timestamp
 			log.Printf("[scrib] system audio anchored at PTS=%.3fs (wall=%.3fs), backlog discarded", timestamp, elapsed)
 		}
-		// Re-base system audio timestamps to match wall-clock
-		timestamp = timestamp - r.sysAnchor + 1.0 // +1.0 accounts for warmup period
+		timestamp = timestamp - r.sysAnchor + 1.0
 	}
 
 	mono := make([]int16, frameCount)
@@ -120,17 +129,19 @@ func (r *Recorder) onAudioGo(src []int16, frameCount, channels int, isMic bool, 
 	}
 }
 
-const driftWarningThreshold = 0.050
+const (
+	driftWarningThreshold = 0.050
+	driftLogInterval      = 5 * time.Second
+)
 
-func (r *Recorder) interleave() []int16 {
+// bounds walks the chunk slice once to find t0, tEnd, and frame coverage.
+func (r *Recorder) bounds() (t0, tEnd float64, ok bool) {
 	if len(r.micChunks) == 0 && len(r.sysChunks) == 0 {
-		return nil
+		return 0, 0, false
 	}
-
 	sr := float64(r.sampleRate)
-
-	t0 := math.Inf(1)
-	tEnd := math.Inf(-1)
+	t0 = math.Inf(1)
+	tEnd = math.Inf(-1)
 	for _, c := range r.micChunks {
 		if c.timestamp < t0 {
 			t0 = c.timestamp
@@ -149,6 +160,15 @@ func (r *Recorder) interleave() []int16 {
 			tEnd = end
 		}
 	}
+	return t0, tEnd, true
+}
+
+func (r *Recorder) interleave() []int16 {
+	t0, tEnd, ok := r.bounds()
+	if !ok {
+		return nil
+	}
+	sr := float64(r.sampleRate)
 
 	totalFrames := int(math.Round((tEnd - t0) * sr))
 	if totalFrames <= 0 {
@@ -178,7 +198,6 @@ func (r *Recorder) interleave() []int16 {
 	}
 
 	r.checkDrift()
-
 	return out
 }
 
@@ -188,17 +207,22 @@ func (r *Recorder) checkDrift() {
 	}
 
 	sr := float64(r.sampleRate)
-
 	micEnd := r.micChunks[len(r.micChunks)-1].timestamp +
 		float64(len(r.micChunks[len(r.micChunks)-1].samples))/sr
 	sysEnd := r.sysChunks[len(r.sysChunks)-1].timestamp +
 		float64(len(r.sysChunks[len(r.sysChunks)-1].samples))/sr
 
 	drift := math.Abs(micEnd - sysEnd)
-	if drift > driftWarningThreshold {
-		log.Printf("[scrib] audio channel drift detected: %.1fms (mic end=%.3fs, sys end=%.3fs)",
-			drift*1000, micEnd, sysEnd)
+	if drift <= driftWarningThreshold {
+		return
 	}
+	now := time.Now()
+	if now.Sub(r.lastDriftLog) < driftLogInterval {
+		return
+	}
+	r.lastDriftLog = now
+	log.Printf("[scrib] audio channel drift detected: %.1fms (mic end=%.3fs, sys end=%.3fs)",
+		drift*1000, micEnd, sysEnd)
 }
 
 func (r *Recorder) MicLevel() float64 {
@@ -214,13 +238,9 @@ func (r *Recorder) SysLevel() float64 {
 }
 
 func (r *Recorder) Start() error {
-	globalMu.Lock()
-	if globalRecorder != nil {
-		globalMu.Unlock()
+	if !globalRecorder.CompareAndSwap(nil, r) {
 		panic("audio: Start() called while another recorder is active; call Stop() first")
 	}
-	globalRecorder = r
-	globalMu.Unlock()
 
 	r.mu.Lock()
 	r.recording = true
@@ -233,9 +253,7 @@ func (r *Recorder) Start() error {
 
 	ret := C.start_capture(C.int(r.sampleRate))
 	if ret != 0 {
-		globalMu.Lock()
-		globalRecorder = nil
-		globalMu.Unlock()
+		globalRecorder.Store(nil)
 		return fmt.Errorf("start_capture failed: %d", ret)
 	}
 	return nil
@@ -250,10 +268,10 @@ func (r *Recorder) Stop() []int16 {
 	r.sysChunks = nil
 	r.mu.Unlock()
 
-	globalMu.Lock()
-	globalRecorder = nil
-	globalMu.Unlock()
-
+	// Clear global AFTER stop_capture+mu unlock so any in-flight callback
+	// either (a) already acquired r.mu and saw r.recording == false, or
+	// (b) will load a nil pointer and drop its frames.
+	globalRecorder.Store(nil)
 	return out
 }
 
@@ -276,38 +294,11 @@ func (r *Recorder) Snapshot(fromFrame int) []int16 {
 func (r *Recorder) FrameCount() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	total := 0
-	for _, c := range r.micChunks {
-		total += len(c.samples)
-	}
-	for _, c := range r.sysChunks {
-		total += len(c.samples)
-	}
-	if total == 0 {
+	t0, tEnd, ok := r.bounds()
+	if !ok {
 		return 0
 	}
-	sr := float64(r.sampleRate)
-	t0 := math.Inf(1)
-	tEnd := math.Inf(-1)
-	for _, c := range r.micChunks {
-		if c.timestamp < t0 {
-			t0 = c.timestamp
-		}
-		end := c.timestamp + float64(len(c.samples))/sr
-		if end > tEnd {
-			tEnd = end
-		}
-	}
-	for _, c := range r.sysChunks {
-		if c.timestamp < t0 {
-			t0 = c.timestamp
-		}
-		end := c.timestamp + float64(len(c.samples))/sr
-		if end > tEnd {
-			tEnd = end
-		}
-	}
-	return int(math.Round((tEnd - t0) * sr))
+	return int(math.Round((tEnd - t0) * float64(r.sampleRate)))
 }
 
 func GetInputDeviceName() string {

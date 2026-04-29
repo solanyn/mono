@@ -6,11 +6,13 @@ import (
 	"database/sql"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -34,9 +36,14 @@ type Config struct {
 	S3SecretKey    string
 	S3UseSSL       bool
 	AudioServiceURL string
+	AudioProcessURL string
 	STTModel        string
 	VADThreshold    string
+	MergeGap        string
+	MaxAudioBytes   int64
 }
+
+const defaultMaxAudioBytes int64 = 2 << 30 // 2 GiB
 
 // Server is the scrib sync server.
 type Server struct {
@@ -44,10 +51,20 @@ type Server struct {
 	db     *sql.DB
 	s3     *minio.Client
 	router chi.Router
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
+
+	busMu sync.Mutex
+	buses map[string]*eventBus
 }
 
 // New creates a new scrib server.
 func New(cfg Config) (*Server, error) {
+	if cfg.MaxAudioBytes <= 0 {
+		cfg.MaxAudioBytes = defaultMaxAudioBytes
+	}
+
 	db, err := sql.Open("postgres", cfg.DatabaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
@@ -64,8 +81,10 @@ func New(cfg Config) (*Server, error) {
 		return nil, fmt.Errorf("s3 client: %w", err)
 	}
 
-	s := &Server{cfg: cfg, db: db, s3: s3Client}
+	ctx, cancel := context.WithCancel(context.Background())
+	s := &Server{cfg: cfg, db: db, s3: s3Client, ctx: ctx, cancel: cancel, buses: make(map[string]*eventBus)}
 	if err := s.migrate(); err != nil {
+		cancel()
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
 
@@ -73,45 +92,95 @@ func New(cfg Config) (*Server, error) {
 	return s, nil
 }
 
+// Shutdown cancels in-flight processing goroutines and waits up to grace for them to finish.
+func (s *Server) Shutdown(grace time.Duration) {
+	s.cancel()
+	done := make(chan struct{})
+	go func() {
+		s.wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(grace):
+		log.Printf("shutdown: %v grace expired, in-flight jobs abandoned", grace)
+	}
+}
+
 func (s *Server) routes() chi.Router {
 	r := chi.NewRouter()
+	r.Use(middleware.RequestID)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(60 * time.Second))
 
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("ok"))
-	})
+	r.Get("/health", s.handleHealth)
 
 	r.Get("/openapi.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(openapiSpec)
+		if _, err := w.Write(openapiSpec); err != nil {
+			log.Printf("openapi write: %v", err)
+		}
 	})
 
 	r.Route("/v1", func(r chi.Router) {
-		r.Post("/sync/push", s.handlePush)
-		r.Get("/sync/pull", s.handlePull)
+		// Short, cheap handlers get the 60s timeout.
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.Timeout(60 * time.Second))
 
-		r.Get("/meetings", s.handleListMeetings)
-		r.Post("/meetings", s.handleCreateMeeting)
-		r.Get("/meetings/{uuid}", s.handleGetMeeting)
-		r.Get("/search", s.handleSearch)
-		r.Get("/speakers", s.handleListSpeakers)
-		r.Post("/speakers", s.handleCreateSpeaker)
+			r.Post("/sync/push", s.handlePush)
+			r.Get("/sync/pull", s.handlePull)
 
+			r.Get("/meetings", s.handleListMeetings)
+			r.Post("/meetings", s.handleCreateMeeting)
+			r.Get("/meetings/{uuid}", s.handleGetMeeting)
+			r.Get("/search", s.handleSearch)
+			r.Get("/speakers", s.handleListSpeakers)
+			r.Post("/speakers", s.handleCreateSpeaker)
+
+			r.Post("/process/{uuid}", s.handleProcess)
+		})
+
+		// Long-running I/O: no request-scoped timeout.
+		// Upload caps size via MaxBytesReader; clients may be on slow links.
 		r.Post("/audio/{uuid}", s.handleUploadAudio)
 		r.Get("/audio/{uuid}", s.handleDownloadAudio)
 
-		r.Post("/process/{uuid}", s.handleProcess)
+		// SSE: no timeout — client holds the stream until done/error.
+		r.Get("/process/{uuid}/events", s.handleProcessEvents)
 	})
 
 	return r
 }
 
-// ListenAndServe starts the server.
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	defer cancel()
+
+	if err := s.db.PingContext(ctx); err != nil {
+		http.Error(w, fmt.Sprintf("db: %v", err), http.StatusServiceUnavailable)
+		return
+	}
+
+	if _, err := s.s3.BucketExists(ctx, s.cfg.S3Bucket); err != nil {
+		http.Error(w, fmt.Sprintf("s3: %v", err), http.StatusServiceUnavailable)
+		return
+	}
+
+	if _, err := w.Write([]byte("ok")); err != nil {
+		log.Printf("health write: %v", err)
+	}
+}
+
+// ListenAndServe starts the server. Prefer using Router() with http.Server directly
+// for graceful shutdown; this helper remains for simple callers/tests.
 func (s *Server) ListenAndServe() error {
 	log.Printf("scrib-server listening on %s", s.cfg.ListenAddr)
 	return http.ListenAndServe(s.cfg.ListenAddr, s.router)
+}
+
+// Router returns the chi router for embedding in a caller-managed http.Server.
+func (s *Server) Router() http.Handler {
+	return s.router
 }
 
 func (s *Server) migrate() error {
@@ -359,25 +428,48 @@ func (s *Server) handleUploadAudio(w http.ResponseWriter, r *http.Request) {
 	uuid := chi.URLParam(r, "uuid")
 	key := fmt.Sprintf("audio/%s.wav", uuid)
 
-	_, err := s.s3.PutObject(context.Background(), s.cfg.S3Bucket, key, r.Body, r.ContentLength, minio.PutObjectOptions{
+	if r.ContentLength > s.cfg.MaxAudioBytes {
+		http.Error(w, fmt.Sprintf("audio too large: %d > %d", r.ContentLength, s.cfg.MaxAudioBytes), http.StatusRequestEntityTooLarge)
+		return
+	}
+
+	body := http.MaxBytesReader(w, r.Body, s.cfg.MaxAudioBytes)
+	defer body.Close()
+
+	// If ContentLength is -1 the minio client streams with unknown size,
+	// which forces multipart; pass -1 explicitly in that case.
+	size := r.ContentLength
+	if size <= 0 {
+		size = -1
+	}
+
+	_, err := s.s3.PutObject(r.Context(), s.cfg.S3Bucket, key, body, size, minio.PutObjectOptions{
 		ContentType: "audio/wav",
 	})
 	if err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			http.Error(w, fmt.Sprintf("audio too large: limit %d", s.cfg.MaxAudioBytes), http.StatusRequestEntityTooLarge)
+			return
+		}
 		http.Error(w, fmt.Sprintf("s3 upload: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	// Update meeting blob key
-	s.db.Exec(`UPDATE meetings SET audio_blob_key = $1 WHERE uuid = $2`, key, uuid)
+	if _, err := s.db.ExecContext(r.Context(), `UPDATE meetings SET audio_blob_key = $1 WHERE uuid = $2`, key, uuid); err != nil {
+		log.Printf("update blob_key %s: %v", uuid, err)
+	}
 
-	json.NewEncoder(w).Encode(map[string]string{"blob_key": key})
+	if err := json.NewEncoder(w).Encode(map[string]string{"blob_key": key}); err != nil {
+		log.Printf("encode upload response: %v", err)
+	}
 }
 
 func (s *Server) handleDownloadAudio(w http.ResponseWriter, r *http.Request) {
 	uuid := chi.URLParam(r, "uuid")
 	key := fmt.Sprintf("audio/%s.wav", uuid)
 
-	obj, err := s.s3.GetObject(context.Background(), s.cfg.S3Bucket, key, minio.GetObjectOptions{})
+	obj, err := s.s3.GetObject(r.Context(), s.cfg.S3Bucket, key, minio.GetObjectOptions{})
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -385,7 +477,9 @@ func (s *Server) handleDownloadAudio(w http.ResponseWriter, r *http.Request) {
 	defer obj.Close()
 
 	w.Header().Set("Content-Type", "audio/wav")
-	io.Copy(w, obj)
+	if _, err := io.Copy(w, obj); err != nil {
+		log.Printf("download %s: %v", uuid, err)
+	}
 }
 
 func (s *Server) handleListMeetings(w http.ResponseWriter, r *http.Request) {
@@ -608,14 +702,20 @@ func (s *Server) handleProcess(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var exists bool
-	err := s.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM meetings WHERE uuid = $1)`, uuid).Scan(&exists)
+	err := s.db.QueryRowContext(r.Context(), `SELECT EXISTS(SELECT 1 FROM meetings WHERE uuid = $1)`, uuid).Scan(&exists)
 	if err != nil || !exists {
 		http.Error(w, "meeting not found", http.StatusNotFound)
 		return
 	}
 
-	go s.processMeeting(uuid)
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		s.processMeeting(s.ctx, uuid)
+	}()
 
 	w.WriteHeader(http.StatusAccepted)
-	json.NewEncoder(w).Encode(map[string]string{"status": "processing", "uuid": uuid})
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": "processing", "uuid": uuid}); err != nil {
+		log.Printf("encode process response: %v", err)
+	}
 }
