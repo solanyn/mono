@@ -1,22 +1,28 @@
 """FastAPI server for scrib-audio pipeline.
 
 Endpoints:
-    POST /v1/audio/process  — full pipeline: diarize + transcribe + align
-    POST /v1/audio/diarize  — diarization only
-    POST /v1/audio/transcribe — transcription only
-    GET  /health            — health check (verifies models loaded)
+    POST /v1/audio/process           — full pipeline: diarize + transcribe + align
+    POST /v1/audio/process/stream    — same, but streams stage progress as SSE,
+                                        final event carries the JSON result
+    POST /v1/audio/diarize           — diarization only
+    POST /v1/audio/transcribe        — transcription only
+    GET  /metrics                    — per-stage timing counters
+    GET  /health                     — verifies models loaded
 """
 
 import asyncio
 import contextlib
+import json
 import logging
 import os
 import tempfile
+import threading
 import time
+from collections import defaultdict
 from typing import AsyncIterator, Callable
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from .diarize import diarize_array, load_model as load_diar_model
 from .pipeline import _load_and_normalise, process, result_to_dict
@@ -45,6 +51,18 @@ _inference_sem = asyncio.Semaphore(1)
 
 # Snapshot of model-load state for /health.
 _state = {"diar_loaded": False, "stt_loaded": False}
+
+# Simple metrics: per-stage count + cumulative seconds.
+_metrics_lock = threading.Lock()
+_metrics: dict[str, dict[str, float]] = defaultdict(lambda: {"count": 0.0, "total_secs": 0.0, "last_secs": 0.0})
+
+
+def _record(stage: str, secs: float) -> None:
+    with _metrics_lock:
+        m = _metrics[stage]
+        m["count"] += 1
+        m["total_secs"] += secs
+        m["last_secs"] = secs
 
 
 @contextlib.asynccontextmanager
@@ -82,6 +100,21 @@ async def health():
     if not (_state["diar_loaded"] and _state["stt_loaded"]):
         return JSONResponse({"status": "loading", **_state}, status_code=503)
     return {"status": "ok", **_state}
+
+
+@app.get("/metrics")
+async def metrics():
+    with _metrics_lock:
+        snapshot = {
+            stage: {
+                "count": int(m["count"]),
+                "total_secs": round(m["total_secs"], 3),
+                "last_secs": round(m["last_secs"], 3),
+                "avg_secs": round(m["total_secs"] / m["count"], 3) if m["count"] else 0.0,
+            }
+            for stage, m in _metrics.items()
+        }
+    return snapshot
 
 
 async def _save_upload(file: UploadFile) -> str:
@@ -122,6 +155,7 @@ async def process_endpoint(
     file: UploadFile = File(...),
     threshold: float = Form(0.5),
     merge_gap: float = Form(0.5),
+    include_embeddings: bool = Form(False),
 ):
     """Full pipeline: diarize + transcribe + align."""
     tmp_path = await _save_upload(file)
@@ -130,8 +164,10 @@ async def process_endpoint(
         result = await _run_with_timeout(
             process, tmp_path, threshold=threshold, merge_gap=merge_gap,
         )
-        log.info("process: %.1fs wall", time.monotonic() - t0)
-        return JSONResponse(result_to_dict(result))
+        elapsed = time.monotonic() - t0
+        _record("process", elapsed)
+        log.info("process: %.1fs wall", elapsed)
+        return JSONResponse(result_to_dict(result, include_embeddings=include_embeddings))
     except asyncio.TimeoutError:
         log.error("process: timeout after %.0fs", REQUEST_TIMEOUT_SECS)
         return JSONResponse({"error": "timeout"}, status_code=504)
@@ -143,6 +179,88 @@ async def process_endpoint(
             os.unlink(tmp_path)
 
 
+@app.post("/v1/audio/process/stream")
+async def process_stream_endpoint(
+    file: UploadFile = File(...),
+    threshold: float = Form(0.5),
+    merge_gap: float = Form(0.5),
+    include_embeddings: bool = Form(False),
+):
+    """SSE variant of /v1/audio/process.
+
+    Emits stage events (load, diarize, diarize_done, transcribe, transcribe_done,
+    align, align_done) then a terminal ``result`` event carrying the full
+    pipeline result JSON, or an ``error`` event on failure.
+    """
+    tmp_path = await _save_upload(file)
+
+    # Progress from the worker thread lands in a thread-safe queue; the
+    # streaming coroutine forwards it to the client while the worker runs.
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue = asyncio.Queue()
+    done_sentinel: object = object()
+
+    def progress(stage: str, detail: str) -> None:
+        # Called from the worker thread; hop back to the event loop.
+        loop.call_soon_threadsafe(queue.put_nowait, {"stage": stage, "detail": detail})
+
+    async def run_worker():
+        t0 = time.monotonic()
+        try:
+            result = await _run_with_timeout(
+                process,
+                tmp_path,
+                threshold=threshold,
+                merge_gap=merge_gap,
+                progress=progress,
+            )
+            elapsed = time.monotonic() - t0
+            _record("process", elapsed)
+            log.info("process_stream: %.1fs wall", elapsed)
+            await queue.put({
+                "stage": "result",
+                "payload": result_to_dict(result, include_embeddings=include_embeddings),
+            })
+        except asyncio.TimeoutError:
+            await queue.put({"stage": "error", "detail": "timeout"})
+        except Exception as e:
+            log.exception("process_stream failed")
+            await queue.put({"stage": "error", "detail": str(e)})
+        finally:
+            await queue.put(done_sentinel)
+
+    async def stream() -> AsyncIterator[bytes]:
+        task = asyncio.create_task(run_worker())
+        try:
+            while True:
+                item = await queue.get()
+                if item is done_sentinel:
+                    break
+                stage = item.get("stage", "progress")
+                if stage == "result":
+                    data = json.dumps(item["payload"])
+                elif stage == "error":
+                    data = json.dumps({"detail": item.get("detail", "")})
+                else:
+                    data = json.dumps({"detail": item.get("detail", "")})
+                yield f"event: {stage}\ndata: {data}\n\n".encode()
+        finally:
+            # Ensure the worker finishes and tempfile is cleaned.
+            with contextlib.suppress(Exception):
+                await task
+            with contextlib.suppress(OSError):
+                os.unlink(tmp_path)
+
+    return StreamingResponse(
+        stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @app.post("/v1/audio/diarize")
 async def diarize_endpoint(
     file: UploadFile = File(...),
@@ -152,12 +270,14 @@ async def diarize_endpoint(
 ):
     """Speaker diarization only."""
     tmp_path = await _save_upload(file)
+    t0 = time.monotonic()
     try:
         data, sr = _load_and_normalise(tmp_path)
         result = await _run_with_timeout(
             diarize_array, data, sr,
             threshold=threshold, min_duration=min_duration, merge_gap=merge_gap,
         )
+        _record("diarize", time.monotonic() - t0)
         return JSONResponse({
             "segments": [
                 {"speaker": s.speaker, "start": s.start, "end": s.end}
@@ -180,9 +300,11 @@ async def diarize_endpoint(
 async def transcribe_endpoint(file: UploadFile = File(...)):
     """Transcription only."""
     tmp_path = await _save_upload(file)
+    t0 = time.monotonic()
     try:
         data, sr = _load_and_normalise(tmp_path)
         result = await _run_with_timeout(transcribe_array, data, sr)
+        _record("transcribe", time.monotonic() - t0)
         return JSONResponse({
             "text": result.text,
             "words": [

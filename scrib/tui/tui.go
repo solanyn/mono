@@ -15,6 +15,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/solanyn/mono/scrib/audio"
+	"github.com/solanyn/mono/scrib/client"
 )
 
 type phase int
@@ -32,6 +33,7 @@ type Options struct {
 	SampleRate int
 	ServerURL  string
 	Template   string
+	OutboxDir  string // optional; if set, phaseFailed 's' key parks the upload here
 }
 
 // ProgressEvent mirrors client.Progress so the TUI doesn't have to import the
@@ -95,6 +97,25 @@ type savedMsg struct {
 	err      error
 }
 
+// uploadReadyMsg fires once the client upload has successfully POSTed
+// /v1/process — from here on progress comes from the server SSE stream,
+// not the uploader's own retry loop.
+type uploadReadyMsg struct {
+	uuid string
+	dur  time.Duration
+}
+
+// sseStageMsg carries a single decoded server-sent event.
+type sseStageMsg struct {
+	stage string
+	data  []byte
+}
+
+// sseDoneMsg signals the SSE subscription terminated.
+type sseDoneMsg struct {
+	err error
+}
+
 func tickCmd() tea.Cmd {
 	return tea.Tick(time.Second, func(t time.Time) tea.Msg { return tickMsg(t) })
 }
@@ -117,6 +138,8 @@ func buildSteps(hasUpload bool) []processStep {
 			processStep{key: "metadata", label: "Creating meeting"},
 			processStep{key: "audio", label: "Uploading audio"},
 			processStep{key: "process", label: "Requesting processing"},
+			processStep{key: "processing", label: "Transcribing + diarizing"},
+			processStep{key: "matching", label: "Matching speakers"},
 		)
 	}
 	return steps
@@ -194,6 +217,47 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.detail = ""
 			m.advanceAfter(msg.Stage)
 		}
+
+	case uploadReadyMsg:
+		// Client-side upload completed; hand off to SSE for server-side stages.
+		m.result = &pipelineResult{UUID: msg.uuid, Duration: msg.dur}
+		m.advanceTo("processing")
+		m.detail = ""
+		cmd, cancel := m.startSSE(msg.uuid)
+		m.uploadCancel = cancel
+		cmds = append(cmds, cmd)
+
+	case sseStageMsg:
+		// Server emits: started, processing, matching, done, error.
+		switch msg.stage {
+		case "started", "processing":
+			m.advanceTo("processing")
+			m.detail = ""
+		case "matching":
+			m.markStepDone("processing")
+			m.advanceTo("matching")
+			m.detail = ""
+		case "done":
+			m.markStepDone("processing")
+			m.markStepDone("matching")
+		case "error":
+			if m.err == nil {
+				m.err = fmt.Errorf("server: %s", string(msg.data))
+			}
+		}
+
+	case sseDoneMsg:
+		m.uploadCancel = nil
+		if msg.err != nil && m.err == nil {
+			m.err = msg.err
+		}
+		if m.err != nil {
+			m.phase = phaseFailed
+			return m, nil
+		}
+		m.phase = phaseResults
+		m.resultVP = viewport.New(viewport.WithWidth(max(m.width-4, 1)), viewport.WithHeight(max(m.height-4, 1)))
+		m.resultVP.SetContent(m.renderResults())
 
 	case pipelineDoneMsg:
 		m.uploadCancel = nil
@@ -281,6 +345,17 @@ func (m model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 		case "s":
 			// Save-and-quit: audio is already on disk at m.opts.OutputPath.
+			// If an outbox is configured, also park a retry record so
+			// `scrib upload` or startup-resume can pick it up later.
+			if m.opts.OutboxDir != "" && m.monoPath != "" {
+				_, _ = client.OutboxWrite(m.opts.OutboxDir, client.OutboxEntry{
+					Name:      m.opts.Name,
+					Template:  m.opts.Template,
+					WAVPath:   m.monoPath,
+					ServerURL: m.opts.ServerURL,
+					LastErr:   errString(m.err),
+				})
+			}
 			return m, tea.Quit
 		case "q", "ctrl+c":
 			return m, tea.Quit
@@ -329,18 +404,25 @@ func (m *model) startUpload(samples []int16, dur time.Duration) (tea.Cmd, contex
 	fn := m.uploadFn
 	opts := m.opts
 	progressCh := make(chan ProgressEvent, 8)
+	uuidCh := make(chan string, 1)
+	errCh := make(chan error, 1)
 
 	go func() {
 		defer close(progressCh)
-		_, _ = fn(ctx, samples, opts, func(e ProgressEvent) {
+		uuid, err := fn(ctx, samples, opts, func(e ProgressEvent) {
 			select {
 			case progressCh <- e:
 			case <-ctx.Done():
 			}
 		})
+		if err != nil {
+			errCh <- err
+			return
+		}
+		uuidCh <- uuid
 	}()
 
-	return m.waitUpload(ctx, progressCh, samples, opts, dur), cancel
+	return m.waitUpload(ctx, progressCh, uuidCh, errCh, dur), cancel
 }
 
 func (m *model) startUploadFromPath(monoPath string) (tea.Cmd, context.CancelFunc) {
@@ -348,6 +430,8 @@ func (m *model) startUploadFromPath(monoPath string) (tea.Cmd, context.CancelFun
 	fn := m.uploadFn
 	opts := m.opts
 	progressCh := make(chan ProgressEvent, 8)
+	uuidCh := make(chan string, 1)
+	errCh := make(chan error, 1)
 
 	// Load samples back from disk for the uploader. Keeps the API symmetrical
 	// even though the server only cares about the on-disk WAV.
@@ -361,43 +445,46 @@ func (m *model) startUploadFromPath(monoPath string) (tea.Cmd, context.CancelFun
 
 	go func() {
 		defer close(progressCh)
-		_, _ = fn(ctx, samples, opts, func(e ProgressEvent) {
+		uuid, err := fn(ctx, samples, opts, func(e ProgressEvent) {
 			select {
 			case progressCh <- e:
 			case <-ctx.Done():
 			}
 		})
+		if err != nil {
+			errCh <- err
+			return
+		}
+		uuidCh <- uuid
 	}()
 
-	return m.waitUpload(ctx, progressCh, samples, opts, dur), cancel
+	return m.waitUpload(ctx, progressCh, uuidCh, errCh, dur), cancel
 }
 
 // waitUpload bridges the uploader goroutine to the tea message stream. Each
 // call returns ONE message; the caller chains further waits via tea.Batch.
-func (m *model) waitUpload(ctx context.Context, progressCh <-chan ProgressEvent, samples []int16, opts Options, dur time.Duration) tea.Cmd {
+func (m *model) waitUpload(ctx context.Context, progressCh <-chan ProgressEvent, uuidCh <-chan string, errCh <-chan error, dur time.Duration) tea.Cmd {
 	// Collect on a separate goroutine so the tea loop gets a steady stream
 	// of progress + the final done message.
-	resultCh := make(chan tea.Msg, len(progressCh)+1)
+	resultCh := make(chan tea.Msg, cap(progressCh)+2)
 	go func() {
 		defer close(resultCh)
-		// We need to re-invoke the uploader — but we already kicked it off.
-		// Instead, drain progressCh until it closes.
-		var lastErr error
 		for ev := range progressCh {
 			resultCh <- pipelineProgressMsg(ev)
-			if ev.Err == nil {
-				if ev.Stage == "process" {
-					// success of the last stage
-					resultCh <- pipelineDoneMsg{result: &pipelineResult{Duration: dur}}
-					return
-				}
-			} else {
-				lastErr = ev.Err
-			}
 		}
-		if lastErr != nil {
-			resultCh <- pipelineDoneMsg{err: lastErr}
-		} else {
+		// Progress channel closed — uploader returned. Surface its result.
+		select {
+		case uuid, ok := <-uuidCh:
+			if ok && uuid != "" {
+				resultCh <- uploadReadyMsg{uuid: uuid, dur: dur}
+				return
+			}
+		default:
+		}
+		select {
+		case err := <-errCh:
+			resultCh <- pipelineDoneMsg{err: err}
+		default:
 			resultCh <- pipelineDoneMsg{err: fmt.Errorf("upload ended without success")}
 		}
 	}()
@@ -405,6 +492,54 @@ func (m *model) waitUpload(ctx context.Context, progressCh <-chan ProgressEvent,
 		msg, ok := <-resultCh
 		if !ok {
 			return pipelineDoneMsg{err: ctx.Err()}
+		}
+		return msg
+	}
+}
+
+// startSSE subscribes to /v1/process/{uuid}/events and feeds stage + done
+// messages back into the tea loop. Returns the Cmd + a cancel func so
+// ctrl+c in the processing phase can tear the stream down.
+func (m *model) startSSE(uuid string) (tea.Cmd, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(context.Background())
+	serverURL := m.opts.ServerURL
+	events := make(chan sseStageMsg, 16)
+	doneCh := make(chan error, 1)
+
+	go func() {
+		defer close(events)
+		err := client.StreamProcess(ctx, serverURL, uuid, func(e client.StreamEvent) {
+			select {
+			case events <- sseStageMsg{stage: e.Stage, data: e.Data}:
+			case <-ctx.Done():
+			}
+		})
+		if client.IsStreamUnavailable(err) {
+			// Processing already done / not streaming — treat as success;
+			// the server will have its state reflected in /v1/meetings.
+			doneCh <- nil
+			return
+		}
+		doneCh <- err
+	}()
+
+	return m.waitSSE(events, doneCh), cancel
+}
+
+func (m *model) waitSSE(events <-chan sseStageMsg, doneCh <-chan error) tea.Cmd {
+	out := make(chan tea.Msg, cap(events)+1)
+	go func() {
+		defer close(out)
+		for ev := range events {
+			out <- ev
+		}
+		err := <-doneCh
+		out <- sseDoneMsg{err: err}
+	}()
+	return func() tea.Msg {
+		msg, ok := <-out
+		if !ok {
+			return sseDoneMsg{}
 		}
 		return msg
 	}
@@ -660,4 +795,11 @@ func max(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func errString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }

@@ -83,6 +83,12 @@ func runRecord(cfg *config.Config, args []string, template string) error {
 		return fmt.Errorf("create output dir: %w", err)
 	}
 
+	// Best-effort drain of any parked retries from previous runs. Runs before
+	// we start the recorder so the user sees the result before the TUI takes over.
+	if cfg.ServerURL != "" {
+		drainOutbox(cfg, filepath.Join(outDir, ".outbox"))
+	}
+
 	name := time.Now().Format("2006-01-02-150405")
 	if len(args) > 0 && args[0] != "" {
 		name = time.Now().Format("2006-01-02") + "-" + args[0]
@@ -95,9 +101,61 @@ func runRecord(cfg *config.Config, args []string, template string) error {
 		SampleRate: cfg.SampleRate,
 		ServerURL:  cfg.ServerURL,
 		Template:   template,
+		OutboxDir:  filepath.Join(outDir, ".outbox"),
 	}
 
 	return tui.Run(opts, makeUploadFn(cfg))
+}
+
+// drainOutbox retries any parked uploads from previous runs. Errors are
+// reported to stderr but don't block the current recording from starting.
+func drainOutbox(cfg *config.Config, outboxDir string) {
+	entries, bad, err := client.OutboxList(outboxDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "outbox scan failed: %v\n", err)
+		return
+	}
+	for _, p := range bad {
+		fmt.Fprintf(os.Stderr, "outbox: corrupt entry %s (skipped)\n", p)
+	}
+	if len(entries) == 0 {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "resuming %d parked upload(s) from %s\n", len(entries), outboxDir)
+	for _, e := range entries {
+		if _, err := os.Stat(e.WAVPath); err != nil {
+			fmt.Fprintf(os.Stderr, "  %s: wav missing (%v) — dropping\n", e.Name, err)
+			_ = client.OutboxDelete(outboxDir, e)
+			continue
+		}
+		dur := time.Duration(e.DurationS * float64(time.Second))
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
+		res, err := client.Upload(ctx, client.UploadInput{
+			ServerURL: firstNonEmpty(e.ServerURL, cfg.ServerURL),
+			Name:      e.Name,
+			Template:  e.Template,
+			Duration:  dur,
+			WAVPath:   e.WAVPath,
+		}, func(p client.Progress) {
+			if p.Err != nil {
+				fmt.Fprintf(os.Stderr, "  %s %s attempt %d: %v\n", e.Name, p.Stage, p.Attempt, p.Err)
+			}
+		})
+		cancel()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "  %s: failed (%v) — leaving in outbox\n", e.Name, err)
+			continue
+		}
+		fmt.Fprintf(os.Stderr, "  %s: uploaded (%s)\n", e.Name, res.UUID)
+		_ = client.OutboxDelete(outboxDir, e)
+	}
+}
+
+func firstNonEmpty(a, b string) string {
+	if a != "" {
+		return a
+	}
+	return b
 }
 
 // runUpload re-uploads an existing WAV file (e.g. after a failed first attempt).

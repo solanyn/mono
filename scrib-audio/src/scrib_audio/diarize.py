@@ -7,7 +7,8 @@ CoreML acceleration on Apple Silicon. Processes 1 hour in ~8 seconds.
 import logging
 import os
 import tempfile
-from dataclasses import dataclass
+from collections import defaultdict
+from dataclasses import dataclass, field
 
 import numpy as np
 import soundfile as sf
@@ -29,6 +30,7 @@ class DiarResult:
     segments: list[DiarSegment]
     num_speakers: int
     duration_seconds: float
+    speaker_embeddings: dict[str, list[float]] = field(default_factory=dict)
 
 
 def load_model():
@@ -39,6 +41,38 @@ def load_model():
         log.info("loading Senko diarizer (device=auto)")
         _diarizer = senko.Diarizer(device="auto", warmup=True, quiet=True)
     return _diarizer
+
+
+def _extract_speaker_embeddings(result: dict) -> dict[str, list[float]]:
+    """Best-effort per-speaker embedding extraction from Senko output.
+
+    Senko's result shape varies by version. We try the most common keys
+    and fall back to an empty dict; the Go matcher then treats this
+    meeting as label-only.
+    """
+    # Direct speaker→embedding map
+    if "speaker_embeddings" in result:
+        raw = result["speaker_embeddings"]
+        return {str(k): list(map(float, v)) for k, v in raw.items()}
+
+    # Per-segment embeddings; average per speaker
+    segments = result.get("segments") or result.get("merged_segments") or []
+    by_speaker: dict[str, list[np.ndarray]] = defaultdict(list)
+    for seg in segments:
+        emb = seg.get("embedding") if isinstance(seg, dict) else None
+        if emb is None:
+            continue
+        speaker = str(seg.get("speaker", "UNKNOWN"))
+        by_speaker[speaker].append(np.asarray(emb, dtype=np.float32))
+
+    out: dict[str, list[float]] = {}
+    for speaker, embs in by_speaker.items():
+        mean = np.mean(np.stack(embs), axis=0)
+        norm = np.linalg.norm(mean)
+        if norm > 0:
+            mean = mean / norm
+        out[speaker] = mean.astype(np.float32).tolist()
+    return out
 
 
 def diarize_array(
@@ -93,15 +127,20 @@ def diarize_array(
     if merge_gap > 0:
         segments = _merge_segments(segments, merge_gap)
 
+    embeddings = _extract_speaker_embeddings(result)
+    if not embeddings:
+        log.info("diarize: no per-speaker embeddings available from diarizer output")
+
     log.info(
-        "diarize: %d segments, %d speakers in %.1fs",
-        len(segments), len(speaker_set), duration,
+        "diarize: %d segments, %d speakers in %.1fs (%d embeddings)",
+        len(segments), len(speaker_set), duration, len(embeddings),
     )
 
     return DiarResult(
         segments=segments,
         num_speakers=len(speaker_set),
         duration_seconds=round(duration, 3),
+        speaker_embeddings=embeddings,
     )
 
 

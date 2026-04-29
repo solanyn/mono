@@ -4,6 +4,7 @@
 package client
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/rand"
@@ -13,6 +14,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -248,3 +250,99 @@ func newUUID() (string, error) {
 	b[8] = (b[8] & 0x3f) | 0x80
 	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16]), nil
 }
+
+// StreamEvent is one decoded SSE event from /v1/process/{uuid}/events.
+// Stage comes from the `event:` line, Data is the raw JSON payload from `data:`.
+type StreamEvent struct {
+	Stage string
+	Data  []byte
+}
+
+// StreamProcess subscribes to the server's SSE feed for a single meeting and
+// forwards every event to onEvent. It returns when the server closes the
+// connection (stage=done or stage=error) or when ctx is cancelled.
+//
+// Uses its own http.Client without a global timeout so the long-lived
+// connection can block on the event stream.
+func StreamProcess(ctx context.Context, serverURL, uuid string, onEvent func(StreamEvent)) error {
+	req, err := http.NewRequestWithContext(ctx, "GET", serverURL+"/v1/process/"+uuid+"/events", nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Accept", "text/event-stream")
+	req.Header.Set("Cache-Control", "no-cache")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		// Processing already finished (bus closed + reaped) or never started.
+		// Caller should treat as "no stream available" and fall back to polling.
+		return errStreamUnavailable
+	}
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+		return fmt.Errorf("sse %d: %s", resp.StatusCode, b)
+	}
+
+	scanner := bufio.NewScanner(resp.Body)
+	// SSE events can carry full result payloads; raise the max line size.
+	scanner.Buffer(make([]byte, 64*1024), 4*1024*1024)
+
+	var stage string
+	var dataBuf bytes.Buffer
+	flush := func() {
+		if stage == "" && dataBuf.Len() == 0 {
+			return
+		}
+		data := append([]byte(nil), dataBuf.Bytes()...)
+		onEvent(StreamEvent{Stage: stage, Data: data})
+		stage = ""
+		dataBuf.Reset()
+	}
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		// Blank line = end of event.
+		if line == "" {
+			flush()
+			continue
+		}
+		// Comments (keepalives) start with ':'.
+		if strings.HasPrefix(line, ":") {
+			continue
+		}
+		if v, ok := strings.CutPrefix(line, "event:"); ok {
+			stage = strings.TrimSpace(v)
+			continue
+		}
+		if v, ok := strings.CutPrefix(line, "data:"); ok {
+			if dataBuf.Len() > 0 {
+				dataBuf.WriteByte('\n')
+			}
+			dataBuf.WriteString(strings.TrimPrefix(v, " "))
+			continue
+		}
+	}
+	flush()
+
+	if err := scanner.Err(); err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return err
+	}
+	return nil
+}
+
+// ErrStreamUnavailable is returned when the server has no active event bus
+// for the given uuid — either processing is already done or never started.
+var errStreamUnavailable = errors.New("sse stream unavailable")
+
+// IsStreamUnavailable reports whether err indicates the server isn't
+// currently streaming for this meeting.
+func IsStreamUnavailable(err error) bool { return errors.Is(err, errStreamUnavailable) }
