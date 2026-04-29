@@ -1,18 +1,14 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"time"
 
-	cryptorand "crypto/rand"
-
 	"github.com/solanyn/mono/scrib/audio"
+	"github.com/solanyn/mono/scrib/client"
 	"github.com/solanyn/mono/scrib/config"
 	"github.com/solanyn/mono/scrib/tui"
 	"github.com/spf13/cobra"
@@ -65,7 +61,17 @@ func main() {
 		},
 	}
 
-	rootCmd.AddCommand(recordCmd, standupCmd, standup3Cmd)
+	uploadCmd := &cobra.Command{
+		Use:   "upload <wav-path>",
+		Short: "Upload a previously recorded WAV (resume after failed upload)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runUpload(cfg, args[0], template)
+		},
+	}
+	uploadCmd.Flags().StringVarP(&template, "template", "t", "", "Summary template")
+
+	rootCmd.AddCommand(recordCmd, standupCmd, standup3Cmd, uploadCmd)
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
@@ -94,11 +100,58 @@ func runRecord(cfg *config.Config, args []string, template string) error {
 	return tui.Run(opts, makeUploadFn(cfg))
 }
 
+// runUpload re-uploads an existing WAV file (e.g. after a failed first attempt).
+// Uses the mono WAV on disk directly — no TUI, just stdout progress.
+func runUpload(cfg *config.Config, wavPath, template string) error {
+	if cfg.ServerURL == "" {
+		return fmt.Errorf("server_url not configured")
+	}
+	abs, err := filepath.Abs(wavPath)
+	if err != nil {
+		return err
+	}
+	name := strip(filepath.Base(abs), ".wav")
+
+	samples, err := audio.ReadWAVMono(abs)
+	if err != nil {
+		// If stereo, downmix to a new temp mono WAV first.
+		return fmt.Errorf("read wav: %w (tip: mono WAV expected; pass the upload copy, not the raw stereo)", err)
+	}
+	dur := time.Duration(len(samples)/cfg.SampleRate) * time.Second
+
+	ctx := context.Background()
+	res, err := client.Upload(ctx, client.UploadInput{
+		ServerURL: cfg.ServerURL,
+		Name:      name,
+		Template:  template,
+		Duration:  dur,
+		WAVPath:   abs,
+	}, func(p client.Progress) {
+		if p.Err != nil {
+			fmt.Fprintf(os.Stderr, "  %s attempt %d failed: %v\n", p.Stage, p.Attempt, p.Err)
+		} else {
+			fmt.Fprintf(os.Stderr, "  %s ok\n", p.Stage)
+		}
+	})
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Uploaded: %s (%s)\n", name, res.UUID)
+	return nil
+}
+
+func strip(s, suffix string) string {
+	if len(s) >= len(suffix) && s[len(s)-len(suffix):] == suffix {
+		return s[:len(s)-len(suffix)]
+	}
+	return s
+}
+
 func makeUploadFn(cfg *config.Config) tui.UploadFunc {
 	if cfg.ServerURL == "" {
 		return nil
 	}
-	return func(monoSamples []int16, opts tui.Options) (string, error) {
+	return func(ctx context.Context, monoSamples []int16, opts tui.Options, progress func(tui.ProgressEvent)) (string, error) {
 		monoPath, err := audio.WriteWAVTemp(monoSamples, opts.SampleRate, 1)
 		if err != nil {
 			return "", fmt.Errorf("mono wav: %w", err)
@@ -106,125 +159,18 @@ func makeUploadFn(cfg *config.Config) tui.UploadFunc {
 		defer os.Remove(monoPath)
 
 		dur := time.Duration(len(monoSamples)/opts.SampleRate) * time.Second
-		uuid, err := uploadMeeting(cfg.ServerURL, opts.Name, dur, opts.Template)
+		res, err := client.Upload(ctx, client.UploadInput{
+			ServerURL: opts.ServerURL,
+			Name:      opts.Name,
+			Template:  opts.Template,
+			Duration:  dur,
+			WAVPath:   monoPath,
+		}, func(p client.Progress) {
+			progress(tui.ProgressEvent{Stage: p.Stage, Attempt: p.Attempt, Err: p.Err})
+		})
 		if err != nil {
-			return "", fmt.Errorf("create meeting: %w", err)
+			return "", err
 		}
-
-		if err := uploadAudio(cfg.ServerURL, uuid, monoPath); err != nil {
-			return "", fmt.Errorf("upload audio: %w", err)
-		}
-
-		if err := requestProcess(cfg.ServerURL, uuid); err != nil {
-			return "", fmt.Errorf("trigger processing: %w", err)
-		}
-
-		return uuid, nil
+		return res.UUID, nil
 	}
-}
-
-func newUUID() string {
-	b := make([]byte, 16)
-	cryptorand.Read(b)
-	b[6] = (b[6] & 0x0f) | 0x40
-	b[8] = (b[8] & 0x3f) | 0x80
-	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
-}
-
-func uploadMeeting(serverURL, name string, duration time.Duration, template string) (string, error) {
-	uuid := newUUID()
-
-	// Try POST /v1/meetings first (new server), fall back to /v1/sync/push (old server)
-	body := map[string]any{
-		"name":        name,
-		"recorded_at": time.Now().Format(time.RFC3339),
-		"duration_s":  duration.Seconds(),
-		"template":    template,
-	}
-	data, _ := json.Marshal(body)
-
-	resp, err := http.Post(serverURL+"/v1/meetings", "application/json", bytes.NewReader(data))
-	if err == nil && (resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated) {
-		defer resp.Body.Close()
-		var result struct {
-			UUID string `json:"uuid"`
-		}
-		if err := json.NewDecoder(resp.Body).Decode(&result); err == nil && result.UUID != "" {
-			return result.UUID, nil
-		}
-	}
-	if resp != nil {
-		resp.Body.Close()
-	}
-
-	// Fallback: sync/push
-	payload := map[string]any{
-		"client_id": "scrib-client",
-		"meetings": []map[string]any{{
-			"uuid":         uuid,
-			"name":         name,
-			"recorded_at":  time.Now().Format(time.RFC3339),
-			"duration_s":   duration.Seconds(),
-			"template":     template,
-			"num_speakers": 0,
-			"segments":     []any{},
-			"summaries":    []any{},
-		}},
-	}
-	data, _ = json.Marshal(payload)
-
-	resp2, err := http.Post(serverURL+"/v1/sync/push", "application/json", bytes.NewReader(data))
-	if err != nil {
-		return "", err
-	}
-	defer resp2.Body.Close()
-
-	if resp2.StatusCode != http.StatusOK && resp2.StatusCode != http.StatusCreated {
-		b, _ := io.ReadAll(resp2.Body)
-		return "", fmt.Errorf("server returned %d: %s", resp2.StatusCode, b)
-	}
-
-	return uuid, nil
-}
-
-func uploadAudio(serverURL, uuid, audioPath string) error {
-	f, err := os.Open(audioPath)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	stat, _ := f.Stat()
-	req, err := http.NewRequest("POST", serverURL+"/v1/audio/"+uuid, f)
-	if err != nil {
-		return err
-	}
-	req.ContentLength = stat.Size()
-	req.Header.Set("Content-Type", "audio/wav")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		b, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("upload failed (%d): %s", resp.StatusCode, b)
-	}
-	return nil
-}
-
-func requestProcess(serverURL, uuid string) error {
-	resp, err := http.Post(serverURL+"/v1/process/"+uuid, "", nil)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
-		b, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("process request failed (%d): %s", resp.StatusCode, b)
-	}
-	return nil
 }
