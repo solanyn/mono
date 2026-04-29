@@ -25,23 +25,34 @@ go_binary(
 go_binary(
     name = "dash-server_linux_amd64",
     embed = [":lib"],
-    goos = "linux",
     goarch = "amd64",
+    goos = "linux",
     pure = "on",
     visibility = ["//visibility:public"],
 )
 
 pkg_tar(
-    name = "dash-server_layer",
+    name = "server_layer",
     srcs = [":dash-server_linux_amd64"],
-    strip_prefix = ".",
+    package_dir = "/app",
+    remap_paths = {"/dash-server_linux_amd64": "/dash-server"},
+)
+
+pkg_tar(
+    name = "kobo_dash_layer",
+    srcs = ["//kobo/kobo-dash:kobo-dash_linux_arm"],
+    package_dir = "/app",
+    remap_paths = {"/kobo-dash_linux_arm": "/kobo-dash"},
 )
 
 oci_image(
     name = "dash-server_image",
     base = "@distroless_static_linux_amd64",
-    entrypoint = ["/dash-server_linux_amd64_/dash-server_linux_amd64"],
-    tars = [":dash-server_layer"],
+    entrypoint = ["/app/dash-server"],
+    tars = [
+        ":server_layer",
+        ":kobo_dash_layer",
+    ],
 )
 
 oci_push(

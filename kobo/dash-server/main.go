@@ -1,21 +1,27 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"image"
 	"image/color"
 	"image/png"
+	"io"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/fogleman/gg"
@@ -38,7 +44,7 @@ func init() {
 	flag.IntVar(&width, "width", envOrInt("DASH_WIDTH", 1072), "display width")
 	flag.IntVar(&height, "height", envOrInt("DASH_HEIGHT", 1448), "display height")
 	flag.StringVar(&mdFile, "file", envOr("DASH_FILE", "/data/dashboard.md"), "markdown file path")
-	flag.StringVar(&binDir, "bindir", envOr("DASH_BINDIR", "/data/bin/"), "directory containing kobo-dash binary")
+	flag.StringVar(&binDir, "bindir", envOr("DASH_BINDIR", "/app"), "directory containing kobo-dash binary")
 }
 
 func envOr(key, fallback string) string {
@@ -66,9 +72,10 @@ var (
 )
 
 var (
-	boldRe  = regexp.MustCompile(`\*\*(.+?)\*\*`)
-	emojiRe = regexp.MustCompile(`[\x{1F000}-\x{1FFFF}]|[\x{2600}-\x{27BF}]|[\x{FE00}-\x{FEFF}]|[\x{1F900}-\x{1F9FF}]|[\x{200D}\x{20E3}\x{FE0F}]`)
-	warnRe  = regexp.MustCompile(`\x{26A0}\x{FE0F}?`)
+	boldRe    = regexp.MustCompile(`\*\*(.+?)\*\*`)
+	emojiRe   = regexp.MustCompile(`[\x{1F000}-\x{1FFFF}]|[\x{2600}-\x{27BF}]|[\x{FE00}-\x{FEFF}]|[\x{1F900}-\x{1F9FF}]|[\x{200D}\x{20E3}\x{FE0F}]`)
+	warnRe    = regexp.MustCompile(`\x{26A0}\x{FE0F}?`)
+	numListRe = regexp.MustCompile(`^(\d+)\.\s+(.*)$`)
 )
 
 func initFonts() {
@@ -106,12 +113,40 @@ func initFonts() {
 func main() {
 	flag.Parse()
 	initFonts()
-	http.HandleFunc("/dashboard.png", handleDashboard)
-	http.HandleFunc("/health", handleHealth)
-	http.HandleFunc("/kobo-dash.bin", handleBinary)
-	http.HandleFunc("/kobo-dash.sha256", handleBinarySHA256)
-	log.Printf("listening on %s (%dx%d) file=%s bindir=%s", addr, width, height, mdFile, binDir)
-	log.Fatal(http.ListenAndServe(addr, nil))
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/dashboard.png", handleDashboard)
+	mux.HandleFunc("/health", handleHealth)
+	mux.HandleFunc("/kobo-dash.bin", handleBinary)
+	mux.HandleFunc("/kobo-dash.sha256", handleBinarySHA256)
+
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer cancel()
+
+	go func() {
+		log.Printf("listening on %s (%dx%d) file=%s bindir=%s", addr, width, height, mdFile, binDir)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("listen: %v", err)
+		}
+	}()
+
+	<-ctx.Done()
+	log.Println("shutting down")
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer shutdownCancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("shutdown: %v", err)
+	}
 }
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -142,18 +177,32 @@ func computeBinHash() (string, error) {
 		return binHashCache, nil
 	}
 
-	data, err := os.ReadFile(binPath())
+	f, err := os.Open(binPath())
 	if err != nil {
 		return "", err
 	}
+	defer f.Close()
 
-	h := sha256.Sum256(data)
-	binHashCache = hex.EncodeToString(h[:])
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	binHashCache = hex.EncodeToString(h.Sum(nil))
 	binHashModTime = info.ModTime()
 	return binHashCache, nil
 }
 
 func handleBinary(w http.ResponseWriter, r *http.Request) {
+	hash, err := computeBinHash()
+	if err == nil {
+		etag := `"` + hash + `"`
+		if match := r.Header.Get("If-None-Match"); match == etag {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+		w.Header().Set("ETag", etag)
+		w.Header().Set("Cache-Control", "no-cache")
+	}
 	http.ServeFile(w, r, binPath())
 }
 
@@ -164,23 +213,89 @@ func handleBinarySHA256(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("Cache-Control", "no-cache")
 	fmt.Fprintln(w, hash)
 }
 
-func handleDashboard(w http.ResponseWriter, r *http.Request) {
-	content, err := os.ReadFile(mdFile)
-	if err != nil {
-		log.Printf("read %s: %v", mdFile, err)
-		content = nil
+type dashCache struct {
+	mu      sync.Mutex
+	modTime time.Time
+	size    int64
+	png     []byte
+	etag    string
+}
+
+var dashboardCache dashCache
+
+func renderDashboard() ([]byte, string, error) {
+	dashboardCache.mu.Lock()
+	defer dashboardCache.mu.Unlock()
+
+	info, err := os.Stat(mdFile)
+	var modTime time.Time
+	var size int64
+	if err == nil {
+		modTime = info.ModTime()
+		size = info.Size()
+	}
+
+	if dashboardCache.png != nil &&
+		dashboardCache.modTime.Equal(modTime) &&
+		dashboardCache.size == size {
+		return dashboardCache.png, dashboardCache.etag, nil
+	}
+
+	var content []byte
+	if err == nil {
+		content, err = os.ReadFile(mdFile)
+		if err != nil {
+			log.Printf("read %s: %v", mdFile, err)
+			content = nil
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		log.Printf("stat %s: %v", mdFile, err)
 	}
 
 	img := renderMarkdown(width, height, content)
 	gray := toGrayscale(img)
 	dithered := floydSteinberg(gray)
 
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, dithered); err != nil {
+		return nil, "", err
+	}
+
+	sum := sha256.Sum256(buf.Bytes())
+	etag := `"` + hex.EncodeToString(sum[:16]) + `"`
+
+	dashboardCache.png = buf.Bytes()
+	dashboardCache.etag = etag
+	dashboardCache.modTime = modTime
+	dashboardCache.size = size
+
+	return dashboardCache.png, etag, nil
+}
+
+func handleDashboard(w http.ResponseWriter, r *http.Request) {
+	data, etag, err := renderDashboard()
+	if err != nil {
+		log.Printf("render: %v", err)
+		http.Error(w, "render failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("ETag", etag)
+	w.Header().Set("Cache-Control", "no-cache")
+
+	if match := r.Header.Get("If-None-Match"); match == etag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+
 	w.Header().Set("Content-Type", "image/png")
-	if err := png.Encode(w, dithered); err != nil {
-		log.Printf("png encode: %v", err)
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	if _, err := w.Write(data); err != nil {
+		log.Printf("write response: %v", err)
 	}
 }
 
@@ -246,9 +361,11 @@ func renderMarkdown(w, h int, content []byte) image.Image {
 	contentW := float64(w) - 2*margin
 	lines := strings.Split(string(content), "\n")
 	firstSection := true
+	truncated := false
 
 	for _, line := range lines {
 		if y > float64(h)-40 {
+			truncated = true
 			break
 		}
 
@@ -299,19 +416,19 @@ func renderMarkdown(w, h int, content []byte) image.Image {
 			drawSpans(dc, spans, margin+bw, y)
 			y += 35
 
-		case len(trimmed) > 0 && trimmed[0] >= '0' && trimmed[0] <= '9' && strings.Contains(trimmed, ". "):
-			idx := strings.Index(trimmed, ". ")
-			num := trimmed[:idx+1]
-			text := trimmed[idx+2:]
-			spans := parseInline(text)
-			dc.SetFontFace(bodyFace)
-			dc.SetColor(color.Black)
-			dc.DrawString(num+" ", margin, y)
-			nw, _ := dc.MeasureString(num + " ")
-			drawSpans(dc, spans, margin+nw, y)
-			y += 35
-
 		default:
+			if m := numListRe.FindStringSubmatch(trimmed); m != nil {
+				num := m[1] + "."
+				text := m[2]
+				spans := parseInline(text)
+				dc.SetFontFace(bodyFace)
+				dc.SetColor(color.Black)
+				dc.DrawString(num+" ", margin, y)
+				nw, _ := dc.MeasureString(num + " ")
+				drawSpans(dc, spans, margin+nw, y)
+				y += 35
+				continue
+			}
 			spans := parseInline(trimmed)
 			dc.SetColor(color.Black)
 			drawSpans(dc, spans, margin, y)
@@ -319,11 +436,20 @@ func renderMarkdown(w, h int, content []byte) image.Image {
 		}
 	}
 
+	if truncated {
+		dc.SetFontFace(bodyFace)
+		dc.SetColor(color.Gray{Y: 100})
+		dc.DrawStringAnchored("\u2026", float64(w)/2, float64(h)-20, 0.5, 0.5)
+	}
+
 	return dc.Image()
 }
 
 func toGrayscale(img image.Image) *image.Gray {
 	bounds := img.Bounds()
+	if g, ok := img.(*image.Gray); ok {
+		return g
+	}
 	gray := image.NewGray(bounds)
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
@@ -338,35 +464,29 @@ func floydSteinberg(gray *image.Gray) *image.Gray {
 	w := bounds.Dx()
 	h := bounds.Dy()
 
-	errors := make([][]float64, h)
-	for i := range errors {
-		errors[i] = make([]float64, w)
-	}
+	curr := make([]int32, w+2)
+	next := make([]int32, w+2)
 
 	out := image.NewGray(bounds)
 
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
-			oldVal := float64(gray.GrayAt(x+bounds.Min.X, y+bounds.Min.Y).Y) + errors[y][x]
-			var newVal float64
+			oldVal := int32(gray.Pix[y*gray.Stride+x]) + curr[x+1]
+			var newVal int32
 			if oldVal > 127 {
 				newVal = 255
 			}
-			out.SetGray(x+bounds.Min.X, y+bounds.Min.Y, color.Gray{Y: uint8(newVal)})
+			out.Pix[y*out.Stride+x] = uint8(newVal)
 
-			err := oldVal - newVal
-			if x+1 < w {
-				errors[y][x+1] += err * 7 / 16
-			}
-			if y+1 < h {
-				if x-1 >= 0 {
-					errors[y+1][x-1] += err * 3 / 16
-				}
-				errors[y+1][x] += err * 5 / 16
-				if x+1 < w {
-					errors[y+1][x+1] += err * 1 / 16
-				}
-			}
+			qerr := oldVal - newVal
+			curr[x+2] += qerr * 7 / 16
+			next[x] += qerr * 3 / 16
+			next[x+1] += qerr * 5 / 16
+			next[x+2] += qerr * 1 / 16
+		}
+		curr, next = next, curr
+		for i := range next {
+			next[i] = 0
 		}
 	}
 	return out
