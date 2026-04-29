@@ -30,9 +30,9 @@ jobs:
           disk-cache: ${{ github.workflow }}
           repository-cache: true
       - name: Build
-        run: bazel build //... --config=ci
+        run: bazel build //lake/... //libs/datalake/... --config=ci
       - name: Test
-        run: bazel test //... --config=ci
+        run: bazel test //lake/... //libs/datalake/... --config=ci
 
   push:
     runs-on: ubuntu-latest
