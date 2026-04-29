@@ -8,6 +8,7 @@ AlignedTokens. We merge tokens into words using space-prefix boundaries.
 """
 
 import logging
+import os
 import tempfile
 from dataclasses import dataclass
 
@@ -46,13 +47,7 @@ def load_model(model_name: str | None = None):
 
 
 def _tokens_to_words(sentences) -> list[Word]:
-    """Merge sub-word AlignedTokens into full words.
-
-    Parakeet tokens use space prefix to indicate word boundaries:
-        [" U", "h", " no", ",", " not", " y", "et", "."]
-    becomes:
-        ["Uh", "no,", "not", "yet."]
-    """
+    """Merge sub-word AlignedTokens into full words."""
     words: list[Word] = []
     current_text = ""
     current_start = 0.0
@@ -61,7 +56,6 @@ def _tokens_to_words(sentences) -> list[Word]:
     for sentence in sentences:
         for token in sentence.tokens:
             text = token.text
-            # Space prefix = new word boundary
             if text.startswith(" ") and current_text:
                 words.append(Word(
                     word=current_text.strip(),
@@ -72,16 +66,13 @@ def _tokens_to_words(sentences) -> list[Word]:
                 current_start = token.start
                 current_end = token.end
             elif not current_text:
-                # First token
                 current_text = text
                 current_start = token.start
                 current_end = token.end
             else:
-                # Continuation of current word
                 current_text += text
                 current_end = token.end
 
-    # Flush last word
     if current_text.strip():
         words.append(Word(
             word=current_text.strip(),
@@ -92,39 +83,46 @@ def _tokens_to_words(sentences) -> list[Word]:
     return words
 
 
-def transcribe(audio_path: str) -> Transcript:
-    """Transcribe audio file to text with word-level timestamps.
+def transcribe_array(data: np.ndarray, sr: int) -> Transcript:
+    """Transcribe a normalised float32 mono 16kHz array.
 
-    Args:
-        audio_path: Path to WAV file (16kHz mono preferred).
-
-    Returns:
-        Transcript with full text and per-word timestamps.
+    mlx_audio's model.generate expects a file path, so we write a single
+    short-lived tempfile. Caller owns normalisation.
     """
+    if sr != 16000:
+        raise ValueError(f"transcribe_array expects 16kHz, got {sr}")
+    if data.ndim != 1:
+        raise ValueError(f"transcribe_array expects mono, got shape {data.shape}")
+
     model = load_model()
 
-    data, sr = sf.read(audio_path, dtype="float32")
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".wav")
+    os.close(tmp_fd)
+    try:
+        sf.write(tmp_path, data, sr)
+        log.info("transcribing %.0fs of audio", len(data) / sr)
+        result = model.generate(tmp_path, verbose=True)
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
 
-    # Mono + 16kHz
-    if len(data.shape) > 1 and data.shape[1] > 1:
+    words = _tokens_to_words(result.sentences)
+    log.info("transcribed %d words from %d sentences", len(words), len(result.sentences))
+    return Transcript(text=result.text, words=words)
+
+
+def transcribe(audio_path: str) -> Transcript:
+    """Transcribe an audio file. Handles its own normalisation.
+
+    Prefer :func:`transcribe_array` when the caller has already normalised.
+    """
+    data, sr = sf.read(audio_path, dtype="float32")
+    if data.ndim > 1 and data.shape[1] > 1:
         data = np.mean(data, axis=1)
     if sr != 16000:
         import librosa
         data = librosa.resample(data, orig_sr=sr, target_sr=16000)
         sr = 16000
-
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-        sf.write(tmp.name, data, sr)
-        tmp_path = tmp.name
-
-    try:
-        log.info("transcribing %.0fs of audio", len(data) / sr)
-        result = model.generate(tmp_path, verbose=True)
-
-        words = _tokens_to_words(result.sentences)
-        log.info("transcribed %d words from %d sentences", len(words), len(result.sentences))
-
-        return Transcript(text=result.text, words=words)
-    finally:
-        import os
-        os.unlink(tmp_path)
+    return transcribe_array(data, sr)

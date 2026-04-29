@@ -5,9 +5,9 @@ CoreML acceleration on Apple Silicon. Processes 1 hour in ~8 seconds.
 """
 
 import logging
+import os
 import tempfile
 from dataclasses import dataclass
-from typing import Optional
 
 import numpy as np
 import soundfile as sf
@@ -41,84 +41,88 @@ def load_model():
     return _diarizer
 
 
+def diarize_array(
+    data: np.ndarray,
+    sr: int,
+    threshold: float = 0.5,
+    min_duration: float = 0.0,
+    merge_gap: float = 0.0,
+) -> DiarResult:
+    """Run diarization on an in-memory float32 mono 16kHz array.
+
+    Senko requires a file path, so we write a single short-lived tempfile.
+    Caller owns normalisation; this function does not resample.
+    """
+    if sr != 16000:
+        raise ValueError(f"diarize_array expects 16kHz, got {sr}")
+    if data.ndim != 1:
+        raise ValueError(f"diarize_array expects mono, got shape {data.shape}")
+
+    diarizer = load_model()
+    duration = len(data) / sr
+
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".wav")
+    os.close(tmp_fd)
+    try:
+        sf.write(tmp_path, data, sr, subtype="PCM_16")
+        log.info("diarize: processing %.0fs audio with Senko", duration)
+        result = diarizer.diarize(tmp_path, generate_colors=False)
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+
+    segments_raw = result.get("merged_segments", [])
+    speaker_set: set[str] = set()
+    segments: list[DiarSegment] = []
+
+    for seg in segments_raw:
+        speaker = seg.get("speaker", "UNKNOWN")
+        start = seg.get("start", 0.0)
+        end = seg.get("end", 0.0)
+        if (end - start) < min_duration:
+            continue
+        segments.append(DiarSegment(
+            speaker=speaker,
+            start=round(start, 3),
+            end=round(end, 3),
+        ))
+        speaker_set.add(speaker)
+
+    if merge_gap > 0:
+        segments = _merge_segments(segments, merge_gap)
+
+    log.info(
+        "diarize: %d segments, %d speakers in %.1fs",
+        len(segments), len(speaker_set), duration,
+    )
+
+    return DiarResult(
+        segments=segments,
+        num_speakers=len(speaker_set),
+        duration_seconds=round(duration, 3),
+    )
+
+
 def diarize(
     audio_path: str,
     threshold: float = 0.5,
     min_duration: float = 0.0,
     merge_gap: float = 0.0,
 ) -> DiarResult:
-    """Run speaker diarization on an audio file.
+    """Run diarization on a file path. Handles its own normalisation.
 
-    Args:
-        audio_path: Path to audio file (16kHz mono WAV preferred).
-        threshold: Unused (kept for API compat). Senko handles internally.
-        min_duration: Minimum segment duration in seconds.
-        merge_gap: Merge segments from same speaker within this gap (seconds).
-
-    Returns:
-        DiarResult with speaker segments, count, and duration.
+    Prefer :func:`diarize_array` when caller has already normalised.
     """
-    diarizer = load_model()
-
-    # Senko expects 16kHz mono 16-bit WAV
     data, sr = sf.read(audio_path, dtype="float32")
-    duration = len(data) / sr
-
-    if len(data.shape) > 1 and data.shape[1] > 1:
+    if data.ndim > 1 and data.shape[1] > 1:
         data = np.mean(data, axis=1)
-
     if sr != 16000:
         import librosa
         data = librosa.resample(data, orig_sr=sr, target_sr=16000)
         sr = 16000
-
-    # Write normalized audio for Senko
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-        # Senko needs 16-bit PCM
-        sf.write(tmp.name, data, sr, subtype="PCM_16")
-        tmp_path = tmp.name
-
-    try:
-        log.info("diarize: processing %.0fs audio with Senko", duration)
-        result = diarizer.diarize(tmp_path, generate_colors=False)
-
-        segments_raw = result.get("merged_segments", [])
-        speaker_set: set[str] = set()
-        segments: list[DiarSegment] = []
-
-        for seg in segments_raw:
-            speaker = seg.get("speaker", "UNKNOWN")
-            start = seg.get("start", 0.0)
-            end = seg.get("end", 0.0)
-
-            # Apply min_duration filter
-            if (end - start) < min_duration:
-                continue
-
-            segments.append(DiarSegment(
-                speaker=speaker,
-                start=round(start, 3),
-                end=round(end, 3),
-            ))
-            speaker_set.add(speaker)
-
-        # Merge adjacent segments from same speaker within gap
-        if merge_gap > 0:
-            segments = _merge_segments(segments, merge_gap)
-
-        log.info(
-            "diarize: %d segments, %d speakers in %.1fs",
-            len(segments), len(speaker_set), duration,
-        )
-
-        return DiarResult(
-            segments=segments,
-            num_speakers=len(speaker_set),
-            duration_seconds=round(duration, 3),
-        )
-    finally:
-        import os
-        os.unlink(tmp_path)
+    return diarize_array(data, sr, threshold, min_duration, merge_gap)
 
 
 def _merge_segments(

@@ -4,7 +4,7 @@ Ported from scrib/server/process.go alignSpeakersToWords().
 Maps each word to the speaker with the best temporal overlap.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .diarize import DiarSegment
 from .transcribe import Word
@@ -16,6 +16,7 @@ class AlignedSegment:
     start: float
     end: float
     text: str
+    uncertain: bool = False
 
 
 def align(
@@ -29,13 +30,10 @@ def align(
     overlap. Adjacent words from the same speaker are merged into
     contiguous segments.
 
-    Args:
-        diar_segments: Speaker diarization segments with timestamps.
-        words: Transcribed words with timestamps.
-        duration: Total audio duration in seconds.
-
-    Returns:
-        List of aligned segments, each with speaker, timestamps, and text.
+    A word/segment is flagged ``uncertain`` when the best speaker was
+    assigned via nearest-midpoint fallback or when the temporal overlap
+    covered less than half the word's duration. This matches the Go
+    original in scrib/server/process.go.
     """
     if not diar_segments or not words:
         text = " ".join(w.word for w in words) if words else ""
@@ -46,9 +44,9 @@ def align(
             text=text,
         )]
 
-    # Tag each word with best-matching speaker
-    tagged: list[tuple[str, Word]] = []
+    tagged: list[tuple[str, Word, bool]] = []
     for w in words:
+        word_dur = w.end - w.start
         best_overlap = 0.0
         best_speaker = "UNKNOWN"
 
@@ -61,7 +59,7 @@ def align(
                     best_overlap = overlap
                     best_speaker = seg.speaker
 
-        # Fallback: nearest segment by midpoint
+        uncertain = False
         if best_speaker == "UNKNOWN":
             mid = (w.start + w.end) / 2
             min_dist = float("inf")
@@ -70,26 +68,31 @@ def align(
                 if d < min_dist:
                     min_dist = d
                     best_speaker = seg.speaker
+            uncertain = True
+        elif word_dur > 0 and (best_overlap / word_dur) < 0.5:
+            uncertain = True
 
-        tagged.append((best_speaker, w))
+        tagged.append((best_speaker, w, uncertain))
 
-    # Merge adjacent words from same speaker
     segments: list[AlignedSegment] = []
     if not tagged:
         return segments
 
-    cur_speaker, cur_word = tagged[0]
+    cur_speaker, cur_word, cur_uncertain = tagged[0]
     cur = AlignedSegment(
         speaker=cur_speaker,
         start=cur_word.start,
         end=cur_word.end,
         text=cur_word.word,
+        uncertain=cur_uncertain,
     )
 
-    for speaker, word in tagged[1:]:
+    for speaker, word, uncertain in tagged[1:]:
         if speaker == cur.speaker:
             cur.end = word.end
             cur.text += " " + word.word
+            if uncertain:
+                cur.uncertain = True
         else:
             segments.append(cur)
             cur = AlignedSegment(
@@ -97,6 +100,7 @@ def align(
                 start=word.start,
                 end=word.end,
                 text=word.word,
+                uncertain=uncertain,
             )
     segments.append(cur)
 
