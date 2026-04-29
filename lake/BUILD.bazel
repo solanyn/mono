@@ -107,6 +107,7 @@ go_library(
         ":iceberg_lib",
         ":ingest_lib",
         ":kafka_lib",
+        ":metrics_lib",
         ":storage_lib",
         "@com_github_robfig_cron_v3//:cron",
     ],
