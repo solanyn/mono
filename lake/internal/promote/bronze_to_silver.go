@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	icebergw "github.com/solanyn/mono/lake/internal/iceberg"
@@ -14,21 +14,15 @@ import (
 
 type Result struct {
 	Source   string
-	Key      string
+	Table    string
 	RowCount int
 }
 
-var sourceConfig = map[string]string{
-	"rba":    "f1-data.parquet",
-	"abs":    "cpi_monthly.parquet",
-	"aemo":   "nem_summary.parquet",
-	"rss":    "news.parquet",
-	"reddit": "ausfinance.parquet",
-	"domain": "listings.parquet",
-	"nsw_vg": "bulk_sales.parquet",
-}
+func PromoteSource(ctx context.Context, s3 *storage.Client, iceWriter *icebergw.Writer, bronzeBucket, source, bronzeKey string) (Result, error) {
+	if iceWriter == nil {
+		return Result{}, fmt.Errorf("promote %s: iceberg writer required", source)
+	}
 
-func PromoteSource(ctx context.Context, s3 *storage.Client, iceWriter *icebergw.Writer, bronzeBucket, silverBucket, source, bronzeKey string) (Result, error) {
 	start := time.Now()
 
 	data, err := s3.GetObject(ctx, bronzeBucket, bronzeKey)
@@ -42,83 +36,22 @@ func PromoteSource(ctx context.Context, s3 *storage.Client, iceWriter *icebergw.
 		return Result{}, fmt.Errorf("parse bronze %s: %w", source, err)
 	}
 
-	silver, err := promoteGeneric(rows)
-	if err != nil {
-		metrics.IngestErrors.WithLabelValues("promote_" + source).Inc()
-		return Result{}, fmt.Errorf("transform %s: %w", source, err)
+	if len(rows) == 0 {
+		slog.Info("promote: no rows", "source", source)
+		return Result{Source: source, Table: silverName(source), RowCount: 0}, nil
 	}
 
-	dataset := silverName(source)
-	key, err := s3.PutParquet(ctx, silverBucket, dataset, dataset+".parquet", silver)
-	if err != nil {
-		metrics.IngestErrors.WithLabelValues("promote_" + source).Inc()
-		return Result{}, fmt.Errorf("write silver %s: %w", source, err)
-	}
+	maps := bronzeRowsToMaps(rows)
+	table := silverName(source)
 
-	if iceWriter != nil {
-		var maps []map[string]interface{}
-		for _, row := range rows {
-			var m map[string]interface{}
-			if err := json.Unmarshal([]byte(row.RawPayload), &m); err != nil {
-				continue
-			}
-			maps = append(maps, m)
-		}
-		if err := iceWriter.AppendSilver(ctx, dataset, maps, source, "promote"); err != nil {
-			log.Printf("iceberg commit %s: %v (data written to S3, catalog not updated)", dataset, err)
-		}
+	if err := iceWriter.AppendSilver(ctx, table, maps, source, bronzeKey); err != nil {
+		metrics.IngestErrors.WithLabelValues("promote_" + source).Inc()
+		return Result{}, fmt.Errorf("iceberg append silver %s: %w", table, err)
 	}
 
 	metrics.PromoteTotal.WithLabelValues("silver").Inc()
-	log.Printf("promote %s: %d rows → %s (%.1fs)", source, len(rows), key, time.Since(start).Seconds())
-	return Result{Source: source, Key: key, RowCount: len(rows)}, nil
-}
-
-func PromoteBronzeToSilver(ctx context.Context, s3 *storage.Client, iceWriter *icebergw.Writer, bronzeBucket, silverBucket string) error {
-	for dataset, filename := range sourceConfig {
-		data, err := s3.GetLatest(ctx, bronzeBucket, dataset, filename)
-		if err != nil {
-			log.Printf("promote %s: no bronze data: %v", dataset, err)
-			continue
-		}
-
-		rows, err := storage.ReadBronze(data)
-		if err != nil {
-			log.Printf("promote %s: read bronze: %v", dataset, err)
-			continue
-		}
-
-		silver, err := promoteGeneric(rows)
-		if err != nil {
-			log.Printf("promote %s: transform: %v", dataset, err)
-			continue
-		}
-
-		sd := silverName(dataset)
-		key, err := s3.PutParquet(ctx, silverBucket, sd, sd+".parquet", silver)
-		if err != nil {
-			log.Printf("promote %s: write silver: %v", dataset, err)
-			continue
-		}
-
-		if iceWriter != nil {
-			var maps []map[string]interface{}
-			for _, row := range rows {
-				var m map[string]interface{}
-				if err := json.Unmarshal([]byte(row.RawPayload), &m); err != nil {
-					continue
-				}
-				maps = append(maps, m)
-			}
-			if err := iceWriter.AppendSilver(ctx, sd, maps, dataset, "promote"); err != nil {
-				log.Printf("iceberg commit %s: %v (data written to S3, catalog not updated)", sd, err)
-			}
-		}
-
-		metrics.PromoteTotal.WithLabelValues("silver").Inc()
-		log.Printf("promote %s: %d rows → %s", dataset, len(rows), key)
-	}
-	return nil
+	slog.Info("promote: appended", "source", source, "rows", len(rows), "table", "silver."+table, "dur_sec", time.Since(start).Seconds())
+	return Result{Source: source, Table: table, RowCount: len(rows)}, nil
 }
 
 func silverName(dataset string) string {
@@ -142,32 +75,8 @@ func silverName(dataset string) string {
 	}
 }
 
-func promoteRBA(rows []storage.BronzeRow) ([]byte, error) {
-	return promoteGeneric(rows)
-}
-
-func promoteABS(rows []storage.BronzeRow) ([]byte, error) {
-	return promoteGeneric(rows)
-}
-
-func promoteAEMO(rows []storage.BronzeRow) ([]byte, error) {
-	return promoteGeneric(rows)
-}
-
-func promoteRSS(rows []storage.BronzeRow) ([]byte, error) {
-	return promoteGeneric(rows)
-}
-
-func promoteReddit(rows []storage.BronzeRow) ([]byte, error) {
-	return promoteGeneric(rows)
-}
-
-func promoteDomain(rows []storage.BronzeRow) ([]byte, error) {
-	return promoteGeneric(rows)
-}
-
-func promoteGeneric(rows []storage.BronzeRow) ([]byte, error) {
-	var maps []map[string]interface{}
+func bronzeRowsToMaps(rows []storage.BronzeRow) []map[string]interface{} {
+	maps := make([]map[string]interface{}, 0, len(rows))
 	for _, row := range rows {
 		var m map[string]interface{}
 		if err := json.Unmarshal([]byte(row.RawPayload), &m); err != nil {
@@ -175,8 +84,5 @@ func promoteGeneric(rows []storage.BronzeRow) ([]byte, error) {
 		}
 		maps = append(maps, m)
 	}
-	if len(maps) == 0 {
-		return nil, fmt.Errorf("no rows to promote")
-	}
-	return storage.WriteBronze(maps, "promoted", "")
+	return maps
 }

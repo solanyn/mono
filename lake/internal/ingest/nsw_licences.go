@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"time"
 
@@ -29,7 +29,7 @@ func ingestNSWLicences(ctx context.Context, s3 *storage.Client, bucket, source, 
 	start := time.Now()
 
 	if apiKey == "" || apiSecret == "" {
-		log.Printf("%s: API key/secret not set, skipping", source)
+		slog.Info("nsw_licences: API key/secret not set, skipping", "source", source)
 		return Result{}, nil
 	}
 
@@ -44,13 +44,13 @@ func ingestNSWLicences(ctx context.Context, s3 *storage.Client, bucket, source, 
 		path := fmt.Sprintf("%s?searchText=&pageNum=%d&pageSize=100", endpoint, page)
 		body, err := nswGovGet(ctx, path, token, apiKey, nil)
 		if err != nil {
-			log.Printf("%s: page %d: %v", source, page, err)
+			slog.Error("nsw_licences: page fetch", "source", source, "page", page, "err", err)
 			break
 		}
 
 		var rows []map[string]interface{}
 		if err := json.Unmarshal(body, &rows); err != nil {
-			log.Printf("%s: page %d parse: %v", source, page, err)
+			slog.Error("nsw_licences: page parse", "source", source, "page", page, "err", err)
 			break
 		}
 		if len(rows) == 0 {
@@ -61,7 +61,7 @@ func ingestNSWLicences(ctx context.Context, s3 *storage.Client, bucket, source, 
 	}
 
 	if len(allRows) == 0 {
-		log.Printf("%s: no records fetched", source)
+		slog.Info("nsw_licences: no records fetched", "source", source)
 		return Result{}, nil
 	}
 
@@ -79,6 +79,6 @@ func ingestNSWLicences(ctx context.Context, s3 *storage.Client, bucket, source, 
 	metrics.IngestTotal.WithLabelValues(source).Inc()
 	metrics.IngestDuration.WithLabelValues(source).Observe(time.Since(start).Seconds())
 	metrics.LastIngestTimestamp.WithLabelValues(source).SetToCurrentTime()
-	log.Printf("%s: wrote %d records to %s", source, len(allRows), key)
+	slog.Info("nsw_licences: wrote records", "source", source, "count", len(allRows), "key", key)
 	return Result{Source: source, Key: key, RowCount: len(allRows)}, nil
 }

@@ -4,11 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/google/uuid"
 )
 
 type Client struct {
@@ -27,7 +31,10 @@ func NewClient(endpoint, accessKey, secretKey, region string) *Client {
 
 func (c *Client) PutParquet(ctx context.Context, bucket, dataset, filename string, data []byte) (string, error) {
 	now := time.Now().UTC()
-	key := fmt.Sprintf("%s/%04d/%02d/%02d/%s", dataset, now.Year(), now.Month(), now.Day(), filename)
+	ext := filepath.Ext(filename)
+	base := strings.TrimSuffix(filename, ext)
+	unique := fmt.Sprintf("%s-%d-%s%s", base, now.UnixNano(), uuid.NewString()[:8], ext)
+	key := fmt.Sprintf("%s/%04d/%02d/%02d/%s", dataset, now.Year(), now.Month(), now.Day(), unique)
 
 	_, err := c.s3.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(bucket),
@@ -64,27 +71,16 @@ func (c *Client) GetObject(ctx context.Context, bucket, key string) ([]byte, err
 	}
 	defer resp.Body.Close()
 
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(resp.Body)
-	return buf.Bytes(), nil
-}
-
-func (c *Client) GetLatest(ctx context.Context, bucket, dataset, filename string) ([]byte, error) {
-	now := time.Now().UTC()
-	for i := 0; i < 7; i++ {
-		d := now.AddDate(0, 0, -i)
-		key := fmt.Sprintf("%s/%04d/%02d/%02d/%s", dataset, d.Year(), d.Month(), d.Day(), filename)
-		data, err := c.GetObject(ctx, bucket, key)
-		if err == nil {
-			return data, nil
-		}
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("s3 read %s/%s: %w", bucket, key, err)
 	}
-	return nil, fmt.Errorf("no %s/%s data found in last 7 days", bucket, dataset)
+	return data, nil
 }
 
-func (c *Client) Healthy(ctx context.Context) bool {
+func (c *Client) Healthy(ctx context.Context, bucket string) bool {
 	_, err := c.s3.HeadBucket(ctx, &s3.HeadBucketInput{
-		Bucket: aws.String("bronze"),
+		Bucket: aws.String(bucket),
 	})
 	return err == nil
 }

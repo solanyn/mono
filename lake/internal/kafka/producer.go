@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/twmb/franz-go/pkg/kgo"
 )
@@ -49,7 +49,7 @@ func (p *Producer) publish(ctx context.Context, topic, key string, event interfa
 		return fmt.Errorf("kafka produce %s: %w", topic, err)
 	}
 
-	log.Printf("kafka: published to %s key=%s", topic, key)
+	slog.Debug("kafka: published", "topic", topic, "key", key)
 	return nil
 }
 
@@ -63,7 +63,7 @@ func (p *Producer) PublishRaw(ctx context.Context, topic, key string, data []byt
 	if err := results.FirstErr(); err != nil {
 		return fmt.Errorf("kafka produce %s: %w", topic, err)
 	}
-	log.Printf("kafka: published to %s key=%s", topic, key)
+	slog.Debug("kafka: published", "topic", topic, "key", key)
 	return nil
 }
 

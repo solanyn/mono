@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,37 +14,47 @@ import (
 	"github.com/solanyn/mono/lake/internal/config"
 	icebergw "github.com/solanyn/mono/lake/internal/iceberg"
 	"github.com/solanyn/mono/lake/internal/kafka"
+	"github.com/solanyn/mono/lake/internal/logging"
 	"github.com/solanyn/mono/lake/internal/promote"
 	"github.com/solanyn/mono/lake/internal/storage"
 )
 
 func main() {
-	cfg := config.Load()
+	logging.Setup(os.Getenv("LOG_LEVEL"))
+
+	cfg, err := config.Load()
+	if err != nil {
+		slog.Error("config load", "err", err)
+		os.Exit(1)
+	}
 	s3 := storage.NewClient(cfg.S3Endpoint, cfg.S3AccessKey, cfg.S3SecretKey, cfg.S3Region)
 
-	var iceWriter *icebergw.Writer
-	if cfg.IcebergCatalogURI != "" {
-		iceWriter = icebergw.NewWriter(icebergw.Config{
-			CatalogURI:  cfg.IcebergCatalogURI,
-			S3Endpoint:  cfg.S3Endpoint,
-			S3AccessKey: cfg.S3AccessKey,
-			S3SecretKey: cfg.S3SecretKey,
-			S3Region:    cfg.S3Region,
-		})
-		log.Printf("iceberg writer enabled: %s", cfg.IcebergCatalogURI)
+	if cfg.IcebergCatalogURI == "" {
+		slog.Error("config: ICEBERG_CATALOG_URI required for promote")
+		os.Exit(1)
 	}
+	iceWriter := icebergw.NewWriter(icebergw.Config{
+		CatalogURI:  cfg.IcebergCatalogURI,
+		S3Endpoint:  cfg.S3Endpoint,
+		S3AccessKey: cfg.S3AccessKey,
+		S3SecretKey: cfg.S3SecretKey,
+		S3Region:    cfg.S3Region,
+	})
+	slog.Info("iceberg writer enabled", "uri", cfg.IcebergCatalogURI)
 
 	brokers := strings.Split(cfg.KafkaBrokers, ",")
 
 	consumer, err := kafka.NewConsumer(brokers, "lake-promote", cfg.KafkaTopicBronze)
 	if err != nil {
-		log.Fatalf("kafka consumer: %v", err)
+		slog.Error("kafka consumer", "err", err)
+		os.Exit(1)
 	}
 	defer consumer.Close()
 
 	producer, err := kafka.NewProducer(brokers)
 	if err != nil {
-		log.Fatalf("kafka producer: %v", err)
+		slog.Error("kafka producer", "err", err)
+		os.Exit(1)
 	}
 	defer producer.Close()
 
@@ -53,35 +63,48 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
 	})
+	mux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		if !s3.Healthy(r.Context(), cfg.BronzeBucket) {
+			http.Error(w, "s3 unreachable", http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	})
 	mux.Handle("/metrics", promhttp.Handler())
 
 	srv := &http.Server{Addr: ":" + cfg.HealthPort, Handler: mux}
 	go func() {
-		log.Printf("lake-promote listening on :%s", cfg.HealthPort)
+		slog.Info("lake-promote listening", "port", cfg.HealthPort)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("server: %v", err)
+			slog.Error("server", "err", err)
+			os.Exit(1)
 		}
 	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {
-		log.Println("lake-promote: consuming", cfg.KafkaTopicBronze)
+		slog.Info("lake-promote: consuming", "topic", cfg.KafkaTopicBronze)
 		if err := consumer.ConsumeBronzeWritten(ctx, func(ctx context.Context, event kafka.BronzeWritten) error {
-			log.Printf("promote: received bronze event source=%s key=%s", event.Source, event.Key)
-			result, err := promote.PromoteSource(ctx, s3, iceWriter, cfg.BronzeBucket, cfg.SilverBucket, event.Source, event.Key)
+			slog.Info("promote: received bronze event", "source", event.Source, "key", event.Key)
+			result, err := promote.PromoteSource(ctx, s3, iceWriter, cfg.BronzeBucket, event.Source, event.Key)
 			if err != nil {
 				return err
 			}
+			if result.RowCount == 0 {
+				return nil
+			}
 			return producer.PublishSilverWritten(ctx, kafka.SilverWritten{
 				Source:    result.Source,
-				Bucket:    cfg.SilverBucket,
-				Key:       result.Key,
+				Table:     result.Table,
+				BronzeKey: event.Key,
 				Timestamp: time.Now().UTC(),
 				RowCount:  result.RowCount,
 			})
 		}); err != nil && ctx.Err() == nil {
-			log.Fatalf("consumer: %v", err)
+			slog.Error("consumer", "err", err)
+			os.Exit(1)
 		}
 	}()
 

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -42,7 +42,7 @@ func IngestAEMO(ctx context.Context, s3 *storage.Client, bucket string) (Result,
 	metrics.IngestTotal.WithLabelValues(source).Inc()
 	metrics.IngestDuration.WithLabelValues(source).Observe(time.Since(start).Seconds())
 	metrics.LastIngestTimestamp.WithLabelValues(source).SetToCurrentTime()
-	log.Printf("aemo: wrote %d rows to %s", len(rows), key)
+	slog.Info("aemo: wrote rows", "count", len(rows), "key", key)
 	return Result{Source: source, Key: key, RowCount: len(rows)}, nil
 }
 

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
@@ -81,7 +81,7 @@ func IngestGitHubTrending(ctx context.Context, s3 *storage.Client, bucket string
 	metrics.IngestTotal.WithLabelValues(source).Inc()
 	metrics.IngestDuration.WithLabelValues(source).Observe(time.Since(start).Seconds())
 	metrics.LastIngestTimestamp.WithLabelValues(source).SetToCurrentTime()
-	log.Printf("github_trending: wrote %d repos to %s", len(rows), key)
+	slog.Info("github_trending: wrote repos", "count", len(rows), "key", key)
 	return Result{Source: source, Key: key, RowCount: len(rows)}, nil
 }
 
@@ -137,7 +137,7 @@ func IngestPyPIStats(ctx context.Context, s3 *storage.Client, bucket string) (Re
 	metrics.IngestTotal.WithLabelValues(source).Inc()
 	metrics.IngestDuration.WithLabelValues(source).Observe(time.Since(start).Seconds())
 	metrics.LastIngestTimestamp.WithLabelValues(source).SetToCurrentTime()
-	log.Printf("pypi_stats: wrote %d packages to %s", len(rows), key)
+	slog.Info("pypi_stats: wrote packages", "count", len(rows), "key", key)
 	return Result{Source: source, Key: key, RowCount: len(rows)}, nil
 }
 
@@ -189,7 +189,7 @@ func IngestNpmStats(ctx context.Context, s3 *storage.Client, bucket string) (Res
 	metrics.IngestTotal.WithLabelValues(source).Inc()
 	metrics.IngestDuration.WithLabelValues(source).Observe(time.Since(start).Seconds())
 	metrics.LastIngestTimestamp.WithLabelValues(source).SetToCurrentTime()
-	log.Printf("npm_stats: wrote %d packages to %s", len(rows), key)
+	slog.Info("npm_stats: wrote packages", "count", len(rows), "key", key)
 	return Result{Source: source, Key: key, RowCount: len(rows)}, nil
 }
 
@@ -252,6 +252,6 @@ func IngestHN(ctx context.Context, s3 *storage.Client, bucket string) (Result, e
 	metrics.IngestTotal.WithLabelValues(source).Inc()
 	metrics.IngestDuration.WithLabelValues(source).Observe(time.Since(start).Seconds())
 	metrics.LastIngestTimestamp.WithLabelValues(source).SetToCurrentTime()
-	log.Printf("hn_stories: wrote %d stories to %s", len(rows), key)
+	slog.Info("hn_stories: wrote stories", "count", len(rows), "key", key)
 	return Result{Source: source, Key: key, RowCount: len(rows)}, nil
 }

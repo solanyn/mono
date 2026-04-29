@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,7 +37,7 @@ func IngestBank(ctx context.Context, s3 *storage.Client, bucket string) (Result,
 	for _, f := range files {
 		rows, err := parseOFXFile(f)
 		if err != nil {
-			log.Printf("bank: skipping %s: %v", f, err)
+			slog.Error("bank: skipping file", "file", f, "err", err)
 			continue
 		}
 		allRows = append(allRows, rows...)
@@ -64,14 +64,14 @@ func IngestBank(ctx context.Context, s3 *storage.Client, bucket string) (Result,
 	// Remove processed files
 	for _, f := range processed {
 		if err := os.Remove(f); err != nil {
-			log.Printf("bank: failed to remove %s: %v", f, err)
+			slog.Error("bank: failed to remove file", "file", f, "err", err)
 		}
 	}
 
 	metrics.IngestTotal.WithLabelValues(source).Inc()
 	metrics.IngestDuration.WithLabelValues(source).Observe(time.Since(start).Seconds())
 	metrics.LastIngestTimestamp.WithLabelValues(source).SetToCurrentTime()
-	log.Printf("bank: wrote %d rows from %d files to %s", len(allRows), len(processed), key)
+	slog.Info("bank: wrote rows", "rows", len(allRows), "files", len(processed), "key", key)
 	return Result{Source: source, Key: key, RowCount: len(allRows)}, nil
 }
 

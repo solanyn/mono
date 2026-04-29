@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"time"
 
@@ -20,7 +20,7 @@ func IngestNSWFuel(ctx context.Context, s3 *storage.Client, bucket string) (Resu
 	apiKey := os.Getenv("API_NSW_FUEL_API_KEY")
 	apiSecret := os.Getenv("API_NSW_FUEL_API_SECRET")
 	if apiKey == "" || apiSecret == "" {
-		log.Println("nsw_fuel: API_NSW_FUEL_API_KEY/SECRET not set, skipping")
+		slog.Info("nsw_fuel: API_NSW_FUEL_API_KEY/SECRET not set, skipping")
 		return Result{}, nil
 	}
 
@@ -45,7 +45,7 @@ func IngestNSWFuel(ctx context.Context, s3 *storage.Client, bucket string) (Resu
 	}
 
 	if len(resp.Prices) == 0 {
-		log.Println("nsw_fuel: no prices returned")
+		slog.Info("nsw_fuel: no prices returned")
 		return Result{}, nil
 	}
 
@@ -63,6 +63,6 @@ func IngestNSWFuel(ctx context.Context, s3 *storage.Client, bucket string) (Resu
 	metrics.IngestTotal.WithLabelValues(source).Inc()
 	metrics.IngestDuration.WithLabelValues(source).Observe(time.Since(start).Seconds())
 	metrics.LastIngestTimestamp.WithLabelValues(source).SetToCurrentTime()
-	log.Printf("nsw_fuel: wrote %d prices to %s", len(resp.Prices), key)
+	slog.Info("nsw_fuel: wrote prices", "count", len(resp.Prices), "key", key)
 	return Result{Source: source, Key: key, RowCount: len(resp.Prices)}, nil
 }

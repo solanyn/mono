@@ -4,7 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/apache/arrow-go/v18/arrow"
@@ -27,6 +28,7 @@ type Config struct {
 
 type Writer struct {
 	cfg      Config
+	mu       sync.Mutex
 	catalogs map[string]catalog.Catalog
 }
 
@@ -37,7 +39,10 @@ func NewWriter(cfg Config) *Writer {
 	}
 }
 
-func (w *Writer) getCatalog(warehouse string) (catalog.Catalog, error) {
+func (w *Writer) getCatalog(ctx context.Context, warehouse string) (catalog.Catalog, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
 	if cat, ok := w.catalogs[warehouse]; ok {
 		return cat, nil
 	}
@@ -53,7 +58,7 @@ func (w *Writer) getCatalog(warehouse string) (catalog.Catalog, error) {
 		"s3.path-style-access": "true",
 	}
 
-	cat, err := catalog.Load(context.Background(), "lakekeeper-"+warehouse, props)
+	cat, err := catalog.Load(ctx, "lakekeeper-"+warehouse, props)
 	if err != nil {
 		return nil, fmt.Errorf("load catalog %s: %w", warehouse, err)
 	}
@@ -63,90 +68,47 @@ func (w *Writer) getCatalog(warehouse string) (catalog.Catalog, error) {
 }
 
 func (w *Writer) AppendBronze(ctx context.Context, tableName string, rows []map[string]interface{}, source, batchID string) error {
-	cat, err := w.getCatalog("bronze")
-	if err != nil {
-		return err
-	}
-
-	tbl, err := cat.LoadTable(ctx, catalog.ToIdentifier("default", tableName))
-	if err != nil {
-		return fmt.Errorf("load table bronze.default.%s: %w", tableName, err)
-	}
-
-	now := time.Now().UTC()
-	sources := make([]string, len(rows))
-	ingestedAt := make([]arrow.Timestamp, len(rows))
-	payloads := make([]string, len(rows))
-	batchIDs := make([]string, len(rows))
-
-	ts := arrow.Timestamp(now.UnixMicro())
-	for i, row := range rows {
-		sources[i] = source
-		ingestedAt[i] = ts
-		if v, ok := row["_raw_payload"]; ok && v != nil {
-			payloads[i] = v.(string)
-		} else {
-			b, _ := json.Marshal(row)
-			payloads[i] = string(b)
-		}
-		batchIDs[i] = batchID
-	}
-
-	schema := arrow.NewSchema([]arrow.Field{
-		{Name: "_source", Type: arrow.BinaryTypes.String, Nullable: true},
-		{Name: "_ingested_at", Type: &arrow.TimestampType{Unit: arrow.Microsecond, TimeZone: "UTC"}, Nullable: true},
-		{Name: "_raw_payload", Type: arrow.BinaryTypes.String, Nullable: true},
-		{Name: "_batch_id", Type: arrow.BinaryTypes.String, Nullable: true},
-	}, nil)
-
-	alloc := memory.NewGoAllocator()
-	bldr := array.NewRecordBuilder(alloc, schema)
-	defer bldr.Release()
-
-	bldr.Field(0).(*array.StringBuilder).AppendValues(sources, nil)
-	bldr.Field(1).(*array.TimestampBuilder).AppendValues(ingestedAt, nil)
-	bldr.Field(2).(*array.StringBuilder).AppendValues(payloads, nil)
-	bldr.Field(3).(*array.StringBuilder).AppendValues(batchIDs, nil)
-
-	rec := bldr.NewRecord()
-	defer rec.Release()
-
-	arrowTbl := array.NewTableFromRecords(schema, []arrow.Record{rec})
-	defer arrowTbl.Release()
-
-	_, err = tbl.AppendTable(ctx, arrowTbl, int64(len(rows)), nil)
-	if err != nil {
-		return fmt.Errorf("append to bronze.default.%s: %w", tableName, err)
-	}
-
-	log.Printf("iceberg: appended %d rows to bronze.default.%s", len(rows), tableName)
-	return nil
+	return w.append(ctx, "bronze", tableName, rows, source, batchID)
 }
 
 func (w *Writer) AppendSilver(ctx context.Context, tableName string, rows []map[string]interface{}, source, batchID string) error {
-	cat, err := w.getCatalog("silver")
+	return w.append(ctx, "silver", tableName, rows, source, batchID)
+}
+
+func (w *Writer) AppendGold(ctx context.Context, tableName string, rows []map[string]interface{}, source, batchID string) error {
+	return w.append(ctx, "gold", tableName, rows, source, batchID)
+}
+
+func (w *Writer) append(ctx context.Context, warehouse, tableName string, rows []map[string]interface{}, source, batchID string) error {
+	if len(rows) == 0 {
+		return nil
+	}
+
+	cat, err := w.getCatalog(ctx, warehouse)
 	if err != nil {
 		return err
 	}
 
 	tbl, err := cat.LoadTable(ctx, catalog.ToIdentifier("default", tableName))
 	if err != nil {
-		return fmt.Errorf("load table silver.default.%s: %w", tableName, err)
+		return fmt.Errorf("load table %s.default.%s: %w", warehouse, tableName, err)
 	}
 
-	now := time.Now().UTC()
+	ts := arrow.Timestamp(time.Now().UTC().UnixMicro())
 	sources := make([]string, len(rows))
 	ingestedAt := make([]arrow.Timestamp, len(rows))
 	payloads := make([]string, len(rows))
 	batchIDs := make([]string, len(rows))
 
-	ts := arrow.Timestamp(now.UnixMicro())
 	for i, row := range rows {
 		sources[i] = source
 		ingestedAt[i] = ts
 		if v, ok := row["_raw_payload"]; ok && v != nil {
-			payloads[i] = v.(string)
-		} else {
+			if s, ok := v.(string); ok {
+				payloads[i] = s
+			}
+		}
+		if payloads[i] == "" {
 			b, _ := json.Marshal(row)
 			payloads[i] = string(b)
 		}
@@ -175,17 +137,16 @@ func (w *Writer) AppendSilver(ctx context.Context, tableName string, rows []map[
 	arrowTbl := array.NewTableFromRecords(schema, []arrow.Record{rec})
 	defer arrowTbl.Release()
 
-	_, err = tbl.AppendTable(ctx, arrowTbl, int64(len(rows)), nil)
-	if err != nil {
-		return fmt.Errorf("append to silver.default.%s: %w", tableName, err)
+	if _, err := tbl.AppendTable(ctx, arrowTbl, int64(len(rows)), nil); err != nil {
+		return fmt.Errorf("append to %s.default.%s: %w", warehouse, tableName, err)
 	}
 
-	log.Printf("iceberg: appended %d rows to silver.default.%s", len(rows), tableName)
+	slog.Info("iceberg: appended", "rows", len(rows), "table", warehouse+".default."+tableName)
 	return nil
 }
 
 func (w *Writer) ScanTable(ctx context.Context, warehouse, tableName string) (*table.Table, error) {
-	cat, err := w.getCatalog(warehouse)
+	cat, err := w.getCatalog(ctx, warehouse)
 	if err != nil {
 		return nil, err
 	}

@@ -7,7 +7,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -39,15 +39,15 @@ func IngestNSWVG(ctx context.Context, s3 *storage.Client, bucket string) (Result
 	for year := currentYear - 1; year <= currentYear; year++ {
 		rows, err := fetchNSWVGYear(ctx, year)
 		if err != nil {
-			log.Printf("nsw_vg: year %d: %v", year, err)
+			slog.Error("nsw_vg: fetch year", "year", year, "err", err)
 			continue
 		}
 		allRows = append(allRows, rows...)
-		log.Printf("nsw_vg: fetched %d rows for %d", len(rows), year)
+		slog.Info("nsw_vg: fetched year", "year", year, "rows", len(rows))
 	}
 
 	if len(allRows) == 0 {
-		log.Println("nsw_vg: no data fetched")
+		slog.Info("nsw_vg: no data fetched")
 		return Result{}, nil
 	}
 
@@ -67,7 +67,7 @@ func IngestNSWVG(ctx context.Context, s3 *storage.Client, bucket string) (Result
 	metrics.IngestTotal.WithLabelValues(source).Inc()
 	metrics.IngestDuration.WithLabelValues(source).Observe(time.Since(start).Seconds())
 	metrics.LastIngestTimestamp.WithLabelValues(source).SetToCurrentTime()
-	log.Printf("nsw_vg: wrote %d rows to %s", len(allRows), key)
+	slog.Info("nsw_vg: wrote rows", "count", len(allRows), "key", key)
 	return Result{Source: source, Key: key, RowCount: len(allRows)}, nil
 }
 
@@ -113,13 +113,13 @@ func parseNSWVGZip(data []byte, year int) ([]map[string]interface{}, error) {
 		}
 		rc, err := f.Open()
 		if err != nil {
-			log.Printf("nsw_vg: skip %s: %v", f.Name, err)
+			slog.Error("nsw_vg: skip zip entry", "file", f.Name, "err", err)
 			continue
 		}
 		rows, err := parseNSWVGCSV(rc, year)
 		rc.Close()
 		if err != nil {
-			log.Printf("nsw_vg: parse %s: %v", f.Name, err)
+			slog.Error("nsw_vg: parse zip entry", "file", f.Name, "err", err)
 			continue
 		}
 		allRows = append(allRows, rows...)

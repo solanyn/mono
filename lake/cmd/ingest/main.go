@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,20 +15,31 @@ import (
 	icebergw "github.com/solanyn/mono/lake/internal/iceberg"
 	"github.com/solanyn/mono/lake/internal/ingest"
 	"github.com/solanyn/mono/lake/internal/kafka"
+	"github.com/solanyn/mono/lake/internal/logging"
 	"github.com/solanyn/mono/lake/internal/scheduler"
 	"github.com/solanyn/mono/lake/internal/storage"
 )
 
 func main() {
-	cfg := config.Load()
+	logging.Setup(os.Getenv("LOG_LEVEL"))
+
+	cfg, err := config.Load()
+	if err != nil {
+		slog.Error("config load", "err", err)
+		os.Exit(1)
+	}
 	s3 := storage.NewClient(cfg.S3Endpoint, cfg.S3AccessKey, cfg.S3SecretKey, cfg.S3Region)
+
+	rootCtx, rootCancel := context.WithCancel(context.Background())
+	defer rootCancel()
 
 	var producer *kafka.Producer
 	if cfg.KafkaBrokers != "" {
 		var err error
 		producer, err = kafka.NewProducer(strings.Split(cfg.KafkaBrokers, ","))
 		if err != nil {
-			log.Fatalf("kafka producer: %v", err)
+			slog.Error("kafka producer", "err", err)
+			os.Exit(1)
 		}
 		defer producer.Close()
 	}
@@ -42,10 +53,10 @@ func main() {
 			S3SecretKey: cfg.S3SecretKey,
 			S3Region:    cfg.S3Region,
 		})
-		log.Printf("iceberg writer enabled: %s", cfg.IcebergCatalogURI)
+		slog.Info("iceberg writer enabled", "uri", cfg.IcebergCatalogURI)
 	}
 
-	sched := scheduler.New(cfg, s3, iceWriter, producer)
+	sched := scheduler.New(rootCtx, cfg, s3, iceWriter, producer)
 	sched.Start()
 	defer sched.Stop()
 
@@ -64,7 +75,7 @@ func main() {
 		w.Write([]byte("ok"))
 	})
 	mux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
-		if !s3.Healthy(r.Context()) {
+		if !s3.Healthy(r.Context(), cfg.BronzeBucket) {
 			http.Error(w, "s3 unreachable", http.StatusServiceUnavailable)
 			return
 		}
@@ -81,15 +92,18 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("lake-ingest listening on :%s", cfg.HealthPort)
+		slog.Info("lake-ingest listening", "port", cfg.HealthPort)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("server: %v", err)
+			slog.Error("server", "err", err)
+			os.Exit(1)
 		}
 	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
+	slog.Info("lake-ingest: shutting down")
+	rootCancel()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

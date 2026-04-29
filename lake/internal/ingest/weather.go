@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -44,7 +44,7 @@ func IngestWeather(ctx context.Context, s3 *storage.Client, bucket string) (Resu
 		}
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			log.Printf("weather: %s: %v", city.Name, err)
+			slog.Error("weather: fetch", "city", city.Name, "err", err)
 			continue
 		}
 		body, _ := io.ReadAll(resp.Body)
@@ -102,6 +102,6 @@ func IngestWeather(ctx context.Context, s3 *storage.Client, bucket string) (Resu
 	metrics.IngestTotal.WithLabelValues(source).Inc()
 	metrics.IngestDuration.WithLabelValues(source).Observe(time.Since(start).Seconds())
 	metrics.LastIngestTimestamp.WithLabelValues(source).SetToCurrentTime()
-	log.Printf("weather: wrote %d rows to %s", len(rows), key)
+	slog.Info("weather: wrote rows", "count", len(rows), "key", key)
 	return Result{Source: source, Key: key, RowCount: len(rows)}, nil
 }

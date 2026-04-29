@@ -4,24 +4,38 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
+	"time"
 
+	icebergw "github.com/solanyn/mono/lake/internal/iceberg"
 	"github.com/solanyn/mono/lake/internal/metrics"
 	"github.com/solanyn/mono/lake/internal/storage"
 )
 
-func SilverToGold(ctx context.Context, s3 *storage.Client, silverBucket, goldBucket, source, silverKey string) error {
-	data, err := s3.GetObject(ctx, silverBucket, silverKey)
+type Result struct {
+	Source   string
+	Table    string
+	RowCount int
+}
+
+func SilverToGold(ctx context.Context, s3 *storage.Client, iceWriter *icebergw.Writer, bronzeBucket, source, bronzeKey string) (Result, error) {
+	if iceWriter == nil {
+		return Result{}, fmt.Errorf("aggregate %s: iceberg writer required", source)
+	}
+
+	start := time.Now()
+
+	data, err := s3.GetObject(ctx, bronzeBucket, bronzeKey)
 	if err != nil {
-		return fmt.Errorf("read silver %s: %w", silverKey, err)
+		return Result{}, fmt.Errorf("read bronze %s: %w", bronzeKey, err)
 	}
 
 	rows, err := storage.ReadBronze(data)
 	if err != nil {
-		return fmt.Errorf("parse silver %s: %w", source, err)
+		return Result{}, fmt.Errorf("parse bronze %s: %w", source, err)
 	}
 
-	var maps []map[string]interface{}
+	maps := make([]map[string]interface{}, 0, len(rows))
 	for _, row := range rows {
 		var m map[string]interface{}
 		if err := json.Unmarshal([]byte(row.RawPayload), &m); err != nil {
@@ -30,25 +44,19 @@ func SilverToGold(ctx context.Context, s3 *storage.Client, silverBucket, goldBuc
 		maps = append(maps, m)
 	}
 
+	table := goldName(source)
 	if len(maps) == 0 {
-		log.Printf("aggregate %s: no rows", source)
-		return nil
+		slog.Info("aggregate: no rows", "source", source)
+		return Result{Source: source, Table: table, RowCount: 0}, nil
 	}
 
-	gold, err := storage.WriteBronze(maps, "gold."+source, "")
-	if err != nil {
-		return fmt.Errorf("write gold %s: %w", source, err)
-	}
-
-	dataset := goldName(source)
-	key, err := s3.PutParquet(ctx, goldBucket, dataset, dataset+".parquet", gold)
-	if err != nil {
-		return fmt.Errorf("put gold %s: %w", source, err)
+	if err := iceWriter.AppendGold(ctx, table, maps, source, bronzeKey); err != nil {
+		return Result{}, fmt.Errorf("iceberg append gold %s: %w", table, err)
 	}
 
 	metrics.PromoteTotal.WithLabelValues("gold").Inc()
-	log.Printf("aggregate %s: %d rows → %s", source, len(maps), key)
-	return nil
+	slog.Info("aggregate: appended", "source", source, "rows", len(maps), "table", "gold."+table, "dur_sec", time.Since(start).Seconds())
+	return Result{Source: source, Table: table, RowCount: len(maps)}, nil
 }
 
 func goldName(source string) string {

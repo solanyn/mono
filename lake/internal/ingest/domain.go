@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -90,7 +90,7 @@ func IngestDomain(ctx context.Context, s3 *storage.Client, bucket string) (Resul
 	clientID := os.Getenv("DOMAIN_CLIENT_ID")
 	clientSecret := os.Getenv("DOMAIN_CLIENT_SECRET")
 	if clientID == "" || clientSecret == "" {
-		log.Println("domain: DOMAIN_CLIENT_ID/DOMAIN_CLIENT_SECRET not set, skipping")
+		slog.Info("domain: DOMAIN_CLIENT_ID/DOMAIN_CLIENT_SECRET not set, skipping")
 		return Result{}, nil
 	}
 
@@ -106,10 +106,10 @@ func IngestDomain(ctx context.Context, s3 *storage.Client, bucket string) (Resul
 	for _, city := range getAuctionCities() {
 		auctions, err := fetchAuctionResults(ctx, token, city)
 		if err != nil {
-			log.Printf("domain: auction results %s: %v", city, err)
+			slog.Error("domain: auction results", "city", city, "err", err)
 		} else {
 			rows = append(rows, auctions...)
-			log.Printf("domain: fetched %d auction results for %s", len(auctions), city)
+			slog.Info("domain: fetched auction results", "city", city, "count", len(auctions))
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
@@ -123,17 +123,17 @@ func IngestDomain(ctx context.Context, s3 *storage.Client, bucket string) (Resul
 				time.Sleep(500 * time.Millisecond)
 				listings, err := fetchListings(ctx, token, suburb, state, listingType)
 				if err != nil {
-					log.Printf("domain: %s %s %s: %v", strings.ToLower(listingType), suburb, state, err)
+					slog.Error("domain: listings", "type", strings.ToLower(listingType), "suburb", suburb, "state", state, "err", err)
 					continue
 				}
 				rows = append(rows, listings...)
-				log.Printf("domain: %s %s %s: %d listings", strings.ToLower(listingType), suburb, state, len(listings))
+				slog.Info("domain: listings", "type", strings.ToLower(listingType), "suburb", suburb, "state", state, "count", len(listings))
 			}
 		}
 	}
 
 	if len(rows) == 0 {
-		log.Println("domain: no data fetched")
+		slog.Info("domain: no data fetched")
 		return Result{}, nil
 	}
 
@@ -157,7 +157,7 @@ func IngestDomain(ctx context.Context, s3 *storage.Client, bucket string) (Resul
 	metrics.IngestTotal.WithLabelValues(source).Inc()
 	metrics.IngestDuration.WithLabelValues(source).Observe(time.Since(start).Seconds())
 	metrics.LastIngestTimestamp.WithLabelValues(source).SetToCurrentTime()
-	log.Printf("domain: wrote %d rows to %s (suburbs=%d, types=sale+rent+sold, cities=%d)", len(rows), key, totalSuburbs, len(getAuctionCities()))
+	slog.Info("domain: wrote rows", "count", len(rows), "key", key, "suburbs", totalSuburbs, "cities", len(getAuctionCities()))
 	return Result{Source: source, Key: key, RowCount: len(rows)}, nil
 }
 
