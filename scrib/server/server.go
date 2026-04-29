@@ -54,6 +54,9 @@ type Server struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
+
+	busMu sync.Mutex
+	buses map[string]*eventBus
 }
 
 // New creates a new scrib server.
@@ -79,7 +82,7 @@ func New(cfg Config) (*Server, error) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	s := &Server{cfg: cfg, db: db, s3: s3Client, ctx: ctx, cancel: cancel}
+	s := &Server{cfg: cfg, db: db, s3: s3Client, ctx: ctx, cancel: cancel, buses: make(map[string]*eventBus)}
 	if err := s.migrate(); err != nil {
 		cancel()
 		return nil, fmt.Errorf("migrate: %w", err)
@@ -141,6 +144,9 @@ func (s *Server) routes() chi.Router {
 		// Upload caps size via MaxBytesReader; clients may be on slow links.
 		r.Post("/audio/{uuid}", s.handleUploadAudio)
 		r.Get("/audio/{uuid}", s.handleDownloadAudio)
+
+		// SSE: no timeout — client holds the stream until done/error.
+		r.Get("/process/{uuid}/events", s.handleProcessEvents)
 	})
 
 	return r

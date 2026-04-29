@@ -1,12 +1,10 @@
 package server
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"sort"
 	"strings"
@@ -16,11 +14,13 @@ import (
 )
 
 type DiarizedSegment struct {
-	Speaker   string  `json:"speaker"`
-	Start     float64 `json:"start"`
-	End       float64 `json:"end"`
-	Text      string  `json:"text"`
-	Uncertain bool    `json:"uncertain,omitempty"`
+	Speaker    string  `json:"speaker"`
+	SpeakerID  *int    `json:"speaker_id,omitempty"`
+	Start      float64 `json:"start"`
+	End        float64 `json:"end"`
+	Text       string  `json:"text"`
+	Uncertain  bool    `json:"uncertain,omitempty"`
+	Embeddings []byte  `json:"-"`
 }
 
 // retry runs fn up to attempts times with exponential backoff (base, base*2, base*4, ...).
@@ -53,17 +53,21 @@ func (s *Server) processMeeting(parent context.Context, meetingUUID string) {
 	ctx, cancel := context.WithTimeout(parent, 30*time.Minute)
 	defer cancel()
 
+	bus := s.bus(meetingUUID)
+	defer s.closeBus(meetingUUID)
+	bus.publish(Event{Stage: "started", At: time.Now()})
+
 	var meetingID int
 	var blobKey sql.NullString
 	err := s.db.QueryRowContext(ctx,
 		`SELECT id, audio_blob_key FROM meetings WHERE uuid = $1`, meetingUUID,
 	).Scan(&meetingID, &blobKey)
 	if err != nil {
-		s.setMeetingError(ctx, meetingUUID, fmt.Errorf("lookup meeting: %w", err))
+		s.failMeeting(ctx, bus, meetingUUID, fmt.Errorf("lookup meeting: %w", err))
 		return
 	}
 	if !blobKey.Valid || blobKey.String == "" {
-		s.setMeetingError(ctx, meetingUUID, fmt.Errorf("no audio uploaded"))
+		s.failMeeting(ctx, bus, meetingUUID, fmt.Errorf("no audio uploaded"))
 		return
 	}
 
@@ -71,33 +75,33 @@ func (s *Server) processMeeting(parent context.Context, meetingUUID string) {
 		log.Printf("mark processing %s: %v", meetingUUID, err)
 	}
 
-	var (
-		segments    []DiarizedSegment
-		numSpeakers int
-		duration    float64
-	)
-
-	if s.cfg.AudioProcessURL != "" {
-		segments, numSpeakers, duration, err = s.runPipelineProcess(ctx, blobKey.String)
-	} else {
-		segments, numSpeakers, duration, err = s.runPipelineLegacy(ctx, blobKey.String)
-	}
+	result, err := s.runPipeline(ctx, bus, blobKey.String)
 	if err != nil {
-		s.setMeetingError(ctx, meetingUUID, err)
+		s.failMeeting(ctx, bus, meetingUUID, err)
 		return
 	}
 
-	if err := s.writeMeetingResults(ctx, meetingID, meetingUUID, segments, numSpeakers, duration); err != nil {
-		s.setMeetingError(ctx, meetingUUID, err)
+	bus.publish(Event{Stage: "matching", At: time.Now()})
+	segments := s.matchSpeakers(ctx, meetingID, result.Segments, result.SpeakerEmbeddings)
+
+	if err := s.writeMeetingResults(ctx, meetingID, meetingUUID, segments, result.NumSpeakers, result.DurationSeconds); err != nil {
+		s.failMeeting(ctx, bus, meetingUUID, err)
 		return
 	}
 
-	log.Printf("processed meeting %s: %d segments, %d speakers", meetingUUID, len(segments), numSpeakers)
+	bus.publish(Event{Stage: "done", At: time.Now(), Detail: fmt.Sprintf("%d segments, %d speakers", len(segments), result.NumSpeakers)})
+	log.Printf("processed meeting %s: %d segments, %d speakers", meetingUUID, len(segments), result.NumSpeakers)
 }
 
-// runPipelineProcess streams the audio from S3 into scrib-audio's single-shot
-// /v1/audio/process endpoint and returns aligned diarised segments directly.
-func (s *Server) runPipelineProcess(ctx context.Context, blobKey string) ([]DiarizedSegment, int, float64, error) {
+// runPipeline streams audio from S3 into scrib-audio's single-shot
+// /v1/audio/process endpoint. scrib-audio does VAD, STT, alignment, and
+// per-speaker embedding; the server just persists.
+func (s *Server) runPipeline(ctx context.Context, bus *eventBus, blobKey string) (*ProcessResult, error) {
+	if s.cfg.AudioProcessURL == "" {
+		return nil, fmt.Errorf("audio process URL not configured")
+	}
+	bus.publish(Event{Stage: "processing", At: time.Now(), Detail: "calling scrib-audio"})
+
 	var result *ProcessResult
 	err := retry(ctx, 3, 2*time.Second, "process", func(ctx context.Context) error {
 		obj, err := s.s3.GetObject(ctx, s.cfg.S3Bucket, blobKey, minio.GetObjectOptions{})
@@ -114,62 +118,9 @@ func (s *Server) runPipelineProcess(ctx context.Context, blobKey string) ([]Diar
 		return nil
 	})
 	if err != nil {
-		return nil, 0, 0, fmt.Errorf("process: %w", err)
+		return nil, fmt.Errorf("process: %w", err)
 	}
-
-	segs := make([]DiarizedSegment, 0, len(result.Segments))
-	for _, s := range result.Segments {
-		segs = append(segs, DiarizedSegment{
-			Speaker:   s.Speaker,
-			Start:     s.Start,
-			End:       s.End,
-			Text:      s.Text,
-			Uncertain: s.Uncertain,
-		})
-	}
-	return segs, result.NumSpeakers, result.DurationSeconds, nil
-}
-
-// runPipelineLegacy is the pre-scrib-audio flow: VAD + STT + in-Go align.
-// Retained so the server still functions when AudioProcessURL is unset (eg.
-// talking to bare mlx-audio). New deployments should prefer AudioProcessURL.
-func (s *Server) runPipelineLegacy(ctx context.Context, blobKey string) ([]DiarizedSegment, int, float64, error) {
-	obj, err := s.s3.GetObject(ctx, s.cfg.S3Bucket, blobKey, minio.GetObjectOptions{})
-	if err != nil {
-		return nil, 0, 0, fmt.Errorf("s3 get: %w", err)
-	}
-	audioBytes, err := io.ReadAll(obj)
-	obj.Close()
-	if err != nil {
-		return nil, 0, 0, fmt.Errorf("s3 read: %w", err)
-	}
-
-	var vadResult *VADResult
-	if err := retry(ctx, 3, 2*time.Second, "vad", func(ctx context.Context) error {
-		r, err := s.vadChunked(ctx, audioBytes, blobKey, s.cfg.VADThreshold)
-		if err != nil {
-			return err
-		}
-		vadResult = r
-		return nil
-	}); err != nil {
-		return nil, 0, 0, fmt.Errorf("vad: %w", err)
-	}
-
-	var sttResult *TranscriptResult
-	if err := retry(ctx, 3, 2*time.Second, "stt", func(ctx context.Context) error {
-		r, err := s.transcribe(ctx, bytes.NewReader(audioBytes), blobKey)
-		if err != nil {
-			return err
-		}
-		sttResult = r
-		return nil
-	}); err != nil {
-		return nil, 0, 0, fmt.Errorf("stt: %w", err)
-	}
-
-	segs := alignSpeakersToWords(vadResult, sttResult)
-	return segs, vadResult.NumSpeakers, vadResult.DurationSeconds, nil
+	return result, nil
 }
 
 func (s *Server) writeMeetingResults(ctx context.Context, meetingID int, meetingUUID string, segments []DiarizedSegment, numSpeakers int, duration float64) error {
@@ -185,9 +136,9 @@ func (s *Server) writeMeetingResults(ctx context.Context, meetingID int, meeting
 
 	for _, seg := range segments {
 		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO segments (uuid, meeting_id, speaker_label, start_s, end_s, text)
-			 VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5)`,
-			meetingID, seg.Speaker, seg.Start, seg.End, seg.Text,
+			`INSERT INTO segments (uuid, meeting_id, speaker_id, speaker_label, start_s, end_s, text)
+			 VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6)`,
+			meetingID, seg.SpeakerID, seg.Speaker, seg.Start, seg.End, seg.Text,
 		); err != nil {
 			return fmt.Errorf("insert segment: %w", err)
 		}
@@ -204,6 +155,11 @@ func (s *Server) writeMeetingResults(ctx context.Context, meetingID int, meeting
 		return fmt.Errorf("commit: %w", err)
 	}
 	return nil
+}
+
+func (s *Server) failMeeting(ctx context.Context, bus *eventBus, uuid string, err error) {
+	bus.publish(Event{Stage: "error", At: time.Now(), Detail: err.Error()})
+	s.setMeetingError(ctx, uuid, err)
 }
 
 func (s *Server) setMeetingError(ctx context.Context, uuid string, err error) {
@@ -223,122 +179,6 @@ func (s *Server) setMeetingError(ctx context.Context, uuid string, err error) {
 	}
 }
 
-func alignSpeakersToWords(vad *VADResult, stt *TranscriptResult) []DiarizedSegment {
-	if len(vad.Segments) == 0 || len(stt.Words) == 0 {
-		return []DiarizedSegment{{
-			Speaker: "SPEAKER_0",
-			Start:   0,
-			End:     vad.DurationSeconds,
-			Text:    stt.Text,
-		}}
-	}
-
-	type taggedWord struct {
-		word      string
-		start     float64
-		end       float64
-		speaker   string
-		uncertain bool
-	}
-
-	tagged := make([]taggedWord, len(stt.Words))
-	for i, w := range stt.Words {
-		tagged[i] = taggedWord{word: w.Word, start: w.Start, end: w.End}
-		wordDur := w.End - w.Start
-
-		bestOverlap := 0.0
-		bestSpeaker := "UNKNOWN"
-		for _, seg := range vad.Segments {
-			overlapStart := max(w.Start, seg.Start)
-			overlapEnd := min(w.End, seg.End)
-			if overlapEnd > overlapStart {
-				overlap := overlapEnd - overlapStart
-				if overlap > bestOverlap {
-					bestOverlap = overlap
-					bestSpeaker = seg.Speaker
-				}
-			}
-		}
-
-		if bestSpeaker == "UNKNOWN" {
-			mid := (w.Start + w.End) / 2
-			minDist := 999999.0
-			for _, seg := range vad.Segments {
-				d := min(abs(mid-seg.Start), abs(mid-seg.End))
-				if d < minDist {
-					minDist = d
-					bestSpeaker = seg.Speaker
-				}
-			}
-			tagged[i].uncertain = true
-		} else if wordDur > 0 && bestOverlap/wordDur < 0.5 {
-			tagged[i].uncertain = true
-		}
-
-		tagged[i].speaker = bestSpeaker
-	}
-
-	var segments []DiarizedSegment
-	if len(tagged) == 0 {
-		return segments
-	}
-
-	cur := DiarizedSegment{
-		Speaker:   tagged[0].speaker,
-		Start:     tagged[0].start,
-		End:       tagged[0].end,
-		Text:      tagged[0].word,
-		Uncertain: tagged[0].uncertain,
-	}
-
-	for i := 1; i < len(tagged); i++ {
-		if tagged[i].speaker == cur.Speaker {
-			cur.End = tagged[i].end
-			cur.Text += " " + tagged[i].word
-			if tagged[i].uncertain {
-				cur.Uncertain = true
-			}
-		} else {
-			segments = append(segments, cur)
-			cur = DiarizedSegment{
-				Speaker:   tagged[i].speaker,
-				Start:     tagged[i].start,
-				End:       tagged[i].end,
-				Text:      tagged[i].word,
-				Uncertain: tagged[i].uncertain,
-			}
-		}
-	}
-	segments = append(segments, cur)
-
-	sort.Slice(segments, func(i, j int) bool {
-		return segments[i].Start < segments[j].Start
-	})
-
-	return segments
-}
-
-func abs(x float64) float64 {
-	if x < 0 {
-		return -x
-	}
-	return x
-}
-
-func max(a, b float64) float64 {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func min(a, b float64) float64 {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 func formatTranscript(segments []DiarizedSegment) string {
 	var sb strings.Builder
 	for _, seg := range segments {
@@ -347,4 +187,9 @@ func formatTranscript(segments []DiarizedSegment) string {
 		fmt.Fprintf(&sb, "**%s** (%d:%02d): %s\n", seg.Speaker, mins, secs, seg.Text)
 	}
 	return sb.String()
+}
+
+// sortSegments keeps output stable: segments ordered by start time.
+func sortSegments(segs []DiarizedSegment) {
+	sort.Slice(segs, func(i, j int) bool { return segs[i].Start < segs[j].Start })
 }
