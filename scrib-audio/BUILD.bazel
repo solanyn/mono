@@ -55,3 +55,26 @@ py_test(
     args = ["-v"],
     target_compatible_with = ["@platforms//os:macos"],
 )
+
+py_test(
+    name = "test_align_golden",
+    srcs = ["tests/test_align_golden.py"],
+    data = ["tests/fixtures/align_golden.json"],
+    deps = [
+        ":scrib_audio_lib",
+        "@scrib_audio_pypi//pytest",
+    ],
+    args = ["-v"],
+    target_compatible_with = ["@platforms//os:macos"],
+)
+
+py_test(
+    name = "test_diarize_stitch",
+    srcs = ["tests/test_diarize_stitch.py"],
+    deps = [
+        ":scrib_audio_lib",
+        "@scrib_audio_pypi//pytest",
+    ],
+    args = ["-v"],
+    target_compatible_with = ["@platforms//os:macos"],
+)
