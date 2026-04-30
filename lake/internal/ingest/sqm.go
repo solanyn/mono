@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"regexp"
 	"strings"
@@ -79,7 +79,7 @@ func IngestSQM(ctx context.Context, s3 *storage.Client, bucket string) (Result, 
 
 			html, err := fetchSQMPage(ctx, client, url)
 			if err != nil {
-				log.Printf("sqm: %s/%s: %v", suburb.Name, metric.Slug, err)
+				slog.Error("sqm: fetch", "suburb", suburb.Name, "metric", metric.Slug, "err", err)
 				continue
 			}
 
@@ -89,7 +89,7 @@ func IngestSQM(ctx context.Context, s3 *storage.Client, bucket string) (Result, 
 				metric.Slug, suburb.Name,
 				now.Format("2006-01-02"), now.Format("150405"))
 			if err := s3.PutRaw(ctx, bucket, rawKey, "text/html", html); err != nil {
-				log.Printf("sqm: store %s/%s: %v", suburb.Name, metric.Slug, err)
+				slog.Error("sqm: store", "suburb", suburb.Name, "metric", metric.Slug, "err", err)
 			}
 
 			// Extract chart data if present
@@ -113,7 +113,7 @@ func IngestSQM(ctx context.Context, s3 *storage.Client, bucket string) (Result, 
 	}
 
 	if len(allRows) == 0 {
-		log.Println("sqm: no data fetched")
+		slog.Info("sqm: no data fetched")
 		return Result{}, nil
 	}
 
@@ -133,7 +133,7 @@ func IngestSQM(ctx context.Context, s3 *storage.Client, bucket string) (Result, 
 	metrics.IngestTotal.WithLabelValues(source).Inc()
 	metrics.IngestDuration.WithLabelValues(source).Observe(time.Since(start).Seconds())
 	metrics.LastIngestTimestamp.WithLabelValues(source).SetToCurrentTime()
-	log.Printf("sqm: wrote %d suburb-metrics to %s", len(allRows), key)
+	slog.Info("sqm: wrote suburb-metrics", "count", len(allRows), "key", key)
 	return Result{Source: source, Key: key, RowCount: len(allRows)}, nil
 }
 

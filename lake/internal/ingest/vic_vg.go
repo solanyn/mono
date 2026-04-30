@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -60,7 +60,7 @@ func IngestVicVG(ctx context.Context, s3 *storage.Client, bucket string) (Result
 	for _, ds := range vicVGDatasets {
 		resources, err := fetchCKANResources(ctx, client, ds.ID)
 		if err != nil {
-			log.Printf("vic_vg: ckan %s: %v", ds.ID, err)
+			slog.Error("vic_vg: ckan", "dataset", ds.ID, "err", err)
 			continue
 		}
 
@@ -68,7 +68,7 @@ func IngestVicVG(ctx context.Context, s3 *storage.Client, bucket string) (Result
 			// Download the XLS file
 			xlsData, err := fetchURL(ctx, client, res.URL)
 			if err != nil {
-				log.Printf("vic_vg: fetch %s (%s): %v", res.Name, ds.Category, err)
+				slog.Error("vic_vg: fetch", "resource", res.Name, "category", ds.Category, "err", err)
 				continue
 			}
 
@@ -77,7 +77,7 @@ func IngestVicVG(ctx context.Context, s3 *storage.Client, bucket string) (Result
 			rawKey := fmt.Sprintf("vic_vg/%s/%s/%s.xls",
 				ds.Category, now.Format("2006-01-02"), sanitizeFilename(res.Name))
 			if err := s3.PutRaw(ctx, bucket, rawKey, "application/vnd.ms-excel", xlsData); err != nil {
-				log.Printf("vic_vg: store raw %s: %v", res.Name, err)
+				slog.Error("vic_vg: store raw", "resource", res.Name, "err", err)
 			}
 
 			row := map[string]interface{}{
@@ -94,12 +94,12 @@ func IngestVicVG(ctx context.Context, s3 *storage.Client, bucket string) (Result
 				"file_size":    len(xlsData),
 			}
 			allRows = append(allRows, row)
-			log.Printf("vic_vg: stored %s/%s (%d bytes)", ds.Category, res.Name, len(xlsData))
+			slog.Info("vic_vg: stored", "category", ds.Category, "resource", res.Name, "bytes", len(xlsData))
 		}
 	}
 
 	if len(allRows) == 0 {
-		log.Println("vic_vg: no data fetched")
+		slog.Info("vic_vg: no data fetched")
 		return Result{}, nil
 	}
 
@@ -119,7 +119,7 @@ func IngestVicVG(ctx context.Context, s3 *storage.Client, bucket string) (Result
 	metrics.IngestTotal.WithLabelValues(source).Inc()
 	metrics.IngestDuration.WithLabelValues(source).Observe(time.Since(start).Seconds())
 	metrics.LastIngestTimestamp.WithLabelValues(source).SetToCurrentTime()
-	log.Printf("vic_vg: wrote %d resources to %s", len(allRows), key)
+	slog.Info("vic_vg: wrote resources", "count", len(allRows), "key", key)
 	return Result{Source: source, Key: key, RowCount: len(allRows)}, nil
 }
 

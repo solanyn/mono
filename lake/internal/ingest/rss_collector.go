@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -105,7 +105,7 @@ func (c *RSSCollector) Start() {
 		})
 	}
 	c.cron.Start()
-	log.Printf("rss_collector: started with %d feeds (stagger=%s)", len(Feeds), startupStagger)
+	slog.Info("rss_collector: started", "feeds", len(Feeds), "stagger", startupStagger.String())
 }
 
 func (c *RSSCollector) Stop() {
@@ -122,7 +122,7 @@ func (c *RSSCollector) processFeed(feed Feed) {
 
 	rawXML, err := c.fetchURL(ctx, feed.URL)
 	if err != nil {
-		log.Printf("rss_collector: fetch %s: %v", feed.Slug, err)
+		slog.Error("rss_collector: fetch feed", "feed", feed.Slug, "err", err)
 		metrics.IngestErrors.WithLabelValues(source).Inc()
 		return
 	}
@@ -132,13 +132,13 @@ func (c *RSSCollector) processFeed(feed Feed) {
 		feed.Category, feed.Slug,
 		now.Format("2006-01-02"), now.Unix())
 	if err := c.s3.PutRaw(ctx, c.bucket, feedKey, "application/xml", rawXML); err != nil {
-		log.Printf("rss_collector: store xml %s: %v", feed.Slug, err)
+		slog.Error("rss_collector: store xml", "feed", feed.Slug, "err", err)
 	}
 
 	fp := gofeed.NewParser()
 	parsed, err := fp.ParseString(string(rawXML))
 	if err != nil {
-		log.Printf("rss_collector: parse %s: %v", feed.Slug, err)
+		slog.Error("rss_collector: parse feed", "feed", feed.Slug, "err", err)
 		metrics.IngestErrors.WithLabelValues(source).Inc()
 		return
 	}
@@ -221,14 +221,14 @@ func (c *RSSCollector) processFeed(feed Feed) {
 	batchID := uuid.New().String()
 	data, err := storage.WriteBronze(rows, "rss_feeds."+feed.Slug, batchID)
 	if err != nil {
-		log.Printf("rss_collector: write bronze %s: %v", feed.Slug, err)
+		slog.Error("rss_collector: write bronze", "feed", feed.Slug, "err", err)
 		metrics.IngestErrors.WithLabelValues(source).Inc()
 		return
 	}
 
 	key, err := c.s3.PutParquet(ctx, c.bucket, "rss_feeds/"+feed.Slug, "articles.parquet", data)
 	if err != nil {
-		log.Printf("rss_collector: put s3 %s: %v", feed.Slug, err)
+		slog.Error("rss_collector: put s3", "feed", feed.Slug, "err", err)
 		metrics.IngestErrors.WithLabelValues(source).Inc()
 		return
 	}
@@ -237,7 +237,7 @@ func (c *RSSCollector) processFeed(feed Feed) {
 		for _, event := range events {
 			eventData, _ := json.Marshal(event)
 			if err := c.producer.PublishRaw(ctx, "lake.articles.new", feed.Slug, eventData); err != nil {
-				log.Printf("rss_collector: kafka %s: %v", feed.Slug, err)
+				slog.Error("rss_collector: kafka publish", "feed", feed.Slug, "err", err)
 			}
 		}
 	}
@@ -245,7 +245,7 @@ func (c *RSSCollector) processFeed(feed Feed) {
 	metrics.IngestTotal.WithLabelValues(source).Inc()
 	metrics.IngestDuration.WithLabelValues(source).Observe(time.Since(start).Seconds())
 	metrics.LastIngestTimestamp.WithLabelValues(source).SetToCurrentTime()
-	log.Printf("rss_collector: %s wrote %d new articles to %s", feed.Slug, len(rows), key)
+	slog.Info("rss_collector: wrote articles", "feed", feed.Slug, "count", len(rows), "key", key)
 }
 
 func (c *RSSCollector) fetchAndExtract(ctx context.Context, feed Feed, articleURL, guid string, now time.Time) (fullText, articleKey string, partial bool) {
@@ -263,7 +263,7 @@ func (c *RSSCollector) fetchAndExtract(ctx context.Context, feed Feed, articleUR
 		feed.Category, feed.Slug,
 		now.Format("2006-01-02"), guidHash)
 	if err := c.s3.PutRaw(ctx, c.bucket, articleKey, "text/html", html); err != nil {
-		log.Printf("rss_collector: store html %s: %v", feed.Slug, err)
+		slog.Error("rss_collector: store html", "feed", feed.Slug, "err", err)
 	}
 
 	parsedURL, err := url.Parse(articleURL)

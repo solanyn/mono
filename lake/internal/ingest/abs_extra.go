@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -69,6 +69,6 @@ func ingestSDMX(ctx context.Context, s3 *storage.Client, bucket, source, url, fi
 	metrics.IngestTotal.WithLabelValues(source).Inc()
 	metrics.IngestDuration.WithLabelValues(source).Observe(time.Since(start).Seconds())
 	metrics.LastIngestTimestamp.WithLabelValues(source).SetToCurrentTime()
-	log.Printf("%s: wrote %d rows to %s", source, len(rows), key)
+	slog.Info("sdmx: wrote rows", "source", source, "count", len(rows), "key", key)
 	return Result{Source: source, Key: key, RowCount: len(rows)}, nil
 }

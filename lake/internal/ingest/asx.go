@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -29,7 +29,7 @@ func IngestASX(ctx context.Context, s3 *storage.Client, bucket string) (Result, 
 		}
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			log.Printf("asx: %s: %v", ticker, err)
+			slog.Error("asx: fetch", "ticker", ticker, "err", err)
 			continue
 		}
 		body, _ := io.ReadAll(resp.Body)
@@ -69,6 +69,6 @@ func IngestASX(ctx context.Context, s3 *storage.Client, bucket string) (Result, 
 	metrics.IngestTotal.WithLabelValues(source).Inc()
 	metrics.IngestDuration.WithLabelValues(source).Observe(time.Since(start).Seconds())
 	metrics.LastIngestTimestamp.WithLabelValues(source).SetToCurrentTime()
-	log.Printf("asx: wrote %d announcements to %s", len(rows), key)
+	slog.Info("asx: wrote announcements", "count", len(rows), "key", key)
 	return Result{Source: source, Key: key, RowCount: len(rows)}, nil
 }

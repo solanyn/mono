@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -31,7 +31,7 @@ func IngestReddit(ctx context.Context, s3 *storage.Client, bucket string) (Resul
 	for _, url := range redditFeeds {
 		posts, err := fetchReddit(ctx, url)
 		if err != nil {
-			log.Printf("reddit: %v", err)
+			slog.Error("reddit: fetch", "err", err)
 			continue
 		}
 		for _, p := range posts {
@@ -45,7 +45,7 @@ func IngestReddit(ctx context.Context, s3 *storage.Client, bucket string) (Resul
 	}
 
 	if len(rows) == 0 {
-		log.Println("reddit: no posts fetched")
+		slog.Info("reddit: no posts fetched")
 		return Result{}, nil
 	}
 
@@ -65,7 +65,7 @@ func IngestReddit(ctx context.Context, s3 *storage.Client, bucket string) (Resul
 	metrics.IngestTotal.WithLabelValues(source).Inc()
 	metrics.IngestDuration.WithLabelValues(source).Observe(time.Since(start).Seconds())
 	metrics.LastIngestTimestamp.WithLabelValues(source).SetToCurrentTime()
-	log.Printf("reddit: wrote %d posts to %s", len(rows), key)
+	slog.Info("reddit: wrote posts", "count", len(rows), "key", key)
 	return Result{Source: source, Key: key, RowCount: len(rows)}, nil
 }
 

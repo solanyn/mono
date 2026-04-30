@@ -1,6 +1,11 @@
 package config
 
-import "os"
+import (
+	"errors"
+	"fmt"
+	"os"
+	"strings"
+)
 
 type Config struct {
 	S3Endpoint   string
@@ -8,8 +13,6 @@ type Config struct {
 	S3SecretKey  string
 	S3Region     string
 	BronzeBucket string
-	SilverBucket string
-	GoldBucket   string
 
 	KafkaBrokers     string
 	KafkaTopicBronze string
@@ -25,7 +28,6 @@ type Config struct {
 	CronRBA    string
 	CronABS    string
 	CronAEMO   string
-	CronRSS    string
 	CronReddit string
 	CronDomain string
 	CronNSWVG  string
@@ -51,15 +53,13 @@ type Config struct {
 	IcebergCatalogURI string
 }
 
-func Load() Config {
-	return Config{
+func Load() (Config, error) {
+	cfg := Config{
 		S3Endpoint:   envOr("S3_ENDPOINT", "http://garage.storage.svc.cluster.local:3900"),
 		S3AccessKey:  os.Getenv("S3_ACCESS_KEY"),
 		S3SecretKey:  os.Getenv("S3_SECRET_KEY"),
 		S3Region:     envOr("S3_REGION", "us-east-1"),
 		BronzeBucket: envOr("S3_BRONZE_BUCKET", "bronze"),
-		SilverBucket: envOr("S3_SILVER_BUCKET", "silver"),
-		GoldBucket:   envOr("S3_GOLD_BUCKET", "gold"),
 
 		KafkaBrokers:     envOr("KAFKA_BROKERS", "redpanda.streaming.svc.cluster.local:9093"),
 		KafkaTopicBronze: envOr("KAFKA_TOPIC_BRONZE", "lake.bronze.written"),
@@ -75,7 +75,6 @@ func Load() Config {
 		CronRBA:    envOr("CRON_RBA", "0 20 * * *"),
 		CronABS:    envOr("CRON_ABS", "0 21 * * *"),
 		CronAEMO:   envOr("CRON_AEMO", "*/5 * * * *"),
-		CronRSS:    envOr("CRON_RSS", "*/15 * * * *"),
 		CronReddit: envOr("CRON_REDDIT", "*/30 * * * *"),
 		CronDomain: envOr("CRON_DOMAIN", "0 23 * * *"),
 		CronNSWVG:  envOr("CRON_NSW_VG", "0 0 * * 0"),
@@ -94,12 +93,42 @@ func Load() Config {
 		CronNSWProperty: envOr("CRON_NSW_PROPERTY", "0 3 * * *"),
 		CronNSWTrades:   envOr("CRON_NSW_TRADES", "30 3 * * *"),
 
-		CronVicVG: envOr("CRON_VIC_VG", "0 2 * * 0"),   // Weekly Sunday 2am
-		CronSQM:   envOr("CRON_SQM", "0 4 * * 1"),       // Weekly Monday 4am
-		CronBank: envOr("CRON_BANK", "*/5 * * * *"),  // Every 5 min - check for new OFX files
+		CronVicVG: envOr("CRON_VIC_VG", "0 2 * * 0"),
+		CronSQM:   envOr("CRON_SQM", "0 4 * * 1"),
+		CronBank:  envOr("CRON_BANK", "*/5 * * * *"),
 
 		IcebergCatalogURI: envOr("ICEBERG_CATALOG_URI", "http://lakekeeper.storage.svc.cluster.local:8181/catalog"),
 	}
+
+	if err := cfg.Validate(); err != nil {
+		return cfg, err
+	}
+	return cfg, nil
+}
+
+func (c Config) Validate() error {
+	var missing []string
+	if c.S3AccessKey == "" {
+		missing = append(missing, "S3_ACCESS_KEY")
+	}
+	if c.S3SecretKey == "" {
+		missing = append(missing, "S3_SECRET_KEY")
+	}
+	if c.CronDomain != "" {
+		if c.DomainClientID == "" {
+			missing = append(missing, "DOMAIN_CLIENT_ID (required because CRON_DOMAIN is set)")
+		}
+		if c.DomainClientSecret == "" {
+			missing = append(missing, "DOMAIN_CLIENT_SECRET (required because CRON_DOMAIN is set)")
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("config: missing required env vars: %s", strings.Join(missing, ", "))
+	}
+	if c.HealthPort == "" {
+		return errors.New("config: HEALTH_PORT must not be empty")
+	}
+	return nil
 }
 
 func envOr(key, fallback string) string {

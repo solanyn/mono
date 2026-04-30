@@ -12,8 +12,8 @@ type BronzeWritten struct {
 
 type SilverWritten struct {
 	Source    string    `json:"source"`
-	Bucket    string    `json:"bucket"`
-	Key       string    `json:"key"`
+	Table     string    `json:"table"`
+	BronzeKey string    `json:"bronze_key"`
 	Timestamp time.Time `json:"timestamp"`
 	RowCount  int       `json:"row_count"`
 }
