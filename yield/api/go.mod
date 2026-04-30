@@ -7,7 +7,7 @@ require (
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/jonas-p/go-shp v0.1.1
 	github.com/pressly/goose/v3 v3.27.1
-	github.com/redis/go-redis/v9 v9.18.0
+	github.com/redis/go-redis/v9 v9.19.0
 	github.com/robfig/cron/v3 v3.0.1
 )
 
