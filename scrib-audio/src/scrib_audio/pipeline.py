@@ -11,7 +11,7 @@ import numpy as np
 import soundfile as sf
 
 from .align import AlignedSegment, align
-from .diarize import diarize_array
+from .diarize import diarize_chunked
 from .transcribe import Transcript, transcribe_array
 
 log = logging.getLogger(__name__)
@@ -75,11 +75,12 @@ def process(
     log.info("pipeline: %.0fs audio, %d samples", duration, len(data))
 
     _emit("diarize", f"{duration:.0f}s audio")
-    diar_result = diarize_array(
+    diar_result = diarize_chunked(
         data, sr,
         threshold=threshold,
         min_duration=min_duration,
         merge_gap=merge_gap,
+        progress=progress,
     )
     log.info(
         "pipeline: diarization done — %d segments, %d speakers",
