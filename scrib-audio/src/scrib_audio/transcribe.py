@@ -20,6 +20,15 @@ log = logging.getLogger(__name__)
 _model = None
 _model_name: str = "mlx-community/parakeet-tdt-0.6b-v3"
 
+# Long-form chunking for parakeet-tdt. Without chunking, mlx-audio tries to
+# allocate the full mel + attention state in a single Metal buffer, which
+# exceeds the per-buffer cap (~9.5 GB on an M4 Mini) for recordings longer
+# than ~10 minutes. 120s chunks match the safe ceiling used in scrib-server's
+# former VAD path (commit eec7c24); 15s of overlap gives the token merger
+# enough context to stitch word boundaries cleanly.
+_STT_CHUNK_SECS = float(os.environ.get("SCRIB_AUDIO_STT_CHUNK_SECS", 120.0))
+_STT_OVERLAP_SECS = float(os.environ.get("SCRIB_AUDIO_STT_OVERLAP_SECS", 15.0))
+
 
 @dataclass
 class Word:
@@ -100,8 +109,17 @@ def transcribe_array(data: np.ndarray, sr: int) -> Transcript:
     os.close(tmp_fd)
     try:
         sf.write(tmp_path, data, sr)
-        log.info("transcribing %.0fs of audio", len(data) / sr)
-        result = model.generate(tmp_path, verbose=True)
+        duration = len(data) / sr
+        log.info(
+            "transcribing %.0fs of audio (chunk=%.0fs overlap=%.0fs)",
+            duration, _STT_CHUNK_SECS, _STT_OVERLAP_SECS,
+        )
+        result = model.generate(
+            tmp_path,
+            chunk_duration=_STT_CHUNK_SECS,
+            overlap_duration=_STT_OVERLAP_SECS,
+            verbose=True,
+        )
     finally:
         try:
             os.unlink(tmp_path)
