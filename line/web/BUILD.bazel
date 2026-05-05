@@ -1,0 +1,52 @@
+load("@aspect_bazel_lib//lib:copy_to_bin.bzl", "copy_to_bin")
+load("@aspect_rules_js//js:defs.bzl", "js_run_binary")
+load("@npm//line/web:vite/package_json.bzl", vite_bin = "bin")
+load("@npm//:defs.bzl", "npm_link_all_packages")
+
+npm_link_all_packages()
+
+copy_to_bin(
+    name = "srcs",
+    srcs = [
+        "package.json",
+        "tsconfig.json",
+        "vite.config.ts",
+        "index.html",
+    ] + glob([
+        "src/**",
+    ]),
+)
+
+BUILD_DEPS = [":node_modules/" + d for d in [
+    "react",
+    "react-dom",
+    "react-router",
+    "three",
+    "@react-three/fiber",
+    "@react-three/drei",
+    "recharts",
+    "@vitejs/plugin-react",
+    "vite",
+]]
+
+vite_bin.vite_binary(
+    name = "vite",
+    chdir = package_name(),
+)
+
+js_run_binary(
+    name = "build",
+    srcs = [":srcs"] + BUILD_DEPS,
+    args = ["build"],
+    mnemonic = "ViteBuild",
+    out_dirs = ["dist"],
+    tool = ":vite",
+    execution_requirements = {"no-sandbox": "1"},
+)
+
+vite_bin.vite_binary(
+    name = "dev",
+    chdir = package_name(),
+    args = ["--host", "0.0.0.0"],
+    data = [":srcs"] + BUILD_DEPS,
+)

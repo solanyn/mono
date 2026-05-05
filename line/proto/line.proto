@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package line.v1;
+
+option go_package = "github.com/solanyn/mono/line/gen/linepb";
+
+service LineService {
+  rpc GetSession(GetSessionRequest) returns (GetSessionResponse);
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
+  rpc StreamTelemetry(StreamTelemetryRequest) returns (stream TelemetryFrame);
+}
+
+message GetSessionRequest {
+  string session_id = 1;
+}
+
+message GetSessionResponse {
+  Session session = 1;
+}
+
+message ListSessionsRequest {
+  int32 limit = 1;
+  string cursor = 2;
+}
+
+message ListSessionsResponse {
+  repeated Session sessions = 1;
+  string next_cursor = 2;
+}
+
+message Session {
+  string id = 1;
+  int64 started_at = 2;
+  int64 ended_at = 3;
+  int32 car_code = 4;
+  string track_id = 5;
+  int32 lap_count = 6;
+  int32 best_lap_ms = 7;
+}
+
+message StreamTelemetryRequest {
+  string session_id = 1;
+  int32 lap_number = 2;
+}
+
+message TelemetryFrame {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+  float speed = 4;
+  float throttle = 5;
+  float brake = 6;
+  float steering = 7;
+  int32 rpm = 8;
+  int32 gear = 9;
+  int64 timestamp_ns = 10;
+}

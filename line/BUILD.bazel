@@ -1,0 +1,101 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+load("//line:service.bzl", "line_service")
+
+go_library(
+    name = "linepb_lib",
+    srcs = glob(["gen/linepb/*.go"]),
+    importpath = "github.com/solanyn/mono/line/gen/linepb",
+)
+
+go_library(
+    name = "storage_lib",
+    srcs = glob(["internal/storage/*.go"]),
+    importpath = "github.com/solanyn/mono/line/internal/storage",
+    deps = [
+        "@com_github_aws_aws_sdk_go_v2//aws",
+        "@com_github_aws_aws_sdk_go_v2_credentials//:credentials",
+        "@com_github_aws_aws_sdk_go_v2_service_s3//:s3",
+        "@com_github_google_uuid//:uuid",
+        "@com_github_parquet_go_parquet_go//:parquet-go",
+        "@com_github_parquet_go_parquet_go//compress/snappy",
+    ],
+)
+
+go_library(
+    name = "telemetry_lib",
+    srcs = glob(["internal/telemetry/*.go"], exclude = ["internal/telemetry/*_test.go"]),
+    importpath = "github.com/solanyn/mono/line/internal/telemetry",
+    deps = [
+        ":storage_lib",
+        "@org_golang_x_crypto//salsa20",
+    ],
+)
+
+go_library(
+    name = "kafka_lib",
+    srcs = glob(["internal/kafka/*.go"]),
+    importpath = "github.com/solanyn/mono/line/internal/kafka",
+    deps = [
+        "@com_github_twmb_franz_go//pkg/kgo",
+    ],
+)
+
+go_library(
+    name = "coach_lib",
+    srcs = glob(["internal/coach/*.go"], exclude = ["internal/coach/*_test.go"]),
+    importpath = "github.com/solanyn/mono/line/internal/coach",
+    deps = [
+        ":telemetry_lib",
+        "@com_github_gorilla_websocket//:websocket",
+    ],
+)
+
+go_test(
+    name = "telemetry_test",
+    srcs = glob(["internal/telemetry/*_test.go"]),
+    embed = [":telemetry_lib"],
+)
+
+go_test(
+    name = "coach_test",
+    srcs = glob(["internal/coach/*_test.go"]),
+    embed = [":coach_lib"],
+)
+
+line_service(
+    name = "capture",
+    srcs = ["cmd/capture/main.go"],
+    repository = "ghcr.io/solanyn/line-capture",
+    deps = [
+        ":kafka_lib",
+        ":telemetry_lib",
+    ],
+)
+
+line_service(
+    name = "assembler",
+    srcs = ["cmd/assembler/main.go"],
+    repository = "ghcr.io/solanyn/line-assembler",
+    deps = [
+        ":kafka_lib",
+        ":storage_lib",
+        ":telemetry_lib",
+        "@com_github_google_uuid//:uuid",
+        "@com_github_twmb_franz_go//pkg/kgo",
+    ],
+)
+
+line_service(
+    name = "api",
+    srcs = ["cmd/api/main.go"],
+    repository = "ghcr.io/solanyn/line-api",
+    deps = [
+        ":coach_lib",
+        ":kafka_lib",
+        ":linepb_lib",
+        ":storage_lib",
+        ":telemetry_lib",
+        "@com_github_gorilla_websocket//:websocket",
+        "@com_github_twmb_franz_go//pkg/kgo",
+    ],
+)
