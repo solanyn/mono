@@ -45,6 +45,23 @@ func (c *S3Client) PutLap(ctx context.Context, sessionID string, lapNum int, dat
 	return key, nil
 }
 
+func (c *S3Client) GetObject(ctx context.Context, key string) ([]byte, error) {
+	resp, err := c.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(c.bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("s3 get %s: %w", key, err)
+	}
+	defer resp.Body.Close()
+
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(resp.Body); err != nil {
+		return nil, fmt.Errorf("s3 read body: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
 func (c *S3Client) GetLap(ctx context.Context, sessionID string, lapNum int) ([]byte, error) {
 	prefix := fmt.Sprintf("bronze/telemetry/%s/", sessionID)
 	target := fmt.Sprintf("lap-%03d-", lapNum)

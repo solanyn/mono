@@ -1,0 +1,24 @@
+[project]
+name = "analytics"
+version = "0.1.0"
+description = "GT7 telemetry analytics - lap metrics, consistency scoring, progression"
+requires-python = ">=3.12"
+dependencies = [
+    "pyarrow>=18.0.0",
+    "pandas>=2.2.0",
+    "numpy>=2.0.0",
+    "scipy>=1.14.0",
+    "boto3>=1.35.0",
+    "s3fs>=2024.0.0",
+    "confluent-kafka>=2.6.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/analytics"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0.0"]

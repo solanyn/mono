@@ -117,3 +117,96 @@ export function connectCoach(
   }
   return ws
 }
+
+export interface LapMetrics {
+  session_id: string
+  lap_number: number
+  total_distance_m: number
+  top_speed: number
+  avg_speed: number
+  min_speed: number
+  max_rpm: number
+  brake_count: number
+  throttle_pct: number
+  coast_pct: number
+  brake_pct: number
+  avg_tire_temps: Record<string, number>
+  fuel_used: number
+  frame_count: number
+  track_id?: string
+  track_name?: string
+  corner_count?: number
+  corners?: CornerData[]
+}
+
+export interface CornerData {
+  entry_idx: number
+  apex_idx: number
+  exit_idx: number
+  entry_speed: number
+  apex_speed: number
+  exit_speed: number
+  direction: string
+}
+
+export interface SessionSummary {
+  session_id: string
+  car_code: number
+  track_name: string
+  lap_count: number
+  consistency: {
+    consistency_score: number
+    lap_time_cv: number
+    speed_cv: number
+    best_lap_idx: number
+    worst_lap_idx: number
+    best_worst_delta_ms: number
+  }
+  tyre_degradation: {
+    avg_temp_per_lap: number[]
+    degradation_rate: number
+    estimated_laps_remaining: number
+    compound_guess: string
+    front_rear_balance: number
+  }
+  fuel_strategy: {
+    consumption_per_lap: number
+    fuel_remaining: number
+    laps_remaining: number
+    optimal_pit_lap: number
+  }
+  journal: {
+    total_laps: number
+    best_lap_ms: number
+    worst_lap_ms: number
+    consistency_score: number
+    highlights: string[]
+    areas_to_improve: string[]
+    corner_notes: string[]
+    summary: string
+  }
+}
+
+export interface TrackInfo {
+  track_id: string
+  name: string
+  country: string
+  length_m: number
+  corners: { number: number; name: string; direction: string; notes: string }[]
+  source: string
+}
+
+export async function fetchLapMetrics(sessionId: string, lap: number): Promise<LapMetrics> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/laps/${lap}/metrics`)
+  return res.json()
+}
+
+export async function fetchSessionSummary(sessionId: string): Promise<SessionSummary> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/summary`)
+  return res.json()
+}
+
+export async function fetchTracks(): Promise<{ tracks: TrackInfo[] }> {
+  const res = await fetch(`${API_BASE}/tracks`)
+  return res.json()
+}

@@ -62,6 +62,33 @@ go_test(
     embed = [":coach_lib"],
 )
 
+go_library(
+    name = "db_lib",
+    srcs = glob(["internal/db/*.go"]),
+    importpath = "github.com/solanyn/mono/line/internal/db",
+    deps = [
+        "@com_github_jackc_pgx_v5//pgxpool",
+    ],
+)
+
+go_library(
+    name = "migrations_lib",
+    srcs = ["migrations/embed.go"],
+    embedsrcs = ["migrations/001_initial.sql"],
+    importpath = "github.com/solanyn/mono/line/migrations",
+)
+
+line_service(
+    name = "migrate",
+    srcs = ["cmd/migrate/main.go"],
+    repository = "ghcr.io/solanyn/line-migrate",
+    deps = [
+        ":migrations_lib",
+        "@com_github_jackc_pgx_v5//stdlib",
+        "@com_github_pressly_goose_v3//:goose",
+    ],
+)
+
 line_service(
     name = "capture",
     srcs = ["cmd/capture/main.go"],
@@ -77,6 +104,7 @@ line_service(
     srcs = ["cmd/assembler/main.go"],
     repository = "ghcr.io/solanyn/line-assembler",
     deps = [
+        ":db_lib",
         ":kafka_lib",
         ":storage_lib",
         ":telemetry_lib",
@@ -91,6 +119,7 @@ line_service(
     repository = "ghcr.io/solanyn/line-api",
     deps = [
         ":coach_lib",
+        ":db_lib",
         ":kafka_lib",
         ":linepb_lib",
         ":storage_lib",

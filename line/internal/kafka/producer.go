@@ -3,6 +3,7 @@ package kafka
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/twmb/franz-go/pkg/kgo"
 )
@@ -12,13 +13,22 @@ type Producer struct {
 	topic  string
 }
 
-func NewProducer(brokers []string, topic string) (*Producer, error) {
-	client, err := kgo.NewClient(
+func NewProducer(brokers []string, opts ...string) (*Producer, error) {
+	var topic string
+	if len(opts) > 0 {
+		topic = opts[0]
+	}
+
+	kopts := []kgo.Opt{
 		kgo.SeedBrokers(brokers...),
 		kgo.AllowAutoTopicCreation(),
-		kgo.DefaultProduceTopic(topic),
 		kgo.ProducerBatchCompression(kgo.SnappyCompression()),
-	)
+	}
+	if topic != "" {
+		kopts = append(kopts, kgo.DefaultProduceTopic(topic))
+	}
+
+	client, err := kgo.NewClient(kopts...)
 	if err != nil {
 		return nil, fmt.Errorf("kafka producer: %w", err)
 	}
@@ -37,13 +47,16 @@ func (p *Producer) Produce(ctx context.Context, key, value []byte) error {
 	return nil
 }
 
-func (p *Producer) ProduceAsync(ctx context.Context, key, value []byte, fn func(error)) {
+func (p *Producer) ProduceAsync(ctx context.Context, topic string, key string, value []byte) {
 	record := &kgo.Record{
-		Key:   key,
+		Topic: topic,
+		Key:   []byte(key),
 		Value: value,
 	}
 	p.client.Produce(ctx, record, func(_ *kgo.Record, err error) {
-		fn(err)
+		if err != nil {
+			slog.Error("kafka produce async failed", "topic", topic, "key", key, "err", err)
+		}
 	})
 }
 

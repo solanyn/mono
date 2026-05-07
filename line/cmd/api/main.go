@@ -19,6 +19,7 @@ import (
 
 	"github.com/solanyn/mono/line/gen/linepb"
 	"github.com/solanyn/mono/line/internal/coach"
+	"github.com/solanyn/mono/line/internal/db"
 	"github.com/solanyn/mono/line/internal/kafka"
 	"github.com/solanyn/mono/line/internal/storage"
 	"github.com/solanyn/mono/line/internal/telemetry"
@@ -29,9 +30,12 @@ var upgrader = websocket.Upgrader{
 }
 
 type server struct {
-	s3    *storage.S3Client
-	live  *liveHub
-	coach *coach.Pipeline
+	s3       *storage.S3Client
+	silver   *storage.S3Client
+	gold     *storage.S3Client
+	live     *liveHub
+	coach    *coach.Pipeline
+	database *db.DB
 }
 
 type liveHub struct {
@@ -92,18 +96,37 @@ func main() {
 	s3SecretKey := os.Getenv("S3_SECRET_KEY")
 	s3Region := envOrDefault("S3_REGION", "us-east-1")
 	s3Bucket := envOrDefault("S3_BUCKET", "line-bronze")
+	silverBucket := envOrDefault("S3_SILVER_BUCKET", "line-silver")
+	goldBucket := envOrDefault("S3_GOLD_BUCKET", "line-gold")
 	addr := envOrDefault("ADDR", ":8080")
 	ttsEndpoint := envOrDefault("TTS_ENDPOINT", "http://mac.internal:8000")
 	llmEndpoint := envOrDefault("LLM_ENDPOINT", "http://mac.internal:8080")
 	llmModel := envOrDefault("LLM_MODEL", "mlx-community/gemma-4-e4b-it-4bit")
 	coachVoice := envOrDefault("COACH_VOICE", "af_heart")
 	useLLM := envOrDefault("COACH_USE_LLM", "true") == "true"
+	databaseURL := envOrDefault("DATABASE_URL", "")
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
 	s3Client := storage.NewS3Client(s3Endpoint, s3AccessKey, s3SecretKey, s3Region, s3Bucket)
+	silverClient := storage.NewS3Client(s3Endpoint, s3AccessKey, s3SecretKey, s3Region, silverBucket)
+	goldClient := storage.NewS3Client(s3Endpoint, s3AccessKey, s3SecretKey, s3Region, goldBucket)
 	hub := newLiveHub()
+
+	var database *db.DB
+	if databaseURL != "" {
+		var err error
+		database, err = db.New(ctx, databaseURL)
+		if err != nil {
+			slog.Error("failed to connect to database", "err", err)
+			os.Exit(1)
+		}
+		defer database.Close()
+		slog.Info("database connected")
+	} else {
+		slog.Warn("DATABASE_URL not set, session queries will return empty")
+	}
 
 	coachPipeline := coach.NewPipeline(coach.Config{
 		TTSEndpoint: ttsEndpoint,
@@ -114,7 +137,7 @@ func main() {
 		UseLLM:      useLLM,
 	})
 
-	srv := &server{s3: s3Client, live: hub, coach: coachPipeline}
+	srv := &server{s3: s3Client, silver: silverClient, gold: goldClient, live: hub, coach: coachPipeline, database: database}
 
 	consumer, err := kafka.NewConsumer(brokers, group, topic)
 	if err != nil {
@@ -183,6 +206,9 @@ func main() {
 	mux.HandleFunc("GET /api/v1/sessions/{id}/laps/{lap}/telemetry", srv.handleGetTelemetry)
 	mux.HandleFunc("GET /api/v1/live", srv.handleLiveWS)
 	mux.HandleFunc("GET /api/v1/coach", srv.handleCoachWS)
+	mux.HandleFunc("GET /api/v1/sessions/{id}/laps/{lap}/metrics", srv.handleLapMetrics)
+	mux.HandleFunc("GET /api/v1/sessions/{id}/summary", srv.handleSessionSummary)
+	mux.HandleFunc("GET /api/v1/tracks", srv.handleListTracks)
 
 	webDir := envOrDefault("WEB_DIR", "")
 	if webDir != "" {
@@ -220,25 +246,64 @@ func (s *server) handleStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) handleListSessions(w http.ResponseWriter, r *http.Request) {
-	// TODO: query PostgreSQL for session metadata
-	writeJSON(w, map[string]interface{}{
-		"sessions":    []linepb.Session{},
-		"next_cursor": "",
-	})
+	if s.database == nil {
+		writeJSON(w, map[string]interface{}{"sessions": []interface{}{}, "next_cursor": ""})
+		return
+	}
+	limit := 50
+	offset := 0
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+			limit = v
+		}
+	}
+	if o := r.URL.Query().Get("offset"); o != "" {
+		if v, err := strconv.Atoi(o); err == nil && v >= 0 {
+			offset = v
+		}
+	}
+	sessions, err := s.database.ListSessions(r.Context(), limit, offset)
+	if err != nil {
+		slog.Error("list sessions", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if sessions == nil {
+		sessions = []db.Session{}
+	}
+	writeJSON(w, map[string]interface{}{"sessions": sessions})
 }
 
 func (s *server) handleGetSession(w http.ResponseWriter, r *http.Request) {
-	_ = r.PathValue("id")
-	// TODO: query PostgreSQL
-	http.Error(w, "not implemented", http.StatusNotImplemented)
+	id := r.PathValue("id")
+	if s.database == nil {
+		http.Error(w, "not available", http.StatusServiceUnavailable)
+		return
+	}
+	session, err := s.database.GetSession(r.Context(), id)
+	if err != nil {
+		http.Error(w, "session not found", http.StatusNotFound)
+		return
+	}
+	writeJSON(w, session)
 }
 
 func (s *server) handleListLaps(w http.ResponseWriter, r *http.Request) {
-	_ = r.PathValue("id")
-	// TODO: query PostgreSQL for lap metadata
-	writeJSON(w, map[string]interface{}{
-		"laps": []linepb.Lap{},
-	})
+	id := r.PathValue("id")
+	if s.database == nil {
+		writeJSON(w, map[string]interface{}{"laps": []interface{}{}})
+		return
+	}
+	laps, err := s.database.ListLaps(r.Context(), id)
+	if err != nil {
+		slog.Error("list laps", "session", id, "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if laps == nil {
+		laps = []db.Lap{}
+	}
+	writeJSON(w, map[string]interface{}{"laps": laps})
 }
 
 func (s *server) handleGetTelemetry(w http.ResponseWriter, r *http.Request) {
@@ -345,6 +410,54 @@ func (s *server) handleCoachWS(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
+}
+
+func (s *server) handleLapMetrics(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("id")
+	lapStr := r.PathValue("lap")
+	lapNum, err := strconv.Atoi(lapStr)
+	if err != nil {
+		http.Error(w, "invalid lap number", http.StatusBadRequest)
+		return
+	}
+
+	key := "laps/" + sessionID + "/" + strconv.Itoa(lapNum) + "/metrics.json"
+	data, err := s.silver.GetObject(r.Context(), key)
+	if err != nil {
+		http.Error(w, "metrics not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(data)
+}
+
+func (s *server) handleSessionSummary(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("id")
+	key := "sessions/" + sessionID + "/summary.json"
+	data, err := s.gold.GetObject(r.Context(), key)
+	if err != nil {
+		http.Error(w, "summary not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(data)
+}
+
+func (s *server) handleListTracks(w http.ResponseWriter, r *http.Request) {
+	tracksFile := envOrDefault("TRACKS_DATA", "")
+	if tracksFile == "" {
+		writeJSON(w, map[string]interface{}{"tracks": []interface{}{}})
+		return
+	}
+	data, err := os.ReadFile(tracksFile)
+	if err != nil {
+		http.Error(w, "tracks data not available", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(data)
 }
 
 func corsMiddleware(next http.Handler) http.Handler {

@@ -44,6 +44,8 @@ type Detector struct {
 	lastTireAvg float32
 }
 
+const maxLapHistory = 20
+
 func NewDetector(bufSize int) *Detector {
 	return &Detector{
 		events: make(chan Event, bufSize),
@@ -80,6 +82,9 @@ func (d *Detector) onLapComplete(newFrame telemetry.Frame) {
 
 	stats := d.computeLapStats(d.currentLap, d.lapFrames)
 	d.lapHistory = append(d.lapHistory, stats)
+	if len(d.lapHistory) > maxLapHistory {
+		d.lapHistory = d.lapHistory[len(d.lapHistory)-maxLapHistory:]
+	}
 
 	data := map[string]interface{}{
 		"lap_number": stats.LapNumber,
