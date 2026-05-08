@@ -4,59 +4,83 @@ import type { TelemetryFrame } from './api'
 
 interface TelemetryChartProps {
   frames?: TelemetryFrame[]
+  compareFrames?: TelemetryFrame[]
 }
 
-export function TelemetryChart({ frames }: TelemetryChartProps) {
-  const data = useMemo(() => {
-    if (!frames || frames.length === 0) {
-      return Array.from({ length: 200 }, (_, i) => ({
-        distance: i * 10,
-        speed: 80 + 40 * Math.sin(i * 0.05) + Math.random() * 5,
-        throttle: Math.max(0, Math.min(100, 50 + 50 * Math.cos(i * 0.05))),
-        brake: Math.max(0, Math.min(100, -50 * Math.cos(i * 0.05))),
-      }))
+function framesToData(frames: TelemetryFrame[]) {
+  let dist = 0
+  return frames.map((f, i) => {
+    if (i > 0) {
+      const prev = frames[i - 1]
+      const dx = f.x - prev.x
+      const dz = f.z - prev.z
+      dist += Math.sqrt(dx * dx + dz * dz)
     }
-    let dist = 0
-    return frames.map((f, i) => {
-      if (i > 0) {
-        const prev = frames[i - 1]
-        const dx = f.x - prev.x
-        const dz = f.z - prev.z
-        dist += Math.sqrt(dx * dx + dz * dz)
-      }
-      return {
-        distance: Math.round(dist),
-        speed: f.speed,
-        throttle: f.throttle * 100,
-        brake: f.brake * 100,
-      }
-    })
+    return {
+      distance: Math.round(dist),
+      speed: f.speed,
+      throttle: f.throttle * 100,
+      brake: f.brake * 100,
+    }
+  })
+}
+
+export function TelemetryChart({ frames, compareFrames }: TelemetryChartProps) {
+  const data = useMemo(() => {
+    if (!frames || frames.length === 0) return []
+    return framesToData(frames)
   }, [frames])
 
-  return (
-    <div>
-      <h3 style={{ margin: '0 0 0.5rem', fontSize: '0.9rem', color: '#888' }}>Speed (km/h)</h3>
-      <ResponsiveContainer width="100%" height={120}>
-        <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
-          <XAxis dataKey="distance" stroke="#555" tick={{ fontSize: 10 }} />
-          <YAxis stroke="#555" tick={{ fontSize: 10 }} />
-          <Tooltip contentStyle={{ background: '#1a1a1a', border: '1px solid #333' }} />
-          <Line type="monotone" dataKey="speed" stroke="#4fc3f7" dot={false} strokeWidth={1.5} />
-        </LineChart>
-      </ResponsiveContainer>
+  const compareData = useMemo(() => {
+    if (!compareFrames || compareFrames.length === 0) return null
+    return framesToData(compareFrames)
+  }, [compareFrames])
 
-      <h3 style={{ margin: '1rem 0 0.5rem', fontSize: '0.9rem', color: '#888' }}>Throttle / Brake (%)</h3>
-      <ResponsiveContainer width="100%" height={120}>
-        <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
-          <XAxis dataKey="distance" stroke="#555" tick={{ fontSize: 10 }} />
-          <YAxis stroke="#555" tick={{ fontSize: 10 }} domain={[0, 100]} />
-          <Tooltip contentStyle={{ background: '#1a1a1a', border: '1px solid #333' }} />
-          <Line type="monotone" dataKey="throttle" stroke="#66bb6a" dot={false} strokeWidth={1.5} />
-          <Line type="monotone" dataKey="brake" stroke="#ef5350" dot={false} strokeWidth={1.5} />
-        </LineChart>
-      </ResponsiveContainer>
+  const merged = useMemo(() => {
+    if (!compareData) return data
+    return data.map((d, i) => ({
+      ...d,
+      speed2: compareData[i]?.speed ?? null,
+      throttle2: compareData[i]?.throttle ?? null,
+      brake2: compareData[i]?.brake ?? null,
+    }))
+  }, [data, compareData])
+
+  if (merged.length === 0) {
+    return <div className="text-xs text-text-dim text-center py-8">Select a lap to view telemetry</div>
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-xs text-text-muted mb-1">Speed (km/h)</h3>
+        <ResponsiveContainer width="100%" height={100}>
+          <LineChart data={merged}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
+            <XAxis dataKey="distance" stroke="#555" tick={{ fontSize: 9 }} />
+            <YAxis stroke="#555" tick={{ fontSize: 9 }} />
+            <Tooltip contentStyle={{ background: '#1a1a1a', border: '1px solid #333', fontSize: 11 }} />
+            <Line type="monotone" dataKey="speed" stroke="#4fc3f7" dot={false} strokeWidth={1.5} />
+            {compareData && <Line type="monotone" dataKey="speed2" stroke="#ff7043" dot={false} strokeWidth={1} strokeDasharray="4 2" />}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div>
+        <h3 className="text-xs text-text-muted mb-1">Throttle / Brake (%)</h3>
+        <ResponsiveContainer width="100%" height={80}>
+          <LineChart data={merged}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
+            <XAxis dataKey="distance" stroke="#555" tick={{ fontSize: 9 }} />
+            <YAxis stroke="#555" tick={{ fontSize: 9 }} domain={[0, 100]} />
+            <Tooltip contentStyle={{ background: '#1a1a1a', border: '1px solid #333', fontSize: 11 }} />
+            <Line type="monotone" dataKey="throttle" stroke="#66bb6a" dot={false} strokeWidth={1.5} />
+            <Line type="monotone" dataKey="brake" stroke="#ef5350" dot={false} strokeWidth={1.5} />
+            {compareData && <Line type="monotone" dataKey="throttle2" stroke="#66bb6a" dot={false} strokeWidth={1} strokeDasharray="4 2" opacity={0.5} />}
+            {compareData && <Line type="monotone" dataKey="brake2" stroke="#ef5350" dot={false} strokeWidth={1} strokeDasharray="4 2" opacity={0.5} />}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   )
 }

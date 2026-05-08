@@ -1,5 +1,5 @@
 declare module 'recharts' {
-  import type { FC, SVGProps } from 'react'
+  import type { FC } from 'react'
 
   export interface LineChartProps {
     data?: unknown[]
@@ -16,6 +16,8 @@ declare module 'recharts' {
     stroke?: string
     dot?: boolean
     strokeWidth?: number
+    strokeDasharray?: string
+    opacity?: number
   }
   export const Line: FC<LineProps>
 

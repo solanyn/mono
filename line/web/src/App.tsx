@@ -1,18 +1,21 @@
 import { NavLink, Outlet } from 'react-router'
-
-const navStyle = (active: boolean) => ({ color: active ? '#4fc3f7' : '#888', textDecoration: 'none' as const })
+import clsx from 'clsx'
 
 export function App() {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#0a0a0a', color: '#e0e0e0' }}>
-      <header style={{ display: 'flex', alignItems: 'center', gap: '2rem', padding: '0.75rem 1.5rem', borderBottom: '1px solid #222' }}>
-        <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600 }}>line</h1>
-        <nav style={{ display: 'flex', gap: '1rem' }}>
-          <NavLink to="/" style={({ isActive }: { isActive: boolean }) => navStyle(isActive)}>Sessions</NavLink>
-          <NavLink to="/live" style={({ isActive }: { isActive: boolean }) => navStyle(isActive)}>Live</NavLink>
+    <div className="flex flex-col h-screen bg-bg text-text">
+      <header className="flex items-center gap-4 sm:gap-6 px-4 sm:px-5 py-3 border-b border-border">
+        <h1 className="text-lg font-semibold tracking-tight">line</h1>
+        <nav className="flex gap-3 sm:gap-4 text-sm">
+          <NavLink to="/" className={({ isActive }: { isActive: boolean }) => clsx('transition-colors', isActive ? 'text-accent' : 'text-text-muted hover:text-text')} end>
+            Sessions
+          </NavLink>
+          <NavLink to="/live" className={({ isActive }: { isActive: boolean }) => clsx('transition-colors', isActive ? 'text-accent' : 'text-text-muted hover:text-text')}>
+            Live
+          </NavLink>
         </nav>
       </header>
-      <main style={{ flex: 1, overflow: 'hidden' }}>
+      <main className="flex-1 overflow-hidden">
         <Outlet />
       </main>
     </div>
