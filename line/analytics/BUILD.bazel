@@ -1,0 +1,50 @@
+load("@rules_python//python:py_binary.bzl", "py_binary")
+load("@rules_python//python:py_library.bzl", "py_library")
+load("@rules_python//python:py_test.bzl", "py_test")
+load("@rules_uv//uv:pip.bzl", "pip_compile")
+
+pip_compile(
+    name = "generate_requirements_txt",
+    requirements_in = "pyproject.toml",
+    requirements_txt = "requirements_lock.txt",
+    python_platform = "x86_64-unknown-linux-gnu",
+    extra_args = ["--extra", "dev"],
+)
+
+py_library(
+    name = "analytics_lib",
+    srcs = glob(["src/analytics/**/*.py"]),
+    data = glob(["data/**"]),
+    imports = ["src"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@line_pypi//pyarrow",
+        "@line_pypi//pandas",
+        "@line_pypi//numpy",
+        "@line_pypi//scipy",
+        "@line_pypi//boto3",
+        "@line_pypi//s3fs",
+        "@line_pypi//confluent_kafka",
+    ],
+)
+
+py_binary(
+    name = "worker",
+    srcs = ["src/analytics/worker.py"],
+    imports = ["src"],
+    main = "src/analytics/worker.py",
+    visibility = ["//visibility:public"],
+    deps = [":analytics_lib"],
+)
+
+py_test(
+    name = "test_analytics",
+    srcs = ["tests/test_analytics.py"],
+    data = glob(["data/**"]),
+    deps = [
+        ":analytics_lib",
+        "@line_pypi//pytest",
+    ],
+    args = ["-v"],
+    size = "small",
+)

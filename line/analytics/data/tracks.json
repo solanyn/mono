@@ -1,0 +1,155 @@
+{
+  "tracks": [
+    {
+      "track_id": "tsukuba",
+      "name": "Tsukuba Circuit",
+      "country": "Japan",
+      "length_m": 2045,
+      "corners": [
+        {"number": 1, "name": "First Corner", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Tight left, late apex"},
+        {"number": 2, "name": "Dunlop", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Fast right kink"},
+        {"number": 3, "name": "First Hairpin", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Heavy braking, tight left"},
+        {"number": 4, "name": "Second Hairpin", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Right hairpin, trail brake"},
+        {"number": 5, "name": "Backstretch Esses", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Quick direction changes"},
+        {"number": 6, "name": "Last Corner", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Long left onto main straight"}
+      ],
+      "source": "community"
+    },
+    {
+      "track_id": "deep_forest",
+      "name": "Deep Forest Raceway",
+      "country": "Fictional",
+      "length_m": 3194,
+      "corners": [
+        {"number": 1, "name": "Turn 1", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Fast right after start"},
+        {"number": 2, "name": "Turn 2", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Sweeping left"},
+        {"number": 3, "name": "Hairpin", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Tight right hairpin"},
+        {"number": 4, "name": "Esses", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Fast S-curves through forest"},
+        {"number": 5, "name": "Final Corner", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Medium right onto straight"}
+      ],
+      "source": "community"
+    },
+    {
+      "track_id": "trial_mountain",
+      "name": "Trial Mountain Circuit",
+      "country": "Fictional",
+      "length_m": 3975,
+      "corners": [
+        {"number": 1, "name": "First Turn", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Downhill right"},
+        {"number": 2, "name": "Tunnel Entry", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Left into tunnel"},
+        {"number": 3, "name": "Tunnel Exit", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Blind right exiting tunnel"},
+        {"number": 4, "name": "Hairpin", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Tight left hairpin"},
+        {"number": 5, "name": "Back Straight Kink", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Flat-out right kink"},
+        {"number": 6, "name": "Chicane", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Left-right chicane"},
+        {"number": 7, "name": "Final Corner", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Long right onto main straight"}
+      ],
+      "source": "community"
+    },
+    {
+      "track_id": "nurburgring_nordschleife",
+      "name": "Nürburgring Nordschleife",
+      "country": "Germany",
+      "length_m": 20832,
+      "corners": [
+        {"number": 1, "name": "T13", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "First corner after GP start"},
+        {"number": 2, "name": "Hatzenbach", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Fast left-right complex"},
+        {"number": 3, "name": "Flugplatz", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Crest then left, car gets light"},
+        {"number": 4, "name": "Schwedenkreuz", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Fast left kink"},
+        {"number": 5, "name": "Aremberg", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Downhill right, heavy braking"},
+        {"number": 6, "name": "Fuchsröhre", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Fast downhill left"},
+        {"number": 7, "name": "Adenauer Forst", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Tight left hairpin"},
+        {"number": 8, "name": "Metzgesfeld", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Right after Adenauer"},
+        {"number": 9, "name": "Kallenhard", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Downhill left"},
+        {"number": 10, "name": "Wehrseifen", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Tight right, uphill exit"},
+        {"number": 11, "name": "Ex-Mühle", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Left at bottom of valley"},
+        {"number": 12, "name": "Bergwerk", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Fast left, commitment corner"},
+        {"number": 13, "name": "Kesselchen", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Right-left through valley"},
+        {"number": 14, "name": "Karussell", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Banked left, use the ditch"},
+        {"number": 15, "name": "Hohe Acht", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Highest point, left over crest"},
+        {"number": 16, "name": "Brünnchen", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Right-left downhill"},
+        {"number": 17, "name": "Pflanzgarten", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Jump then left, very fast"},
+        {"number": 18, "name": "Schwalbenschwanz", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Right chicane"},
+        {"number": 19, "name": "Galgenkopf", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Left before Döttinger Höhe"},
+        {"number": 20, "name": "Döttinger Höhe", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Flat-out right kink on straight"}
+      ],
+      "source": "community"
+    },
+    {
+      "track_id": "spa",
+      "name": "Circuit de Spa-Francorchamps",
+      "country": "Belgium",
+      "length_m": 7004,
+      "corners": [
+        {"number": 1, "name": "La Source", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Tight right hairpin"},
+        {"number": 2, "name": "Eau Rouge", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Flat-out left-right uphill"},
+        {"number": 3, "name": "Raidillon", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Blind crest right after Eau Rouge"},
+        {"number": 4, "name": "Les Combes", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Left-right chicane, heavy braking"},
+        {"number": 5, "name": "Malmedy", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Right after Les Combes"},
+        {"number": 6, "name": "Rivage", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Downhill left hairpin"},
+        {"number": 7, "name": "Pouhon", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Fast double-apex left"},
+        {"number": 8, "name": "Fagnes", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Right chicane"},
+        {"number": 9, "name": "Stavelot", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Left onto back straight"},
+        {"number": 10, "name": "Blanchimont", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Very fast left, commitment"},
+        {"number": 11, "name": "Bus Stop", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Right-left chicane before pit straight"}
+      ],
+      "source": "community"
+    },
+    {
+      "track_id": "suzuka",
+      "name": "Suzuka Circuit",
+      "country": "Japan",
+      "length_m": 5807,
+      "corners": [
+        {"number": 1, "name": "Turn 1", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Medium right after start"},
+        {"number": 2, "name": "Turn 2", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Left into S-curves"},
+        {"number": 3, "name": "S-Curves", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Fast S-curves, rhythm section"},
+        {"number": 4, "name": "Dunlop", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Left over crest"},
+        {"number": 5, "name": "Degner 1", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Fast right"},
+        {"number": 6, "name": "Degner 2", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Tight right downhill"},
+        {"number": 7, "name": "Hairpin", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Slow left hairpin"},
+        {"number": 8, "name": "Spoon", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Double-apex left"},
+        {"number": 9, "name": "130R", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Very fast left, flat in most cars"},
+        {"number": 10, "name": "Casio Triangle", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Right-left chicane before straight"}
+      ],
+      "source": "community"
+    },
+    {
+      "track_id": "brands_hatch_gp",
+      "name": "Brands Hatch GP",
+      "country": "United Kingdom",
+      "length_m": 3908,
+      "corners": [
+        {"number": 1, "name": "Paddock Hill Bend", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Downhill left, blind apex"},
+        {"number": 2, "name": "Druids", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Tight right hairpin uphill"},
+        {"number": 3, "name": "Graham Hill Bend", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Left downhill"},
+        {"number": 4, "name": "Surtees", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Fast right kink"},
+        {"number": 5, "name": "Hawthorn Bend", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Right into back section"},
+        {"number": 6, "name": "Westfield Bend", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Left downhill"},
+        {"number": 7, "name": "Dingle Dell", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Fast left"},
+        {"number": 8, "name": "Stirlings", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Right uphill"},
+        {"number": 9, "name": "Clark Curve", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Left onto pit straight"}
+      ],
+      "source": "community"
+    },
+    {
+      "track_id": "laguna_seca",
+      "name": "WeatherTech Raceway Laguna Seca",
+      "country": "United States",
+      "length_m": 3602,
+      "corners": [
+        {"number": 1, "name": "Turn 1", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Downhill right after start"},
+        {"number": 2, "name": "Turn 2", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Left uphill"},
+        {"number": 3, "name": "Turn 3", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Right at top of hill"},
+        {"number": 4, "name": "Turn 4", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Left downhill"},
+        {"number": 5, "name": "Turn 5", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Right hairpin"},
+        {"number": 6, "name": "Turn 6", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Left uphill to Corkscrew"},
+        {"number": 7, "name": "Corkscrew Entry", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Blind left over crest, massive drop"},
+        {"number": 8, "name": "Corkscrew Exit", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Right at bottom of drop"},
+        {"number": 9, "name": "Rainey Curve", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Fast left"},
+        {"number": 10, "name": "Turn 10", "direction": "right", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Right before pit straight"},
+        {"number": 11, "name": "Turn 11", "direction": "left", "reference_apex_x": 0, "reference_apex_z": 0, "notes": "Left onto pit straight"}
+      ],
+      "source": "community"
+    }
+  ]
+}

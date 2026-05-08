@@ -2177,7 +2177,12 @@ pip.parse(
     python_version = "3.12",
     requirements_lock = "//scrib-audio:requirements_lock.txt",
 )
-use_repo(pip, "lake_pypi", "pypi", "scrib_audio_pypi")
+pip.parse(
+    hub_name = "line_pypi",
+    python_version = "3.12",
+    requirements_lock = "//line/analytics:requirements_lock.txt",
+)
+use_repo(pip, "lake_pypi", "line_pypi", "pypi", "scrib_audio_pypi")
 
 # js
 node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node", dev_dependency = True)
