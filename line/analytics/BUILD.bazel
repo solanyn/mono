@@ -8,6 +8,7 @@ pip_compile(
     requirements_in = "pyproject.toml",
     requirements_txt = "requirements_lock.txt",
     python_platform = "x86_64-unknown-linux-gnu",
+    extra_args = ["--extra", "dev"],
 )
 
 py_library(
