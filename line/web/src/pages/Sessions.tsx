@@ -8,52 +8,55 @@ export function SessionsPage() {
 
   useEffect(() => {
     fetchSessions().then(({ sessions }) => {
-      setSessions(sessions)
+      setSessions(sessions ?? [])
       setLoading(false)
-    })
+    }).catch(() => setLoading(false))
   }, [])
 
-  if (loading) return <div style={{ padding: '2rem' }}>Loading...</div>
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
 
   if (sessions.length === 0) {
     return (
-      <div style={{ padding: '2rem', color: '#666' }}>
-        <p>No sessions recorded yet. Start a race in GT7 to begin capturing telemetry.</p>
+      <div className="flex flex-col items-center justify-center h-full gap-3 text-text-muted">
+        <div className="text-4xl opacity-30">&#127937;</div>
+        <p className="text-sm">No sessions recorded yet.</p>
+        <p className="text-xs text-text-dim">Start a race in GT7 to begin capturing telemetry.</p>
       </div>
     )
   }
 
   return (
-    <div style={{ padding: '1.5rem', overflow: 'auto', height: '100%' }}>
-      <h2 style={{ margin: '0 0 1rem', fontSize: '1.1rem' }}>Sessions</h2>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+    <div className="p-5 overflow-auto h-full">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-base font-medium">Sessions</h2>
+        <span className="text-xs text-text-muted">{sessions.length} total</span>
+      </div>
+      <div className="flex flex-col gap-2">
         {sessions.map((s) => (
           <Link
             key={s.id}
             to={`/sessions/${s.id}`}
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: '1rem',
-              background: '#1a1a1a',
-              borderRadius: '8px',
-              textDecoration: 'none',
-              color: '#e0e0e0',
-              border: '1px solid #2a2a2a',
-            }}
+            className="flex justify-between items-center p-4 bg-surface-2 rounded-lg border border-border hover:border-accent/40 transition-colors group"
           >
             <div>
-              <div style={{ fontWeight: 500 }}>{s.track_id || 'Unknown Track'}</div>
-              <div style={{ fontSize: '0.85rem', color: '#888', marginTop: '0.25rem' }}>
-                Car {s.car_code} · {s.lap_count} laps
+              <div className="font-medium text-sm group-hover:text-accent transition-colors">
+                {s.track_id || 'Unknown Track'}
+              </div>
+              <div className="text-xs text-text-muted mt-1">
+                Car {s.car_code} &middot; {s.lap_count} laps
               </div>
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ color: '#4fc3f7', fontFamily: 'monospace' }}>
+            <div className="text-right">
+              <div className="text-accent font-mono text-sm">
                 {formatLapTime(s.best_lap_ms)}
               </div>
-              <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.25rem' }}>
+              <div className="text-xs text-text-dim mt-1">
                 {new Date(s.started_at).toLocaleDateString()}
               </div>
             </div>

@@ -25,6 +25,9 @@ BUILD_DEPS = [":node_modules/" + d for d in [
     "@react-three/fiber",
     "@react-three/drei",
     "recharts",
+    "clsx",
+    "tailwindcss",
+    "@tailwindcss/vite",
     "@vitejs/plugin-react",
     "vite",
 ]]

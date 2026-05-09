@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Line } from '@react-three/drei'
 import * as THREE from 'three'
 import { connectLive, connectCoach, type TelemetryFrame, type LiveStatus, type CoachMessage } from '../api'
+import clsx from 'clsx'
 
 const MAX_TRAIL = 600
 
@@ -59,8 +60,8 @@ export function LivePage() {
   }, [coachEnabled, playAudio])
 
   return (
-    <div style={{ display: 'flex', height: '100%' }}>
-      <div style={{ flex: 1, minHeight: 0 }}>
+    <div className="flex flex-col-reverse md:flex-row h-full">
+      <div className="flex-1 min-h-0 bg-surface">
         <Canvas camera={{ position: [0, 200, 200], fov: 60 }}>
           <ambientLight intensity={0.4} />
           <directionalLight position={[100, 200, 100]} intensity={0.8} />
@@ -69,50 +70,54 @@ export function LivePage() {
           <OrbitControls enableDamping dampingFactor={0.1} maxPolarAngle={Math.PI / 2.1} />
         </Canvas>
       </div>
-      <aside style={{ width: '280px', borderLeft: '1px solid #222', padding: '1rem', overflow: 'auto' }}>
+      <aside className="w-full md:w-72 border-b md:border-b-0 md:border-l border-border p-4 overflow-auto flex flex-col gap-5 max-h-64 md:max-h-none">
         <StatusBadge active={status.active} />
+
         {status.active && (
-          <div style={{ marginTop: '1rem', fontSize: '0.85rem', color: '#aaa' }}>
-            <div>Car: {status.car_code}</div>
-            <div>Lap: {status.current_lap}</div>
-            {status.track_id && <div>Track: {status.track_id}</div>}
+          <div className="text-xs text-text-muted space-y-1">
+            <div>Car: <span className="text-text font-mono">{status.car_code}</span></div>
+            <div>Lap: <span className="text-text font-mono">{status.current_lap}</span></div>
+            {status.track_id && <div>Track: <span className="text-text">{status.track_id}</span></div>}
           </div>
         )}
+
         {latest && (
-          <div style={{ marginTop: '1.5rem' }}>
-            <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.9rem', color: '#888' }}>Telemetry</h3>
-            <Gauge label="Speed" value={latest.speed} unit="km/h" max={350} color="#4fc3f7" />
-            <Gauge label="RPM" value={latest.rpm} unit="" max={9000} color="#ff7043" />
-            <Gauge label="Throttle" value={latest.throttle * 100} unit="%" max={100} color="#66bb6a" />
-            <Gauge label="Brake" value={latest.brake * 100} unit="%" max={100} color="#ef5350" />
-            <div style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: '#ccc' }}>
-              Gear: {latest.gear}
+          <div>
+            <h3 className="text-xs font-medium text-text-muted mb-3 uppercase tracking-wider">Telemetry</h3>
+            <div className="space-y-2">
+              <Gauge label="Speed" value={latest.speed} unit="km/h" max={350} color="bg-accent" />
+              <Gauge label="RPM" value={latest.rpm} unit="" max={9000} color="bg-orange" />
+              <Gauge label="Throttle" value={latest.throttle * 100} unit="%" max={100} color="bg-green" />
+              <Gauge label="Brake" value={latest.brake * 100} unit="%" max={100} color="bg-red" />
+            </div>
+            <div className="mt-3 text-center">
+              <span className="text-3xl font-mono font-bold text-text">{latest.gear}</span>
+              <span className="text-xs text-text-muted ml-1">gear</span>
             </div>
           </div>
         )}
-        <div style={{ marginTop: '1.5rem', borderTop: '1px solid #333', paddingTop: '1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ margin: 0, fontSize: '0.9rem', color: '#888' }}>Coach</h3>
+
+        <div className="border-t border-border pt-4">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-xs font-medium text-text-muted uppercase tracking-wider">Coach</h3>
             <button
               onClick={() => setCoachEnabled((v) => !v)}
-              style={{
-                background: coachEnabled ? '#66bb6a' : '#444',
-                border: 'none',
-                borderRadius: 4,
-                padding: '2px 8px',
-                fontSize: '0.75rem',
-                color: '#fff',
-                cursor: 'pointer',
-              }}
+              className={clsx(
+                'px-2 py-0.5 rounded text-xs font-medium transition-colors',
+                coachEnabled ? 'bg-green text-white' : 'bg-border-2 text-text-muted',
+              )}
             >
               {coachEnabled ? 'ON' : 'OFF'}
             </button>
           </div>
-          <div style={{ marginTop: '0.75rem', maxHeight: '200px', overflow: 'auto' }}>
+          <div className="space-y-2 max-h-48 overflow-auto">
+            {coachMessages.length === 0 && (
+              <p className="text-xs text-text-dim">Waiting for coaching events...</p>
+            )}
             {coachMessages.map((msg, i) => (
-              <div key={i} style={{ fontSize: '0.8rem', color: '#bbb', marginBottom: '0.5rem', borderLeft: '2px solid #4fc3f7', paddingLeft: '0.5rem' }}>
-                <div>{msg.text}</div>
-                <div style={{ fontSize: '0.7rem', color: '#666' }}>{msg.latency_ms}ms</div>
+              <div key={i} className="text-xs text-text-muted border-l-2 border-accent pl-2">
+                <div className="text-text">{msg.text}</div>
+                <div className="text-text-dim mt-0.5">{msg.latency_ms}ms</div>
               </div>
             ))}
           </div>
@@ -146,17 +151,12 @@ function LiveTrail({ frames }: { frames: TelemetryFrame[] }) {
 
 function StatusBadge({ active }: { active: boolean }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-      <div
-        style={{
-          width: 10,
-          height: 10,
-          borderRadius: '50%',
-          background: active ? '#66bb6a' : '#666',
-          boxShadow: active ? '0 0 8px #66bb6a' : 'none',
-        }}
-      />
-      <span style={{ fontSize: '0.9rem', color: active ? '#66bb6a' : '#666' }}>
+    <div className="flex items-center gap-2">
+      <div className={clsx(
+        'w-2.5 h-2.5 rounded-full',
+        active ? 'bg-green shadow-[0_0_8px_var(--color-green)]' : 'bg-text-dim',
+      )} />
+      <span className={clsx('text-sm', active ? 'text-green' : 'text-text-dim')}>
         {active ? 'Live' : 'Waiting for session'}
       </span>
     </div>
@@ -166,13 +166,13 @@ function StatusBadge({ active }: { active: boolean }) {
 function Gauge({ label, value, unit, max, color }: { label: string; value: number; unit: string; max: number; color: string }) {
   const pct = Math.min(100, (value / max) * 100)
   return (
-    <div style={{ marginBottom: '0.5rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#888' }}>
-        <span>{label}</span>
-        <span style={{ color: '#ccc', fontFamily: 'monospace' }}>{Math.round(value)} {unit}</span>
+    <div>
+      <div className="flex justify-between text-xs mb-0.5">
+        <span className="text-text-muted">{label}</span>
+        <span className="text-text font-mono">{Math.round(value)}{unit && ` ${unit}`}</span>
       </div>
-      <div style={{ height: 4, background: '#2a2a2a', borderRadius: 2, marginTop: 2 }}>
-        <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 2 }} />
+      <div className="h-1.5 bg-border rounded-full overflow-hidden">
+        <div className={clsx('h-full rounded-full transition-all duration-75', color)} style={{ width: `${pct}%` }} />
       </div>
     </div>
   )
