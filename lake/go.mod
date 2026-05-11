@@ -1,6 +1,6 @@
 module github.com/solanyn/mono/lake
 
-go 1.25.0
+go 1.26.3
 
 require (
 	github.com/apache/arrow-go/v18 v18.5.2

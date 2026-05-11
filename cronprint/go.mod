@@ -1,6 +1,6 @@
 module github.com/solanyn/mono/cronprint
 
-go 1.25.0
+go 1.26.3
 
 require (
 	github.com/OpenPrinting/goipp v1.2.0
