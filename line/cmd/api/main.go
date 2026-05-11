@@ -160,6 +160,16 @@ func main() {
 	}
 	defer consumer.Close()
 
+	sessionTopic := envOrDefault("KAFKA_SESSION_TOPIC", "line.session.complete")
+	journalGroup := envOrDefault("KAFKA_JOURNAL_GROUP", "line.api.journal")
+	journalConsumer, err := kafka.NewConsumer(brokers, journalGroup, sessionTopic)
+	if err != nil {
+		slog.Warn("journal consumer not started", "err", err)
+	} else {
+		defer journalConsumer.Close()
+		go srv.runJournalWorker(ctx, journalConsumer)
+	}
+
 	go coachPipeline.Run(ctx)
 
 	go func() {
@@ -230,6 +240,13 @@ func main() {
 	mux.HandleFunc("POST /api/v1/sessions/{id}/laps/{lap}/annotations", srv.handleCreateAnnotation)
 	mux.HandleFunc("DELETE /api/v1/annotations/{id}", srv.handleDeleteAnnotation)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/briefing", srv.handleGenerateBriefing)
+	mux.HandleFunc("GET /api/v1/sessions/{id}/journal", srv.handleGetJournal)
+	mux.HandleFunc("POST /api/v1/sessions/{id}/journal", srv.handleGenerateJournal)
+	mux.HandleFunc("GET /api/v1/reference-laps", srv.handleListReferenceLaps)
+	mux.HandleFunc("POST /api/v1/reference-laps", srv.handleSetReferenceLap)
+	mux.HandleFunc("DELETE /api/v1/reference-laps/{id}", srv.handleDeleteReferenceLap)
+	mux.HandleFunc("GET /api/v1/reference-laps/{trackId}/{carCode}/telemetry", srv.handleReferenceLapTelemetry)
+	mux.HandleFunc("GET /api/v1/compare", srv.handleCarComparison)
 
 	webDir := envOrDefault("WEB_DIR", "")
 	if webDir != "" {
@@ -719,6 +736,14 @@ func (s *server) handleGenerateBriefing(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	var trackHistory []db.SessionHistory
+	if s.database != nil && summary.TrackName != "" {
+		session, _ := s.database.GetSession(r.Context(), sessionID)
+		if session != nil && session.TrackID != nil {
+			trackHistory, _ = s.database.GetTrackHistory(r.Context(), *session.TrackID, 10)
+		}
+	}
+
 	llmEndpoint := envOrDefault("LLM_ENDPOINT", "http://mac.internal:8080")
 	llmModel := envOrDefault("LLM_MODEL", "mlx-community/gemma-4-e4b-it-4bit")
 	llm := coach.NewLLMClient(llmEndpoint, llmModel)
@@ -728,7 +753,8 @@ func (s *server) handleGenerateBriefing(w http.ResponseWriter, r *http.Request) 
 		summary.Journal.BestLapMs, summary.Journal.WorstLapMs,
 		summary.TyreDegradation.DegradationRate, summary.TyreDegradation.CompoundGuess, summary.TyreDegradation.FrontRearBalance,
 		summary.FuelStrategy.ConsumptionPerLap, summary.FuelStrategy.LapsRemaining, summary.FuelStrategy.OptimalPitLap,
-		summary.Journal.Highlights, summary.Journal.AreasToImprove, summary.Journal.CornerNotes)
+		summary.Journal.Highlights, summary.Journal.AreasToImprove, summary.Journal.CornerNotes,
+		trackHistory, s.cars)
 
 	briefing, err := llm.GenerateBriefing(r.Context(), prompt)
 	if err != nil {
@@ -748,13 +774,21 @@ func buildBriefingPrompt(track string, carCode int32, lapCount int,
 	bestLapMs, worstLapMs int,
 	tyreDegrad float64, compound string, frBalance float64,
 	fuelPerLap float64, fuelLapsRemain, pitLap int,
-	highlights, areasToImprove, cornerNotes []string) string {
+	highlights, areasToImprove, cornerNotes []string,
+	history []db.SessionHistory, cars []carEntry) string {
 
 	var b strings.Builder
 	b.WriteString("Generate a pre-race briefing for the driver. Be concise, actionable, and specific.\n\n")
 	b.WriteString("SESSION DATA:\n")
 	b.WriteString("Track: " + track + "\n")
-	b.WriteString("Car code: " + strconv.Itoa(int(carCode)) + "\n")
+	carName := "Car " + strconv.Itoa(int(carCode))
+	for _, c := range cars {
+		if c.ID == int(carCode) {
+			carName = c.Name + " (" + c.Maker + ")"
+			break
+		}
+	}
+	b.WriteString("Car: " + carName + "\n")
 	b.WriteString("Laps completed: " + strconv.Itoa(lapCount) + "\n")
 	b.WriteString("Best lap: " + formatLapTimeMs(bestLapMs) + "\n")
 	b.WriteString("Worst lap: " + formatLapTimeMs(worstLapMs) + "\n")
@@ -795,6 +829,25 @@ func buildBriefingPrompt(track string, carCode int32, lapCount int,
 		b.WriteString("CORNER NOTES:\n")
 		for _, n := range cornerNotes {
 			b.WriteString("- " + n + "\n")
+		}
+		b.WriteString("\n")
+	}
+
+	if len(history) > 0 {
+		b.WriteString("TRACK HISTORY (recent sessions on this track):\n")
+		for _, h := range history {
+			carName := "Car " + strconv.Itoa(int(h.CarCode))
+			for _, c := range cars {
+				if c.ID == int(h.CarCode) {
+					carName = c.Name
+					break
+				}
+			}
+			lapStr := "--:--.---"
+			if h.BestLapMs != nil {
+				lapStr = formatLapTimeMs(int(*h.BestLapMs))
+			}
+			b.WriteString("- " + h.StartedAt.Format("2006-01-02") + " | " + carName + " | Best: " + lapStr + " | " + strconv.Itoa(h.LapCount) + " laps\n")
 		}
 		b.WriteString("\n")
 	}
@@ -882,4 +935,422 @@ func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.ServeContent(w, r, path, stat.ModTime(), f.(io.ReadSeeker))
+}
+
+func (s *server) handleListReferenceLaps(w http.ResponseWriter, r *http.Request) {
+	if s.database == nil {
+		writeJSON(w, []interface{}{})
+		return
+	}
+	trackID := r.URL.Query().Get("track_id")
+	carCodeStr := r.URL.Query().Get("car_code")
+	var carCode int32
+	if carCodeStr != "" {
+		v, _ := strconv.Atoi(carCodeStr)
+		carCode = int32(v)
+	}
+	refs, err := s.database.ListReferenceLaps(r.Context(), trackID, carCode)
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	if refs == nil {
+		refs = []db.ReferenceLap{}
+	}
+	writeJSON(w, refs)
+}
+
+func (s *server) handleSetReferenceLap(w http.ResponseWriter, r *http.Request) {
+	if s.database == nil {
+		http.Error(w, "no database", http.StatusServiceUnavailable)
+		return
+	}
+	var req struct {
+		TrackID   string `json:"track_id"`
+		CarCode   int32  `json:"car_code"`
+		SessionID string `json:"session_id"`
+		LapNumber int    `json:"lap_number"`
+		TimeMs    int32  `json:"time_ms"`
+		S3Key     string `json:"s3_key"`
+		Label     string `json:"label"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	if req.Label == "" {
+		req.Label = "best"
+	}
+	ref := &db.ReferenceLap{
+		TrackID:   req.TrackID,
+		CarCode:   req.CarCode,
+		SessionID: req.SessionID,
+		LapNumber: req.LapNumber,
+		TimeMs:    req.TimeMs,
+		S3Key:     req.S3Key,
+		Label:     req.Label,
+	}
+	if err := s.database.SetReferenceLap(r.Context(), ref); err != nil {
+		slog.Error("set reference lap", "err", err)
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+	writeJSON(w, ref)
+}
+
+func (s *server) handleDeleteReferenceLap(w http.ResponseWriter, r *http.Request) {
+	if s.database == nil {
+		http.Error(w, "no database", http.StatusServiceUnavailable)
+		return
+	}
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := s.database.DeleteReferenceLap(r.Context(), id); err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *server) handleReferenceLapTelemetry(w http.ResponseWriter, r *http.Request) {
+	if s.database == nil {
+		http.Error(w, "no database", http.StatusServiceUnavailable)
+		return
+	}
+	trackID := r.PathValue("trackId")
+	carCodeStr := r.PathValue("carCode")
+	carCode, err := strconv.Atoi(carCodeStr)
+	if err != nil {
+		http.Error(w, "invalid car_code", http.StatusBadRequest)
+		return
+	}
+	label := r.URL.Query().Get("label")
+	if label == "" {
+		label = "best"
+	}
+	ref, err := s.database.GetReferenceLap(r.Context(), trackID, int32(carCode), label)
+	if err != nil {
+		http.Error(w, "reference lap not found", http.StatusNotFound)
+		return
+	}
+	data, err := s.s3.GetObject(r.Context(), ref.S3Key)
+	if err != nil {
+		http.Error(w, "s3 error", http.StatusInternalServerError)
+		return
+	}
+	rows, err := storage.ReadParquet(data)
+	if err != nil {
+		http.Error(w, "parquet error", http.StatusInternalServerError)
+		return
+	}
+	downsample := 1
+	if ds := r.URL.Query().Get("downsample"); ds != "" {
+		if v, err := strconv.Atoi(ds); err == nil && v > 0 {
+			downsample = v
+		}
+	}
+	var frames []linepb.TelemetryFrame
+	for i, row := range rows {
+		if i%downsample != 0 {
+			continue
+		}
+		frames = append(frames, linepb.TelemetryFrame{
+			PacketID:    row.PacketID,
+			X:           row.PosX,
+			Y:           row.PosY,
+			Z:           row.PosZ,
+			Speed:       row.Speed,
+			Throttle:    float32(row.Throttle) / 255.0,
+			Brake:       float32(row.Brake) / 255.0,
+			Steering:    float32(row.Steering) / 127.0,
+			Rpm:         row.RPM,
+			Gear:        row.Gear,
+			TireTempFL:  row.TireTempFL,
+			TireTempFR:  row.TireTempFR,
+			TireTempRL:  row.TireTempRL,
+			TireTempRR:  row.TireTempRR,
+			FuelLevel:   row.FuelLevel,
+			CurrentLap:  row.CurrentLap,
+			CurrentTime: row.CurrentTime,
+		})
+	}
+	writeJSON(w, map[string]interface{}{
+		"reference": ref,
+		"frames":    frames,
+		"total":     len(rows),
+		"returned":  len(frames),
+	})
+}
+
+func (s *server) handleCarComparison(w http.ResponseWriter, r *http.Request) {
+	if s.database == nil {
+		writeJSON(w, map[string]interface{}{"tracks": []string{}, "comparisons": []interface{}{}})
+		return
+	}
+	trackID := r.URL.Query().Get("track_id")
+	if trackID == "" {
+		tracks, err := s.database.GetDistinctTracks(r.Context())
+		if err != nil {
+			http.Error(w, "db error", http.StatusInternalServerError)
+			return
+		}
+		if tracks == nil {
+			tracks = []string{}
+		}
+		writeJSON(w, map[string]interface{}{"tracks": tracks})
+		return
+	}
+	comps, err := s.database.GetCarComparisons(r.Context(), trackID)
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	if comps == nil {
+		comps = []db.CarComparison{}
+	}
+	writeJSON(w, map[string]interface{}{"comparisons": comps})
+}
+
+func (s *server) handleGetJournal(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("id")
+	if s.database == nil {
+		http.Error(w, "not available", http.StatusServiceUnavailable)
+		return
+	}
+	journal, err := s.database.GetJournal(r.Context(), sessionID)
+	if err != nil {
+		http.Error(w, "journal not found", http.StatusNotFound)
+		return
+	}
+	writeJSON(w, journal)
+}
+
+func (s *server) handleGenerateJournal(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("id")
+	if s.database == nil {
+		http.Error(w, "not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	summaryKey := "sessions/" + sessionID + "/summary.json"
+	summaryData, err := s.gold.GetObject(r.Context(), summaryKey)
+	if err != nil {
+		http.Error(w, "session summary not found", http.StatusNotFound)
+		return
+	}
+
+	var summary struct {
+		CarCode     int32  `json:"car_code"`
+		TrackName   string `json:"track_name"`
+		LapCount    int    `json:"lap_count"`
+		Consistency struct {
+			ConsistencyScore float64 `json:"consistency_score"`
+			LapTimeCV        float64 `json:"lap_time_cv"`
+			BestLapIdx       int     `json:"best_lap_idx"`
+			WorstLapIdx      int     `json:"worst_lap_idx"`
+			BestWorstDeltaMs int     `json:"best_worst_delta_ms"`
+		} `json:"consistency"`
+		TyreDegradation struct {
+			DegradationRate  float64 `json:"degradation_rate"`
+			CompoundGuess    string  `json:"compound_guess"`
+			FrontRearBalance float64 `json:"front_rear_balance"`
+		} `json:"tyre_degradation"`
+		Journal struct {
+			BestLapMs      int      `json:"best_lap_ms"`
+			WorstLapMs     int      `json:"worst_lap_ms"`
+			Highlights     []string `json:"highlights"`
+			AreasToImprove []string `json:"areas_to_improve"`
+			CornerNotes    []string `json:"corner_notes"`
+		} `json:"journal"`
+	}
+	if err := json.Unmarshal(summaryData, &summary); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	llmEndpoint := envOrDefault("LLM_ENDPOINT", "http://mac.internal:8080")
+	llmModel := envOrDefault("LLM_MODEL", "mlx-community/gemma-4-e4b-it-4bit")
+	llm := coach.NewLLMClient(llmEndpoint, llmModel)
+
+	prompt := buildJournalPrompt(summary.TrackName, summary.CarCode, summary.LapCount,
+		summary.Consistency.ConsistencyScore, summary.Consistency.BestWorstDeltaMs,
+		summary.Consistency.BestLapIdx, summary.Consistency.WorstLapIdx,
+		summary.Journal.BestLapMs, summary.Journal.WorstLapMs,
+		summary.TyreDegradation.DegradationRate, summary.TyreDegradation.CompoundGuess,
+		summary.Journal.Highlights, summary.Journal.AreasToImprove, summary.Journal.CornerNotes,
+		s.cars)
+
+	content, err := llm.GenerateJournal(r.Context(), prompt)
+	if err != nil {
+		slog.Error("llm journal generation", "err", err)
+		http.Error(w, "journal generation failed", http.StatusInternalServerError)
+		return
+	}
+
+	journal := &db.Journal{
+		SessionID: sessionID,
+		Content:   content,
+	}
+	if err := s.database.SaveJournal(r.Context(), journal); err != nil {
+		slog.Error("save journal", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, journal)
+}
+
+func buildJournalPrompt(track string, carCode int32, lapCount int,
+	consistency float64, bestWorstDelta, bestLapIdx, worstLapIdx int,
+	bestLapMs, worstLapMs int,
+	tyreDegrad float64, compound string,
+	highlights, areasToImprove, cornerNotes []string,
+	cars []carEntry) string {
+
+	var b strings.Builder
+	b.WriteString("Generate a post-session journal entry for a Gran Turismo 7 driver.\n\n")
+	b.WriteString("SESSION:\n")
+	b.WriteString("Track: " + track + "\n")
+	carName := "Car " + strconv.Itoa(int(carCode))
+	for _, c := range cars {
+		if c.ID == int(carCode) {
+			carName = c.Name + " (" + c.Maker + ")"
+			break
+		}
+	}
+	b.WriteString("Car: " + carName + "\n")
+	b.WriteString("Laps: " + strconv.Itoa(lapCount) + "\n")
+	b.WriteString("Best: " + formatLapTimeMs(bestLapMs) + " (lap " + strconv.Itoa(bestLapIdx+1) + ")\n")
+	b.WriteString("Worst: " + formatLapTimeMs(worstLapMs) + " (lap " + strconv.Itoa(worstLapIdx+1) + ")\n")
+	b.WriteString("Consistency: " + strconv.FormatFloat(consistency*100, 'f', 1, 64) + "%\n")
+	b.WriteString("Best-worst delta: " + strconv.Itoa(bestWorstDelta) + "ms\n")
+	b.WriteString("Tyre degradation: " + strconv.FormatFloat(tyreDegrad, 'f', 2, 64) + " C/lap (" + compound + ")\n\n")
+
+	if len(highlights) > 0 {
+		b.WriteString("WHAT WENT WELL:\n")
+		for _, h := range highlights {
+			b.WriteString("- " + h + "\n")
+		}
+		b.WriteString("\n")
+	}
+
+	if len(areasToImprove) > 0 {
+		b.WriteString("WHAT NEEDS WORK:\n")
+		for _, a := range areasToImprove {
+			b.WriteString("- " + a + "\n")
+		}
+		b.WriteString("\n")
+	}
+
+	if len(cornerNotes) > 0 {
+		b.WriteString("CORNER OBSERVATIONS:\n")
+		for _, n := range cornerNotes {
+			b.WriteString("- " + n + "\n")
+		}
+		b.WriteString("\n")
+	}
+
+	b.WriteString("INSTRUCTIONS:\n")
+	b.WriteString("Write a concise session journal (2-4 paragraphs) that:\n")
+	b.WriteString("1. Summarizes the session narrative (how it progressed, where breakthroughs happened)\n")
+	b.WriteString("2. Identifies the key learning from this session\n")
+	b.WriteString("3. Sets 1-2 specific goals for next time on this track\n")
+	b.WriteString("Write in first person as if the driver is writing their own notes. Be honest and reflective.")
+
+	return b.String()
+}
+
+func (s *server) runJournalWorker(ctx context.Context, consumer *kafka.Consumer) {
+	slog.Info("journal worker started")
+	consumer.Run(ctx, func(ctx context.Context, record *kgo.Record) error {
+		var event struct {
+			SessionID string `json:"session_id"`
+			CarCode   int32  `json:"car_code"`
+			LapCount  int    `json:"lap_count"`
+		}
+		if err := json.Unmarshal(record.Value, &event); err != nil {
+			slog.Error("journal worker: unmarshal event", "err", err)
+			return nil
+		}
+
+		if s.database == nil {
+			return nil
+		}
+
+		existing, _ := s.database.GetJournal(ctx, event.SessionID)
+		if existing != nil {
+			return nil
+		}
+
+		time.Sleep(5 * time.Second)
+
+		summaryKey := "sessions/" + event.SessionID + "/summary.json"
+		summaryData, err := s.gold.GetObject(ctx, summaryKey)
+		if err != nil {
+			slog.Debug("journal worker: summary not ready", "session", event.SessionID)
+			return nil
+		}
+
+		var summary struct {
+			CarCode     int32  `json:"car_code"`
+			TrackName   string `json:"track_name"`
+			LapCount    int    `json:"lap_count"`
+			Consistency struct {
+				ConsistencyScore float64 `json:"consistency_score"`
+				BestLapIdx       int     `json:"best_lap_idx"`
+				WorstLapIdx      int     `json:"worst_lap_idx"`
+				BestWorstDeltaMs int     `json:"best_worst_delta_ms"`
+			} `json:"consistency"`
+			TyreDegradation struct {
+				DegradationRate float64 `json:"degradation_rate"`
+				CompoundGuess   string  `json:"compound_guess"`
+			} `json:"tyre_degradation"`
+			Journal struct {
+				BestLapMs      int      `json:"best_lap_ms"`
+				WorstLapMs     int      `json:"worst_lap_ms"`
+				Highlights     []string `json:"highlights"`
+				AreasToImprove []string `json:"areas_to_improve"`
+				CornerNotes    []string `json:"corner_notes"`
+			} `json:"journal"`
+		}
+		if err := json.Unmarshal(summaryData, &summary); err != nil {
+			slog.Error("journal worker: parse summary", "session", event.SessionID, "err", err)
+			return nil
+		}
+
+		llmEndpoint := envOrDefault("LLM_ENDPOINT", "http://mac.internal:8080")
+		llmModel := envOrDefault("LLM_MODEL", "mlx-community/gemma-4-e4b-it-4bit")
+		llm := coach.NewLLMClient(llmEndpoint, llmModel)
+
+		prompt := buildJournalPrompt(summary.TrackName, summary.CarCode, summary.LapCount,
+			summary.Consistency.ConsistencyScore, summary.Consistency.BestWorstDeltaMs,
+			summary.Consistency.BestLapIdx, summary.Consistency.WorstLapIdx,
+			summary.Journal.BestLapMs, summary.Journal.WorstLapMs,
+			summary.TyreDegradation.DegradationRate, summary.TyreDegradation.CompoundGuess,
+			summary.Journal.Highlights, summary.Journal.AreasToImprove, summary.Journal.CornerNotes,
+			s.cars)
+
+		content, err := llm.GenerateJournal(ctx, prompt)
+		if err != nil {
+			slog.Error("journal worker: llm generation", "session", event.SessionID, "err", err)
+			return nil
+		}
+
+		journal := &db.Journal{
+			SessionID: event.SessionID,
+			Content:   content,
+		}
+		if err := s.database.SaveJournal(ctx, journal); err != nil {
+			slog.Error("journal worker: save", "session", event.SessionID, "err", err)
+			return nil
+		}
+
+		slog.Info("journal auto-generated", "session", event.SessionID)
+		return nil
+	})
 }

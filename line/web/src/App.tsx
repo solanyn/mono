@@ -16,6 +16,12 @@ export function App() {
           <NavLink to="/tracks" className={({ isActive }: { isActive: boolean }) => clsx('transition-colors', isActive ? 'text-accent' : 'text-text-muted hover:text-text')}>
             Tracks
           </NavLink>
+          <NavLink to="/reference" className={({ isActive }: { isActive: boolean }) => clsx('transition-colors', isActive ? 'text-accent' : 'text-text-muted hover:text-text')}>
+            Reference
+          </NavLink>
+          <NavLink to="/compare" className={({ isActive }: { isActive: boolean }) => clsx('transition-colors', isActive ? 'text-accent' : 'text-text-muted hover:text-text')}>
+            Compare
+          </NavLink>
           <NavLink to="/live" className={({ isActive }: { isActive: boolean }) => clsx('transition-colors', isActive ? 'text-accent' : 'text-text-muted hover:text-text')}>
             Live
           </NavLink>

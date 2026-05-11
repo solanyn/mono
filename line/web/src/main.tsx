@@ -10,6 +10,8 @@ import { BriefingPage } from './pages/Briefing'
 import { LivePage } from './pages/Live'
 import { ProgressionPage } from './pages/Progression'
 import { TracksPage } from './pages/Tracks'
+import { ReferenceLapsPage } from './pages/ReferenceLaps'
+import { ComparePage } from './pages/Compare'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -24,8 +26,14 @@ createRoot(document.getElementById('root')!).render(
           <Route path="live" element={<LivePage />} />
           <Route path="progression" element={<ProgressionPage />} />
           <Route path="tracks" element={<TracksPage />} />
+          <Route path="reference" element={<ReferenceLapsPage />} />
+          <Route path="compare" element={<ComparePage />} />
         </Route>
       </Routes>
     </BrowserRouter>
   </StrictMode>,
 )
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {})
+}

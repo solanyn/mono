@@ -4,7 +4,7 @@ import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Line } from '@react-three/drei'
 import * as THREE from 'three'
 import clsx from 'clsx'
-import { fetchLaps, fetchTelemetry, fetchLapMetrics, fetchSessionSummary, type Lap, type TelemetryFrame, type LapMetrics, type SessionSummary } from '../api'
+import { fetchLaps, fetchTelemetry, fetchLapMetrics, fetchSessionSummary, fetchSession, fetchReferenceLapTelemetry, setReferenceLap, fetchJournal, generateJournal, type Lap, type TelemetryFrame, type LapMetrics, type SessionSummary, type Journal } from '../api'
 import { TelemetryChart } from '../TelemetryChart'
 
 export function SessionDetail() {
@@ -14,20 +14,34 @@ export function SessionDetail() {
   const [compareLap, setCompareLap] = useState<number | null>(null)
   const [frames, setFrames] = useState<TelemetryFrame[]>([])
   const [compareFrames, setCompareFrames] = useState<TelemetryFrame[]>([])
+  const [refFrames, setRefFrames] = useState<TelemetryFrame[]>([])
   const [metrics, setMetrics] = useState<LapMetrics | null>(null)
   const [summary, setSummary] = useState<SessionSummary | null>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'track' | 'metrics' | 'summary'>('track')
+  const [tab, setTab] = useState<'track' | 'metrics' | 'summary' | 'journal'>('track')
+  const [session, setSession] = useState<{ car_code: number; track_id?: string } | null>(null)
+  const [refSaving, setRefSaving] = useState(false)
+  const [journal, setJournal] = useState<Journal | null>(null)
+  const [journalLoading, setJournalLoading] = useState(false)
 
   useEffect(() => {
     if (!id) return
+    fetchSession(id).then(s => setSession(s)).catch(() => {})
     fetchLaps(id).then(({ laps }) => {
       setLaps(laps ?? [])
       setLoading(false)
       if (laps && laps.length > 0) setSelectedLap(laps[0].lap_number)
     }).catch(() => setLoading(false))
     fetchSessionSummary(id).then(setSummary).catch(() => {})
+    fetchJournal(id).then(setJournal).catch(() => {})
   }, [id])
+
+  useEffect(() => {
+    if (!session?.track_id || !session?.car_code) return
+    fetchReferenceLapTelemetry(session.track_id, session.car_code).then(({ frames }) => {
+      setRefFrames(frames ?? [])
+    }).catch(() => setRefFrames([]))
+  }, [session])
 
   useEffect(() => {
     if (!id || selectedLap === null) return
@@ -95,7 +109,7 @@ export function SessionDetail() {
 
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex items-center gap-1 px-4 py-2 border-b border-border">
-          {(['track', 'metrics', 'summary'] as const).map((t) => (
+          {(['track', 'metrics', 'summary', 'journal'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -121,6 +135,37 @@ export function SessionDetail() {
           >
             Briefing
           </Link>
+          {selectedLap !== null && session?.track_id && (
+            <button
+              onClick={async () => {
+                if (!id || selectedLap === null || !session?.track_id) return
+                const lap = laps.find(l => l.lap_number === selectedLap)
+                if (!lap) return
+                setRefSaving(true)
+                try {
+                  await setReferenceLap({
+                    track_id: session.track_id,
+                    car_code: session.car_code,
+                    session_id: id,
+                    lap_number: selectedLap,
+                    time_ms: lap.time_ms,
+                    s3_key: lap.s3_key,
+                  })
+                  fetchReferenceLapTelemetry(session.track_id, session.car_code).then(({ frames }) => {
+                    setRefFrames(frames ?? [])
+                  }).catch(() => {})
+                } catch {}
+                setRefSaving(false)
+              }}
+              disabled={refSaving}
+              className="px-3 py-1 rounded text-xs font-medium text-text-muted hover:text-green transition-colors disabled:opacity-50"
+            >
+              {refSaving ? 'Saving...' : 'Set as Reference'}
+            </button>
+          )}
+          {refFrames.length > 0 && (
+            <span className="text-[10px] text-green ml-1">ref loaded</span>
+          )}
           {compareLap !== null && (
             <span className="ml-auto text-xs text-orange">
               Comparing with Lap {compareLap}
@@ -137,6 +182,7 @@ export function SessionDetail() {
                 <directionalLight position={[100, 200, 100]} intensity={0.8} />
                 {frames.length > 0 && <TrackLine frames={frames} color="primary" />}
                 {compareFrames.length > 0 && <TrackLine frames={compareFrames} color="compare" />}
+                {refFrames.length > 0 && <TrackLine frames={refFrames} color="reference" />}
                 <gridHelper args={[800, 40, '#333333', '#222222']} />
                 <OrbitControls enableDamping dampingFactor={0.1} maxPolarAngle={Math.PI / 2.1} />
               </Canvas>
@@ -168,6 +214,41 @@ export function SessionDetail() {
         {tab === 'summary' && !summary && (
           <div className="flex-1 flex items-center justify-center text-text-dim text-sm">
             No session summary available yet
+          </div>
+        )}
+
+        {tab === 'journal' && (
+          <div className="flex-1 overflow-auto p-5">
+            {journal ? (
+              <div className="bg-surface-2 rounded-lg border border-border p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider">Session Journal</h4>
+                  <span className="text-[10px] text-text-dim">{new Date(journal.created_at).toLocaleString()}</span>
+                </div>
+                <div className="space-y-3 text-sm text-text leading-relaxed">
+                  {journal.content.split('\n\n').map((p, i) => <p key={i}>{p}</p>)}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full gap-4">
+                <p className="text-text-dim text-sm">No journal entry yet</p>
+                <button
+                  onClick={async () => {
+                    if (!id) return
+                    setJournalLoading(true)
+                    try {
+                      const j = await generateJournal(id)
+                      setJournal(j)
+                    } catch {}
+                    setJournalLoading(false)
+                  }}
+                  disabled={journalLoading}
+                  className="px-4 py-2 rounded-lg bg-accent/15 text-accent text-sm font-medium hover:bg-accent/25 transition-colors disabled:opacity-50"
+                >
+                  {journalLoading ? 'Generating...' : 'Generate Journal'}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -284,7 +365,7 @@ function StatCard({ label, value, accent }: { label: string; value: string; acce
   )
 }
 
-function TrackLine({ frames, color }: { frames: TelemetryFrame[]; color: 'primary' | 'compare' }) {
+function TrackLine({ frames, color }: { frames: TelemetryFrame[]; color: 'primary' | 'compare' | 'reference' }) {
   const { points, colors } = useMemo(() => {
     const speeds = frames.map((f) => f.speed)
     const minSpeed = Math.min(...speeds)
@@ -294,6 +375,9 @@ function TrackLine({ frames, color }: { frames: TelemetryFrame[]; color: 'primar
       const t = maxSpeed > minSpeed ? (f.speed - minSpeed) / (maxSpeed - minSpeed) : 0.5
       if (color === 'compare') {
         return new THREE.Color().setHSL(0.08 + t * 0.05, 0.8, 0.5)
+      }
+      if (color === 'reference') {
+        return new THREE.Color().setHSL(0.55, 0.4, 0.4 + t * 0.2)
       }
       return new THREE.Color().setHSL(t * 0.35, 1, 0.45)
     })
