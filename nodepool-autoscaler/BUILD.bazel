@@ -1,6 +1,7 @@
 load("@rules_go//go:def.bzl", "go_binary", "go_cross_binary", "go_library", "go_test")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
 load("@aspect_bazel_lib//lib:tar.bzl", "tar")
+load("@rules_kubebuilder//controller-gen:controller-gen.bzl", "controller_gen_crd")
 
 go_library(
     name = "api_lib",
@@ -136,14 +137,15 @@ oci_push(
     repository = "ghcr.io/solanyn/nodepool-autoscaler",
 )
 
-# CRD generation via pre-built controller-gen binary
-genrule(
+# CRD generation via controller-gen toolchain
+controller_gen_crd(
     name = "generate_crd",
-    srcs = glob(["api/v1alpha1/*.go"]) + ["go.mod", "go.sum"],
-    outs = ["crd/autoscaling.home-ops.io_nodepoolscalers.yaml"],
-    cmd = "$(location @controller_gen_linux_amd64//file) crd paths=./nodepool-autoscaler/api/v1alpha1 output:crd:dir=$(RULEDIR)/crd",
-    local = True,
-    tools = ["@controller_gen_linux_amd64//file"],
+    srcs = glob(["api/v1alpha1/*.go"]),
+    deps = [
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
+        "@io_k8s_apimachinery//pkg/runtime",
+        "@io_k8s_apimachinery//pkg/runtime/schema",
+    ],
 )
 
 tar(
