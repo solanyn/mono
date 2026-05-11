@@ -67,32 +67,46 @@ func WriteWAVTemp(samples []int16, sampleRate, channels int) (string, error) {
 	return path, nil
 }
 
-// ReadWAVMono reads a 16-bit PCM mono WAV file and returns its samples.
-// Used by the retry path where the uploader is restarted against an on-disk
-// mono WAV already prepared during phaseProcessing.
-func ReadWAVMono(path string) ([]int16, error) {
+// ReadWAV reads a 16-bit PCM WAV file (mono or stereo) and returns its
+// interleaved samples along with the channel count.
+func ReadWAV(path string) (samples []int16, channels int, err error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer f.Close()
 
 	header := make([]byte, 44)
 	if _, err := io.ReadFull(f, header); err != nil {
-		return nil, fmt.Errorf("read wav header: %w", err)
+		return nil, 0, fmt.Errorf("read wav header: %w", err)
 	}
 	if string(header[0:4]) != "RIFF" || string(header[8:12]) != "WAVE" {
-		return nil, fmt.Errorf("not a WAV file: %s", path)
+		return nil, 0, fmt.Errorf("not a WAV file: %s", path)
 	}
-	channels := binary.LittleEndian.Uint16(header[22:24])
+	ch := binary.LittleEndian.Uint16(header[22:24])
 	bitsPerSample := binary.LittleEndian.Uint16(header[34:36])
-	if channels != 1 || bitsPerSample != 16 {
-		return nil, fmt.Errorf("expected 16-bit mono WAV, got %d-bit %d-channel", bitsPerSample, channels)
+	if bitsPerSample != 16 {
+		return nil, 0, fmt.Errorf("expected 16-bit WAV, got %d-bit", bitsPerSample)
+	}
+	if ch != 1 && ch != 2 {
+		return nil, 0, fmt.Errorf("expected 1 or 2 channels, got %d", ch)
 	}
 	dataSize := binary.LittleEndian.Uint32(header[40:44])
-	samples := make([]int16, dataSize/2)
+	samples = make([]int16, dataSize/2)
 	if err := binary.Read(f, binary.LittleEndian, &samples); err != nil {
-		return nil, fmt.Errorf("read samples: %w", err)
+		return nil, 0, fmt.Errorf("read samples: %w", err)
+	}
+	return samples, int(ch), nil
+}
+
+// ReadWAVMono reads a 16-bit PCM mono WAV file and returns its samples.
+func ReadWAVMono(path string) ([]int16, error) {
+	samples, ch, err := ReadWAV(path)
+	if err != nil {
+		return nil, err
+	}
+	if ch != 1 {
+		return nil, fmt.Errorf("expected 16-bit mono WAV, got 16-bit %d-channel", ch)
 	}
 	return samples, nil
 }

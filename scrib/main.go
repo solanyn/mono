@@ -170,11 +170,23 @@ func runUpload(cfg *config.Config, wavPath, template string) error {
 	}
 	name := strip(filepath.Base(abs), ".wav")
 
-	samples, err := audio.ReadWAVMono(abs)
+	samples, channels, err := audio.ReadWAV(abs)
 	if err != nil {
-		// If stereo, downmix to a new temp mono WAV first.
-		return fmt.Errorf("read wav: %w (tip: mono WAV expected; pass the upload copy, not the raw stereo)", err)
+		return fmt.Errorf("read wav: %w", err)
 	}
+
+	uploadPath := abs
+	if channels == 2 {
+		fmt.Fprintf(os.Stderr, "Stereo WAV detected, downmixing to mono...\n")
+		samples = audio.StereoToMono(samples)
+		monoPath, err := audio.WriteWAVTemp(samples, cfg.SampleRate, 1)
+		if err != nil {
+			return fmt.Errorf("write mono wav: %w", err)
+		}
+		defer os.Remove(monoPath)
+		uploadPath = monoPath
+	}
+
 	dur := time.Duration(len(samples)/cfg.SampleRate) * time.Second
 
 	ctx := context.Background()
@@ -183,7 +195,7 @@ func runUpload(cfg *config.Config, wavPath, template string) error {
 		Name:      name,
 		Template:  template,
 		Duration:  dur,
-		WAVPath:   abs,
+		WAVPath:   uploadPath,
 	}, func(p client.Progress) {
 		if p.Err != nil {
 			fmt.Fprintf(os.Stderr, "  %s attempt %d failed: %v\n", p.Stage, p.Attempt, p.Err)
