@@ -260,3 +260,30 @@ export async function generateBriefing(sessionId: string): Promise<{ session_id:
   if (!res.ok) throw new Error(await res.text())
   return res.json()
 }
+
+export interface Car {
+  id: number
+  name: string
+  maker: string
+  country: string
+  group?: string
+}
+
+let carsCache: Car[] | null = null
+
+export async function fetchCars(): Promise<Car[]> {
+  if (carsCache) return carsCache
+  const res = await fetch(`${API_BASE}/cars`)
+  carsCache = await res.json()
+  return carsCache!
+}
+
+export async function fetchCar(id: number): Promise<Car | undefined> {
+  const cars = await fetchCars()
+  return cars.find(c => c.id === id)
+}
+
+export function getCarName(cars: Car[], code: number): string {
+  const car = cars.find(c => c.id === code)
+  return car ? `${car.maker} ${car.name}` : `Car ${code}`
+}

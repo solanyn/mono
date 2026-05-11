@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -16,15 +17,16 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/parquet-go/parquet-go"
 	"github.com/twmb/franz-go/pkg/kgo"
 
+	"github.com/solanyn/mono/line/data"
 	"github.com/solanyn/mono/line/gen/linepb"
 	"github.com/solanyn/mono/line/internal/coach"
 	"github.com/solanyn/mono/line/internal/db"
 	"github.com/solanyn/mono/line/internal/kafka"
 	"github.com/solanyn/mono/line/internal/storage"
 	"github.com/solanyn/mono/line/internal/telemetry"
-	"github.com/solanyn/mono/line/data"
 )
 
 var upgrader = websocket.Upgrader{
@@ -38,6 +40,15 @@ type server struct {
 	live     *liveHub
 	coach    *coach.Pipeline
 	database *db.DB
+	cars     []carEntry
+}
+
+type carEntry struct {
+	ID      int    `json:"id"`
+	Name    string `json:"name"`
+	Maker   string `json:"maker"`
+	Country string `json:"country"`
+	Group   string `json:"group,omitempty"`
 }
 
 type liveHub struct {
@@ -140,6 +151,7 @@ func main() {
 	})
 
 	srv := &server{s3: s3Client, silver: silverClient, gold: goldClient, live: hub, coach: coachPipeline, database: database}
+	srv.loadCars(ctx)
 
 	consumer, err := kafka.NewConsumer(brokers, group, topic)
 	if err != nil {
@@ -211,6 +223,8 @@ func main() {
 	mux.HandleFunc("GET /api/v1/sessions/{id}/laps/{lap}/metrics", srv.handleLapMetrics)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/summary", srv.handleSessionSummary)
 	mux.HandleFunc("GET /api/v1/tracks", srv.handleListTracks)
+	mux.HandleFunc("GET /api/v1/cars", srv.handleListCars)
+	mux.HandleFunc("GET /api/v1/cars/{id}", srv.handleGetCar)
 	mux.HandleFunc("GET /api/v1/progression", srv.handleProgression)
 	mux.HandleFunc("GET /api/v1/sessions/{id}/laps/{lap}/annotations", srv.handleListAnnotations)
 	mux.HandleFunc("POST /api/v1/sessions/{id}/laps/{lap}/annotations", srv.handleCreateAnnotation)
@@ -455,6 +469,75 @@ func (s *server) handleSessionSummary(w http.ResponseWriter, r *http.Request) {
 func (s *server) handleListTracks(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(data.TracksJSON)
+}
+
+func (s *server) handleListCars(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(s.cars)
+}
+
+func (s *server) handleGetCar(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "invalid car id", http.StatusBadRequest)
+		return
+	}
+	for _, c := range s.cars {
+		if c.ID == id {
+			writeJSON(w, c)
+			return
+		}
+	}
+	http.Error(w, "car not found", http.StatusNotFound)
+}
+
+func (s *server) loadCars(ctx context.Context) {
+	if s.s3 == nil {
+		slog.Warn("no S3 client configured, cars unavailable")
+		return
+	}
+	carsData, err := s.s3.GetLatestByPrefix(ctx, "reference/cars/")
+	if err != nil {
+		slog.Warn("failed to load cars from S3", "err", err)
+		return
+	}
+	rows, err := readCarsParquet(carsData)
+	if err != nil {
+		slog.Warn("failed to parse cars parquet", "err", err)
+		return
+	}
+	s.cars = rows
+	slog.Info("loaded cars from S3", "count", len(rows))
+}
+
+func readCarsParquet(buf []byte) ([]carEntry, error) {
+	type parquetCar struct {
+		ID      int32  `parquet:"id"`
+		Name    string `parquet:"name"`
+		Maker   string `parquet:"maker"`
+		Country string `parquet:"country"`
+		Group   string `parquet:"group"`
+	}
+	reader := parquet.NewGenericReader[parquetCar](bytes.NewReader(buf))
+	defer reader.Close()
+
+	rows := make([]parquetCar, reader.NumRows())
+	n, err := reader.Read(rows)
+	if err != nil && err != io.EOF {
+		return nil, err
+	}
+	cars := make([]carEntry, n)
+	for i := 0; i < n; i++ {
+		cars[i] = carEntry{
+			ID:      int(rows[i].ID),
+			Name:    rows[i].Name,
+			Maker:   rows[i].Maker,
+			Country: rows[i].Country,
+			Group:   rows[i].Group,
+		}
+	}
+	return cars, nil
 }
 
 func (s *server) handleProgression(w http.ResponseWriter, r *http.Request) {

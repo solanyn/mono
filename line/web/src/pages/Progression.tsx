@@ -1,16 +1,18 @@
 import { useEffect, useState, useMemo } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ScatterChart, Scatter, Cell } from 'recharts'
 import clsx from 'clsx'
-import { fetchProgression, fetchTracks, type ProgressionPoint, type TrackInfo } from '../api'
+import { fetchProgression, fetchTracks, fetchCars, getCarName, type ProgressionPoint, type TrackInfo, type Car } from '../api'
 
 export function ProgressionPage() {
   const [points, setPoints] = useState<ProgressionPoint[]>([])
   const [tracks, setTracks] = useState<TrackInfo[]>([])
+  const [cars, setCars] = useState<Car[]>([])
   const [selectedTrack, setSelectedTrack] = useState<string>('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     fetchTracks().then(({ tracks }) => setTracks(tracks ?? [])).catch(() => {})
+    fetchCars().then(setCars).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -32,6 +34,7 @@ export function ProgressionPage() {
       consistency: p.consistency_score != null ? Math.round(p.consistency_score * 100) : null,
       trackName: p.track_name || p.track_id || 'Unknown',
       carCode: p.car_code,
+      carName: getCarName(cars, p.car_code),
       sessionId: p.session_id,
     })),
   [points])
@@ -171,6 +174,7 @@ export function ProgressionPage() {
                 <div key={i} className="flex items-center gap-3 text-xs px-2 py-1.5 rounded hover:bg-surface transition-colors">
                   <span className="text-text-dim w-16">{d.date}</span>
                   <span className="flex-1 truncate">{d.trackName}</span>
+                  <span className="text-text-muted truncate max-w-32">{d.carName}</span>
                   <span className="font-mono text-accent">{d.bestLap.toFixed(3)}s</span>
                   <span className="text-text-dim w-12 text-right">{d.lapCount} laps</span>
                   {d.consistency !== null && (

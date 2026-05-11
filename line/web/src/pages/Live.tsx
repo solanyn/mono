@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Line } from '@react-three/drei'
 import * as THREE from 'three'
-import { connectLive, connectCoach, type TelemetryFrame, type LiveStatus, type CoachMessage } from '../api'
+import { connectLive, connectCoach, fetchCars, getCarName, type TelemetryFrame, type LiveStatus, type CoachMessage, type Car } from '../api'
 import clsx from 'clsx'
 
 const MAX_TRAIL = 600
@@ -12,6 +12,7 @@ export function LivePage() {
   const [frames, setFrames] = useState<TelemetryFrame[]>([])
   const [latest, setLatest] = useState<TelemetryFrame | null>(null)
   const [coachMessages, setCoachMessages] = useState<CoachMessage[]>([])
+  const [cars, setCars] = useState<Car[]>([])
   const [coachEnabled, setCoachEnabled] = useState(true)
   const wsRef = useRef<WebSocket | null>(null)
   const coachRef = useRef<WebSocket | null>(null)
@@ -28,6 +29,10 @@ export function LivePage() {
       source.connect(ctx.destination)
       source.start()
     })
+  }, [])
+
+  useEffect(() => {
+    fetchCars().then(setCars).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -75,7 +80,7 @@ export function LivePage() {
 
         {status.active && (
           <div className="text-xs text-text-muted space-y-1">
-            <div>Car: <span className="text-text font-mono">{status.car_code}</span></div>
+            <div>Car: <span className="text-text font-mono">{getCarName(cars, status.car_code ?? 0)}</span></div>
             <div>Lap: <span className="text-text font-mono">{status.current_lap}</span></div>
             {status.track_id && <div>Track: <span className="text-text">{status.track_id}</span></div>}
           </div>

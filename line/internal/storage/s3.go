@@ -62,6 +62,26 @@ func (c *S3Client) GetObject(ctx context.Context, key string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+func (c *S3Client) GetLatestByPrefix(ctx context.Context, prefix string) ([]byte, error) {
+	list, err := c.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+		Bucket: aws.String(c.bucket),
+		Prefix: aws.String(prefix),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("s3 list %s: %w", prefix, err)
+	}
+	if len(list.Contents) == 0 {
+		return nil, fmt.Errorf("no objects found with prefix %s", prefix)
+	}
+	var latest string
+	for _, obj := range list.Contents {
+		if *obj.Key > latest {
+			latest = *obj.Key
+		}
+	}
+	return c.GetObject(ctx, latest)
+}
+
 func (c *S3Client) GetLap(ctx context.Context, sessionID string, lapNum int) ([]byte, error) {
 	prefix := fmt.Sprintf("bronze/telemetry/%s/", sessionID)
 	target := fmt.Sprintf("lap-%03d-", lapNum)
