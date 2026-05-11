@@ -2283,3 +2283,12 @@ oci.pull(
     tag = "3.13-slim",
 )
 use_repo(oci, "distroless_base", "distroless_base_linux_amd64", "distroless_static", "distroless_static_linux_amd64", "distroless_static_linux_arm64_v8", "python_slim", "python_slim_linux_amd64")
+
+# tools
+http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
+http_file(
+    name = "controller_gen_linux_amd64",
+    url = "https://github.com/kubernetes-sigs/controller-tools/releases/download/v0.21.0/controller-gen-linux-amd64",
+    sha256 = "3ec7994b7a41515a7ad8aef8e517429c0a78060df59d5587ac8662db6a8b035f",
+    executable = True,
+)
