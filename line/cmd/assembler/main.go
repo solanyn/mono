@@ -32,6 +32,7 @@ type session struct {
 	lapCount  int
 	trackID   string
 	trackName string
+	bestLapMs int32
 }
 
 type lapWrittenEvent struct {
@@ -189,14 +190,19 @@ func main() {
 
 		if len(sess.laps[frame.CurrentLap]) >= maxFramesPerLap {
 			slog.Warn("lap frame cap reached, force flushing", "session", sess.id, "lap", frame.CurrentLap, "frames", maxFramesPerLap)
-			if err := flushLap(ctx, sess, frame.CurrentLap, s3Client, producer, lapTopic, database, trackDB); err != nil {
+			if err := flushLap(ctx, sess, frame.CurrentLap, nil, s3Client, producer, lapTopic, database, trackDB); err != nil {
 				slog.Error("force flush lap failed", "lap", frame.CurrentLap, "err", err)
 			}
 			totalLapsFlushed++
 		}
 
 		if frame.CurrentLap > sess.lastLap {
-			if err := flushLap(ctx, sess, sess.lastLap, s3Client, producer, lapTopic, database, trackDB); err != nil {
+			var lapTimeMs *int32
+			if frame.LastLap > 0 {
+				lt := frame.LastLap
+				lapTimeMs = &lt
+			}
+			if err := flushLap(ctx, sess, sess.lastLap, lapTimeMs, s3Client, producer, lapTopic, database, trackDB); err != nil {
 				slog.Error("flush lap failed", "lap", sess.lastLap, "err", err)
 			}
 			totalLapsFlushed++
@@ -219,7 +225,7 @@ func main() {
 	slog.Info("assembler stopped", "total_frames", totalFrames, "total_laps", totalLapsFlushed, "total_sessions", totalSessionsClosed)
 }
 
-func flushLap(ctx context.Context, sess *session, lapNum int16, s3Client *storage.S3Client, producer *kafka.Producer, lapTopic string, database *db.DB, trackDB *tracks.Database) error {
+func flushLap(ctx context.Context, sess *session, lapNum int16, lapTimeMs *int32, s3Client *storage.S3Client, producer *kafka.Producer, lapTopic string, database *db.DB, trackDB *tracks.Database) error {
 	rows, ok := sess.laps[lapNum]
 	if !ok || len(rows) == 0 {
 		return nil
@@ -262,15 +268,31 @@ func flushLap(ctx context.Context, sess *session, lapNum int16, s3Client *storag
 		return fmt.Errorf("put lap: %w", err)
 	}
 
-	slog.Info("flushed lap", "session", sess.id, "lap", lapNum, "frames", len(rows), "key", key)
+	var topSpeed float32
+	for _, r := range rows {
+		if r.Speed > topSpeed {
+			topSpeed = r.Speed
+		}
+	}
+
+	slog.Info("flushed lap", "session", sess.id, "lap", lapNum, "frames", len(rows), "key", key, "time_ms", lapTimeMs, "top_speed", topSpeed)
 	sess.lapCount++
+	if lapTimeMs != nil && (*lapTimeMs < sess.bestLapMs || sess.bestLapMs == 0) {
+		sess.bestLapMs = *lapTimeMs
+	}
 	delete(sess.laps, lapNum)
 
 	if database != nil {
+		var ts *float32
+		if topSpeed > 0 {
+			ts = &topSpeed
+		}
 		if err := database.InsertLap(ctx, &db.Lap{
 			SessionID: sess.id,
 			LapNumber: int(lapNum),
+			TimeMs:    lapTimeMs,
 			Frames:    len(rows),
+			TopSpeed:  ts,
 			S3Key:     key,
 		}); err != nil {
 			slog.Error("db insert lap", "session", sess.id, "lap", lapNum, "err", err)
@@ -292,7 +314,7 @@ func flushLap(ctx context.Context, sess *session, lapNum int16, s3Client *storag
 
 func flushSession(ctx context.Context, sess *session, s3Client *storage.S3Client, producer *kafka.Producer, lapTopic string, database *db.DB, trackDB *tracks.Database) {
 	for lapNum := range sess.laps {
-		if err := flushLap(ctx, sess, lapNum, s3Client, producer, lapTopic, database, trackDB); err != nil {
+		if err := flushLap(ctx, sess, lapNum, nil, s3Client, producer, lapTopic, database, trackDB); err != nil {
 			slog.Error("flush remaining lap failed", "session", sess.id, "lap", lapNum, "err", err)
 		}
 	}
@@ -300,7 +322,11 @@ func flushSession(ctx context.Context, sess *session, s3Client *storage.S3Client
 
 func publishSessionComplete(ctx context.Context, producer *kafka.Producer, topic string, sess *session, database *db.DB) {
 	if database != nil {
-		if err := database.EndSession(ctx, sess.id, sess.lapCount, nil); err != nil {
+		var bestLap *int32
+		if sess.bestLapMs > 0 {
+			bestLap = &sess.bestLapMs
+		}
+		if err := database.EndSession(ctx, sess.id, sess.lapCount, bestLap); err != nil {
 			slog.Error("db end session", "session", sess.id, "err", err)
 		}
 	}

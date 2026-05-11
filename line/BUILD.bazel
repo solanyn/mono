@@ -1,4 +1,6 @@
 load("@rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_push")
+load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 load("//line:service.bzl", "line_service")
 
 exports_files(["data/tracks.json"])
@@ -162,10 +164,12 @@ line_service(
     ],
 )
 
-line_service(
+go_binary(
     name = "api",
     srcs = ["cmd/api/main.go"],
-    repository = "ghcr.io/solanyn/line-api",
+    goos = "linux",
+    goarch = "amd64",
+    pure = "on",
     deps = [
         ":coach_lib",
         ":data_lib",
@@ -179,6 +183,32 @@ line_service(
         "@com_github_sherclockholmes_webpush_go//:webpush-go",
         "@com_github_twmb_franz_go//pkg/kgo",
     ],
+    visibility = ["//visibility:public"],
+)
+
+pkg_tar(
+    name = "api_layer",
+    srcs = [":api"],
+    strip_prefix = ".",
+)
+
+pkg_tar(
+    name = "web_layer",
+    srcs = ["//line/web:build"],
+    strip_prefix = ".",
+)
+
+oci_image(
+    name = "api_image",
+    base = "@distroless_static_linux_amd64",
+    entrypoint = ["/api_/api"],
+    tars = [":api_layer", ":web_layer"],
+)
+
+oci_push(
+    name = "push_api",
+    image = ":api_image",
+    repository = "ghcr.io/solanyn/line-api",
 )
 
 line_service(
