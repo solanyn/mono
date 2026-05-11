@@ -67,6 +67,14 @@ func (d *DB) EndSession(ctx context.Context, id string, lapCount int, bestLapMs 
 	return err
 }
 
+func (d *DB) UpdateSessionTrack(ctx context.Context, id string, trackID, trackName *string) error {
+	_, err := d.pool.Exec(ctx,
+		`UPDATE sessions SET track_id = $1, track_name = $2 WHERE id = $3`,
+		trackID, trackName, id,
+	)
+	return err
+}
+
 func (d *DB) InsertLap(ctx context.Context, l *Lap) error {
 	_, err := d.pool.Exec(ctx,
 		`INSERT INTO laps (session_id, lap_number, time_ms, frames, top_speed, s3_key)

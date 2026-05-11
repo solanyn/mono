@@ -382,3 +382,25 @@ export async function generateJournal(sessionId: string): Promise<Journal> {
   if (!res.ok) throw new Error(await res.text())
   return res.json()
 }
+
+export async function getVAPIDKey(): Promise<string> {
+  const res = await fetch(`${API_BASE}/push/vapid`)
+  const data = await res.json()
+  return data.public_key
+}
+
+export async function subscribePush(subscription: PushSubscription): Promise<void> {
+  await fetch(`${API_BASE}/push/subscribe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(subscription.toJSON()),
+  })
+}
+
+export async function unsubscribePush(subscription: PushSubscription): Promise<void> {
+  await fetch(`${API_BASE}/push/subscribe`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(subscription.toJSON()),
+  })
+}

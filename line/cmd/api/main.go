@@ -18,6 +18,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/parquet-go/parquet-go"
+	webpush "github.com/SherClockHolmes/webpush-go"
 	"github.com/twmb/franz-go/pkg/kgo"
 
 	"github.com/solanyn/mono/line/data"
@@ -34,13 +35,17 @@ var upgrader = websocket.Upgrader{
 }
 
 type server struct {
-	s3       *storage.S3Client
-	silver   *storage.S3Client
-	gold     *storage.S3Client
-	live     *liveHub
-	coach    *coach.Pipeline
-	database *db.DB
-	cars     []carEntry
+	s3             *storage.S3Client
+	silver         *storage.S3Client
+	gold           *storage.S3Client
+	live           *liveHub
+	coach          *coach.Pipeline
+	database       *db.DB
+	cars           []carEntry
+	pushSubs       []webpush.Subscription
+	pushMu         sync.RWMutex
+	vapidPublicKey string
+	vapidPrivate   string
 }
 
 type carEntry struct {
@@ -118,6 +123,8 @@ func main() {
 	coachVoice := envOrDefault("COACH_VOICE", "af_heart")
 	useLLM := envOrDefault("COACH_USE_LLM", "true") == "true"
 	databaseURL := envOrDefault("DATABASE_URL", "")
+	vapidPublicKey := envOrDefault("VAPID_PUBLIC_KEY", "")
+	vapidPrivateKey := envOrDefault("VAPID_PRIVATE_KEY", "")
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
@@ -150,7 +157,7 @@ func main() {
 		UseLLM:      useLLM,
 	})
 
-	srv := &server{s3: s3Client, silver: silverClient, gold: goldClient, live: hub, coach: coachPipeline, database: database}
+	srv := &server{s3: s3Client, silver: silverClient, gold: goldClient, live: hub, coach: coachPipeline, database: database, vapidPublicKey: vapidPublicKey, vapidPrivate: vapidPrivateKey}
 	srv.loadCars(ctx)
 
 	consumer, err := kafka.NewConsumer(brokers, group, topic)
@@ -247,6 +254,9 @@ func main() {
 	mux.HandleFunc("DELETE /api/v1/reference-laps/{id}", srv.handleDeleteReferenceLap)
 	mux.HandleFunc("GET /api/v1/reference-laps/{trackId}/{carCode}/telemetry", srv.handleReferenceLapTelemetry)
 	mux.HandleFunc("GET /api/v1/compare", srv.handleCarComparison)
+	mux.HandleFunc("GET /api/v1/push/vapid", srv.handleVAPIDKey)
+	mux.HandleFunc("POST /api/v1/push/subscribe", srv.handlePushSubscribe)
+	mux.HandleFunc("DELETE /api/v1/push/subscribe", srv.handlePushUnsubscribe)
 
 	webDir := envOrDefault("WEB_DIR", "")
 	if webDir != "" {
@@ -1351,6 +1361,74 @@ func (s *server) runJournalWorker(ctx context.Context, consumer *kafka.Consumer)
 		}
 
 		slog.Info("journal auto-generated", "session", event.SessionID)
+		s.sendPushNotification("Session Complete", fmt.Sprintf("Session %s finished with %d laps", event.SessionID, event.LapCount))
 		return nil
 	})
+}
+
+func (s *server) handleVAPIDKey(w http.ResponseWriter, r *http.Request) {
+	json.NewEncoder(w).Encode(map[string]string{"public_key": s.vapidPublicKey})
+}
+
+func (s *server) handlePushSubscribe(w http.ResponseWriter, r *http.Request) {
+	var sub webpush.Subscription
+	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {
+		http.Error(w, "invalid subscription", http.StatusBadRequest)
+		return
+	}
+	s.pushMu.Lock()
+	s.pushSubs = append(s.pushSubs, sub)
+	s.pushMu.Unlock()
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *server) handlePushUnsubscribe(w http.ResponseWriter, r *http.Request) {
+	var sub webpush.Subscription
+	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {
+		http.Error(w, "invalid subscription", http.StatusBadRequest)
+		return
+	}
+	s.pushMu.Lock()
+	for i, existing := range s.pushSubs {
+		if existing.Endpoint == sub.Endpoint {
+			s.pushSubs = append(s.pushSubs[:i], s.pushSubs[i+1:]...)
+			break
+		}
+	}
+	s.pushMu.Unlock()
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *server) sendPushNotification(title, body string) {
+	if s.vapidPublicKey == "" || s.vapidPrivate == "" {
+		return
+	}
+	payload, _ := json.Marshal(map[string]string{"title": title, "body": body})
+	s.pushMu.RLock()
+	subs := make([]webpush.Subscription, len(s.pushSubs))
+	copy(subs, s.pushSubs)
+	s.pushMu.RUnlock()
+
+	for _, sub := range subs {
+		resp, err := webpush.SendNotification(payload, &sub, &webpush.Options{
+			VAPIDPublicKey:  s.vapidPublicKey,
+			VAPIDPrivateKey: s.vapidPrivate,
+			Subscriber:      "mailto:line@goyangi.io",
+		})
+		if err != nil {
+			slog.Debug("push notification failed", "endpoint", sub.Endpoint, "err", err)
+			continue
+		}
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusGone {
+			s.pushMu.Lock()
+			for i, existing := range s.pushSubs {
+				if existing.Endpoint == sub.Endpoint {
+					s.pushSubs = append(s.pushSubs[:i], s.pushSubs[i+1:]...)
+					break
+				}
+			}
+			s.pushMu.Unlock()
+		}
+	}
 }

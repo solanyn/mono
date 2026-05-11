@@ -2,6 +2,8 @@ load("@rules_python//python:py_binary.bzl", "py_binary")
 load("@rules_python//python:py_library.bzl", "py_library")
 load("@rules_python//python:py_test.bzl", "py_test")
 load("@rules_uv//uv:pip.bzl", "pip_compile")
+load("@aspect_bazel_lib//lib:tar.bzl", "tar")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_push")
 
 pip_compile(
     name = "generate_requirements_txt",
@@ -47,4 +49,22 @@ py_test(
     ],
     args = ["-v"],
     size = "small",
+)
+
+tar(
+    name = "worker_layer",
+    srcs = [":worker"],
+)
+
+oci_image(
+    name = "image",
+    base = "@python_slim_linux_amd64",
+    entrypoint = ["/line/analytics/worker"],
+    tars = [":worker_layer"],
+)
+
+oci_push(
+    name = "push_worker",
+    image = ":image",
+    repository = "ghcr.io/solanyn/line-analytics",
 )

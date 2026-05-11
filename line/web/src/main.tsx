@@ -35,5 +35,25 @@ createRoot(document.getElementById('root')!).render(
 )
 
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').catch(() => {})
+  navigator.serviceWorker.register('/sw.js').then(async (reg) => {
+    try {
+      const res = await fetch('/api/v1/push/vapid')
+      const { public_key } = await res.json()
+      if (!public_key) return
+
+      let sub = await reg.pushManager.getSubscription()
+      if (!sub) {
+        const key = Uint8Array.from(atob(public_key.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: key,
+        })
+        await fetch('/api/v1/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(sub.toJSON()),
+        })
+      }
+    } catch {}
+  }).catch(() => {})
 }
