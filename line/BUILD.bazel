@@ -1,5 +1,7 @@
-load("@rules_go//go:def.bzl", "go_library", "go_test")
+load("@rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
 load("//line:service.bzl", "line_service")
+
+exports_files(["data/tracks.json"])
 
 go_library(
     name = "linepb_lib",
@@ -72,10 +74,49 @@ go_library(
 )
 
 go_library(
+    name = "data_lib",
+    srcs = ["data/embed.go"],
+    embedsrcs = [
+        "data/tracks.json",
+    ],
+    importpath = "github.com/solanyn/mono/line/data",
+    visibility = ["//visibility:public"],
+)
+
+go_library(
     name = "migrations_lib",
     srcs = ["migrations/embed.go"],
-    embedsrcs = ["migrations/001_initial.sql"],
+    embedsrcs = glob(["migrations/*.sql"]),
     importpath = "github.com/solanyn/mono/line/migrations",
+)
+
+go_binary(
+    name = "simulator",
+    srcs = ["cmd/simulator/main.go"],
+    deps = [
+        ":telemetry_lib",
+        "@org_golang_x_crypto//salsa20",
+    ],
+)
+
+go_test(
+    name = "simulator_test",
+    srcs = ["cmd/simulator/main_test.go", "cmd/simulator/main.go"],
+    deps = [
+        ":telemetry_lib",
+        "@org_golang_x_crypto//salsa20",
+    ],
+)
+
+go_test(
+    name = "e2e_test",
+    srcs = glob(["test/*_test.go"]),
+    deps = [
+        ":storage_lib",
+        ":telemetry_lib",
+        "@org_golang_x_crypto//salsa20",
+    ],
+    size = "small",
 )
 
 line_service(
@@ -119,12 +160,27 @@ line_service(
     repository = "ghcr.io/solanyn/line-api",
     deps = [
         ":coach_lib",
+        ":data_lib",
         ":db_lib",
         ":kafka_lib",
         ":linepb_lib",
         ":storage_lib",
         ":telemetry_lib",
         "@com_github_gorilla_websocket//:websocket",
+        "@com_github_parquet_go_parquet_go//:parquet-go",
         "@com_github_twmb_franz_go//pkg/kgo",
+    ],
+)
+
+line_service(
+    name = "refdata",
+    srcs = ["cmd/refdata/main.go"],
+    repository = "ghcr.io/solanyn/line-refdata",
+    deps = [
+        "@com_github_aws_aws_sdk_go_v2//aws",
+        "@com_github_aws_aws_sdk_go_v2_credentials//:credentials",
+        "@com_github_aws_aws_sdk_go_v2_service_s3//:s3",
+        "@com_github_parquet_go_parquet_go//:parquet-go",
+        "@com_github_parquet_go_parquet_go//compress/snappy",
     ],
 )

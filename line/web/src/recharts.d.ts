@@ -14,7 +14,7 @@ declare module 'recharts' {
     type?: string
     dataKey: string
     stroke?: string
-    dot?: boolean
+    dot?: boolean | object
     strokeWidth?: number
     strokeDasharray?: string
     opacity?: number
@@ -25,13 +25,19 @@ declare module 'recharts' {
     dataKey?: string
     stroke?: string
     tick?: object
+    type?: string
+    allowDuplicatedCategory?: boolean
+    data?: unknown[]
   }
   export const XAxis: FC<XAxisProps>
 
   export interface YAxisProps {
     stroke?: string
     tick?: object
-    domain?: [number, number]
+    domain?: [string | number, string | number]
+    dataKey?: string
+    tickFormatter?: (value: number) => string
+    reversed?: boolean
   }
   export const YAxis: FC<YAxisProps>
 
@@ -43,6 +49,8 @@ declare module 'recharts' {
 
   export interface TooltipProps {
     contentStyle?: object
+    formatter?: (...args: unknown[]) => unknown
+    labelFormatter?: (label: string) => string
   }
   export const Tooltip: FC<TooltipProps>
 
@@ -52,4 +60,27 @@ declare module 'recharts' {
     children?: React.ReactNode
   }
   export const ResponsiveContainer: FC<ResponsiveContainerProps>
+
+  export interface ScatterChartProps {
+    data?: unknown[]
+    children?: React.ReactNode
+    width?: number
+    height?: number
+    margin?: { top?: number; right?: number; bottom?: number; left?: number }
+  }
+  export const ScatterChart: FC<ScatterChartProps>
+
+  export interface ScatterProps {
+    data?: unknown[]
+    children?: React.ReactNode
+    fill?: string
+    dataKey?: string
+  }
+  export const Scatter: FC<ScatterProps>
+
+  export interface CellProps {
+    fill?: string
+    opacity?: number
+  }
+  export const Cell: FC<CellProps>
 }

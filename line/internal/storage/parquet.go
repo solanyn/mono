@@ -3,6 +3,7 @@ package storage
 import (
 	"bytes"
 	"fmt"
+	"io"
 
 	"github.com/parquet-go/parquet-go"
 	"github.com/parquet-go/parquet-go/compress/snappy"
@@ -81,7 +82,7 @@ func ReadParquet(data []byte) ([]TelemetryRow, error) {
 
 	rows := make([]TelemetryRow, r.NumRows())
 	n, err := r.Read(rows)
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return nil, fmt.Errorf("parquet read: %w", err)
 	}
 	return rows[:n], nil

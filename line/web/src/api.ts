@@ -210,3 +210,80 @@ export async function fetchTracks(): Promise<{ tracks: TrackInfo[] }> {
   const res = await fetch(`${API_BASE}/tracks`)
   return res.json()
 }
+
+export interface ProgressionPoint {
+  session_id: string
+  date: string
+  track_id?: string
+  track_name?: string
+  car_code: number
+  best_lap_ms: number
+  lap_count: number
+  consistency_score?: number
+}
+
+export async function fetchProgression(trackId?: string): Promise<{ points: ProgressionPoint[] }> {
+  const params = trackId ? `?track_id=${encodeURIComponent(trackId)}` : ''
+  const res = await fetch(`${API_BASE}/progression${params}`)
+  return res.json()
+}
+
+export interface Annotation {
+  id: number
+  session_id: string
+  lap_number: number
+  frame_idx: number
+  text: string
+  created_at: string
+}
+
+export async function fetchAnnotations(sessionId: string, lap: number): Promise<{ annotations: Annotation[] }> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/laps/${lap}/annotations`)
+  return res.json()
+}
+
+export async function createAnnotation(sessionId: string, lap: number, frameIdx: number, text: string): Promise<Annotation> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/laps/${lap}/annotations`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ frame_idx: frameIdx, text }),
+  })
+  return res.json()
+}
+
+export async function deleteAnnotation(id: number): Promise<void> {
+  await fetch(`${API_BASE}/annotations/${id}`, { method: 'DELETE' })
+}
+
+export async function generateBriefing(sessionId: string): Promise<{ session_id: string; briefing: string }> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/briefing`, { method: 'POST' })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export interface Car {
+  id: number
+  name: string
+  maker: string
+  country: string
+  group?: string
+}
+
+let carsCache: Car[] | null = null
+
+export async function fetchCars(): Promise<Car[]> {
+  if (carsCache) return carsCache
+  const res = await fetch(`${API_BASE}/cars`)
+  carsCache = await res.json()
+  return carsCache!
+}
+
+export async function fetchCar(id: number): Promise<Car | undefined> {
+  const cars = await fetchCars()
+  return cars.find(c => c.id === id)
+}
+
+export function getCarName(cars: Car[], code: number): string {
+  const car = cars.find(c => c.id === code)
+  return car ? `${car.maker} ${car.name}` : `Car ${code}`
+}

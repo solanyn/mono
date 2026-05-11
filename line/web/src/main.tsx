@@ -8,6 +8,8 @@ import { SessionDetail } from './pages/SessionDetail'
 import { ReplayPage } from './pages/Replay'
 import { BriefingPage } from './pages/Briefing'
 import { LivePage } from './pages/Live'
+import { ProgressionPage } from './pages/Progression'
+import { TracksPage } from './pages/Tracks'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -20,6 +22,8 @@ createRoot(document.getElementById('root')!).render(
           <Route path="sessions/:id/replay" element={<ReplayPage />} />
           <Route path="sessions/:id/briefing" element={<BriefingPage />} />
           <Route path="live" element={<LivePage />} />
+          <Route path="progression" element={<ProgressionPage />} />
+          <Route path="tracks" element={<TracksPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

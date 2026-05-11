@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
-import { fetchSessions, type Session } from '../api'
+import { fetchSessions, fetchCars, getCarName, type Session, type Car } from '../api'
 
 export function SessionsPage() {
   const [sessions, setSessions] = useState<Session[]>([])
+  const [cars, setCars] = useState<Car[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetchSessions().then(({ sessions }) => {
+    Promise.all([fetchSessions(), fetchCars()]).then(([{ sessions }, cars]) => {
       setSessions(sessions ?? [])
+      setCars(cars)
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [])
@@ -49,7 +51,7 @@ export function SessionsPage() {
                 {s.track_id || 'Unknown Track'}
               </div>
               <div className="text-xs text-text-muted mt-1">
-                Car {s.car_code} &middot; {s.lap_count} laps
+                {getCarName(cars, s.car_code)} &middot; {s.lap_count} laps
               </div>
             </div>
             <div className="text-right">

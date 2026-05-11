@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import clsx from 'clsx'
-import { fetchSessionSummary, fetchTracks, fetchLaps, type SessionSummary, type TrackInfo, type Lap } from '../api'
+import { fetchSessionSummary, fetchTracks, fetchLaps, generateBriefing, type SessionSummary, type TrackInfo, type Lap } from '../api'
 
 export function BriefingPage() {
   const { id } = useParams<{ id: string }>()
@@ -9,6 +9,8 @@ export function BriefingPage() {
   const [track, setTrack] = useState<TrackInfo | null>(null)
   const [laps, setLaps] = useState<Lap[]>([])
   const [loading, setLoading] = useState(true)
+  const [llmBriefing, setLlmBriefing] = useState<string | null>(null)
+  const [generating, setGenerating] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -131,6 +133,39 @@ export function BriefingPage() {
           </div>
         </section>
       )}
+
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-xs font-medium text-text-muted uppercase tracking-wider">AI Briefing</h3>
+          <button
+            onClick={() => {
+              if (!id || generating) return
+              setGenerating(true)
+              generateBriefing(id)
+                .then(({ briefing }) => setLlmBriefing(briefing))
+                .catch(() => setLlmBriefing('Failed to generate briefing. Check LLM connection.'))
+                .finally(() => setGenerating(false))
+            }}
+            disabled={generating}
+            className={clsx(
+              'px-3 py-1.5 rounded text-xs font-medium transition-colors',
+              generating ? 'bg-surface-2 text-text-dim cursor-wait' : 'bg-accent/10 text-accent hover:bg-accent/20'
+            )}
+          >
+            {generating ? 'Generating...' : llmBriefing ? 'Regenerate' : 'Generate Briefing'}
+          </button>
+        </div>
+        {llmBriefing && (
+          <div className="bg-surface-2 rounded-lg border border-border p-4 prose prose-invert prose-sm max-w-none">
+            {llmBriefing.split('\n').map((line, i) => (
+              line.trim() ? <p key={i} className="text-xs text-text-muted leading-relaxed mb-2 last:mb-0">{line}</p> : null
+            ))}
+          </div>
+        )}
+        {!llmBriefing && !generating && (
+          <p className="text-xs text-text-dim">Click generate to get a personalized pre-race briefing from the AI coach.</p>
+        )}
+      </section>
     </div>
   )
 }
