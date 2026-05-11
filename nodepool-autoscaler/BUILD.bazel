@@ -145,26 +145,22 @@ genrule(
     tools = ["@io_k8s_sigs_controller_tools//cmd/controller-gen"],
 )
 
-# OCI artifact for deploy manifests (CRD + RBAC + Deployment)
+# OCI artifact for CRDs
 tar(
-    name = "manifests_layer",
-    srcs = [
-        ":generate_crd",
-        "deploy/deployment.yaml",
-        "deploy/kustomization.yaml",
-        "deploy/namespace.yaml",
-        "deploy/rbac.yaml",
-    ],
+    name = "crds_layer",
+    srcs = [":generate_crd"],
 )
 
 oci_image(
-    name = "manifests_image",
+    name = "crds_image",
     base = "@distroless_static",
-    tars = [":manifests_layer"],
+    tars = [":crds_layer"],
 )
 
 oci_push(
-    name = "push_manifests",
-    image = ":manifests_image",
-    repository = "ghcr.io/solanyn/nodepool-autoscaler-manifests",
+    name = "push_crds",
+    image = ":crds_image",
+    repository = "ghcr.io/solanyn/nodepool-autoscaler-crds",
 )
+
+
