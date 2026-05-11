@@ -45,6 +45,7 @@ js_run_binary(
     out_dirs = ["dist"],
     tool = ":vite",
     execution_requirements = {"no-sandbox": "1"},
+    visibility = ["//line:__pkg__"],
 )
 
 vite_bin.vite_binary(
