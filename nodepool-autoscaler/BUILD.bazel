@@ -136,31 +136,4 @@ oci_push(
     repository = "ghcr.io/solanyn/nodepool-autoscaler",
 )
 
-# CRD generation via controller-gen
-genrule(
-    name = "generate_crd",
-    srcs = glob(["api/v1alpha1/*.go"]),
-    outs = ["crd/autoscaling.home-ops.io_nodepoolscalers.yaml"],
-    cmd = "$(location @io_k8s_sigs_controller_tools//cmd/controller-gen) crd paths=./api/v1alpha1 output:crd:dir=$(@D)/crd",
-    tools = ["@io_k8s_sigs_controller_tools//cmd/controller-gen"],
-)
-
-# OCI artifact for CRDs
-tar(
-    name = "crds_layer",
-    srcs = [":generate_crd"],
-)
-
-oci_image(
-    name = "crds_image",
-    base = "@distroless_static",
-    tars = [":crds_layer"],
-)
-
-oci_push(
-    name = "push_crds",
-    image = ":crds_image",
-    repository = "ghcr.io/solanyn/nodepool-autoscaler-crds",
-)
-
 
