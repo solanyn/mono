@@ -20,7 +20,10 @@ func TestEncryptDecryptRoundtrip(t *testing.T) {
 		t.Fatalf("decrypt failed: %v", err)
 	}
 
-	frame := telemetry.Parse(decrypted)
+	frame, err := telemetry.Parse(decrypted)
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
 
 	if frame.PacketID != 42 {
 		t.Errorf("PacketID = %d, want 42", frame.PacketID)
@@ -81,7 +84,10 @@ func TestMultipleLapsSequence(t *testing.T) {
 			if err != nil {
 				t.Fatalf("lap %d frame %d: decrypt failed: %v", lap, i, err)
 			}
-			frame := telemetry.Parse(decrypted)
+			frame, err := telemetry.Parse(decrypted)
+			if err != nil {
+				t.Fatalf("lap %d frame %d: parse failed: %v", lap, i, err)
+			}
 			frames = append(frames, frame)
 		}
 	}
@@ -117,7 +123,10 @@ func TestEncodeDecodeIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decrypt: %v", err)
 	}
-	frame := telemetry.Parse(decrypted)
+	frame, err := telemetry.Parse(decrypted)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
 
 	encoded := frame.Encode()
 	decoded := telemetry.DecodeFrame(encoded)

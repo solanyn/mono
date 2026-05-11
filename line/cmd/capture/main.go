@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/solanyn/mono/line/internal/kafka"
@@ -66,10 +67,10 @@ func main() {
 	buf := make([]byte, 4096)
 	var pktCount int
 	var lastPktID int32
-	var produced int64
-	var dropped int64
-	var decryptErrors int64
-	var gapFrames int64
+	var produced atomic.Int64
+	var dropped atomic.Int64
+	var decryptErrors atomic.Int64
+	var gapFrames atomic.Int64
 
 	go func() {
 		ticker := time.NewTicker(10 * time.Second)
@@ -80,11 +81,11 @@ func main() {
 				return
 			case <-ticker.C:
 				slog.Info("capture stats",
-					"produced", produced,
-					"dropped_dup", dropped,
-					"decrypt_errors", decryptErrors,
-					"gap_frames", gapFrames,
-					"last_pkt_id", lastPktID,
+					"produced", produced.Load(),
+					"dropped_dup", dropped.Load(),
+					"decrypt_errors", decryptErrors.Load(),
+					"gap_frames", gapFrames.Load(),
+					"last_pkt_id", atomic.LoadInt32(&lastPktID),
 				)
 			}
 		}
@@ -110,27 +111,31 @@ func main() {
 
 		decrypted, err := telemetry.Decrypt(buf[:n])
 		if err != nil {
-			decryptErrors++
-			if decryptErrors%100 == 1 {
-				slog.Warn("decrypt failed", "err", err, "total_errors", decryptErrors, "pkt_size", n)
+			errCount := decryptErrors.Add(1)
+			if errCount%100 == 1 {
+				slog.Warn("decrypt failed", "err", err, "total_errors", errCount, "pkt_size", n)
 			}
 			continue
 		}
 
-		frame := telemetry.Parse(decrypted)
+		frame, err := telemetry.Parse(decrypted)
+		if err != nil {
+			slog.Warn("parse failed", "err", err)
+			continue
+		}
 		if frame.PacketID <= lastPktID {
-			dropped++
+			dropped.Add(1)
 			continue
 		}
 
 		gap := frame.PacketID - lastPktID
 		if lastPktID > 0 && gap > 1 {
-			gapFrames += int64(gap - 1)
+			gapFrames.Add(int64(gap - 1))
 			if gap > 10 {
 				slog.Warn("packet gap detected", "expected", lastPktID+1, "got", frame.PacketID, "missed", gap-1)
 			}
 		}
-		lastPktID = frame.PacketID
+		atomic.StoreInt32(&lastPktID, frame.PacketID)
 
 		if !frame.IsOnTrack() {
 			continue
@@ -139,14 +144,14 @@ func main() {
 		encoded := frame.Encode()
 
 		producer.ProduceAsync(ctx, topic, fmt.Sprintf("%d", frame.CarID), encoded)
-		produced++
+		produced.Add(1)
 	}
 
 	slog.Info("shutting down, flushing producer...")
 	if err := producer.Flush(context.Background()); err != nil {
 		slog.Error("flush failed", "err", err)
 	}
-	slog.Info("capture stopped", "total_produced", produced, "total_dropped", dropped, "total_gaps", gapFrames, "total_decrypt_errors", decryptErrors)
+	slog.Info("capture stopped", "total_produced", produced.Load(), "total_dropped", dropped.Load(), "total_gaps", gapFrames.Load(), "total_decrypt_errors", decryptErrors.Load())
 }
 
 func envOrDefault(key, def string) string {

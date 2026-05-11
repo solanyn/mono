@@ -95,7 +95,10 @@ func Decrypt(data []byte) ([]byte, error) {
 	return out, nil
 }
 
-func Parse(d []byte) Frame {
+func Parse(d []byte) (Frame, error) {
+	if len(d) < PacketSize {
+		return Frame{}, fmt.Errorf("packet too short for parse: %d < %d", len(d), PacketSize)
+	}
 	return Frame{
 		PacketID:    int32(binary.LittleEndian.Uint32(d[0x70 : 0x70+4])),
 		PosX:       f32(d, 0x04),
@@ -147,7 +150,7 @@ func Parse(d []byte) Frame {
 		CarID:      int32(binary.LittleEndian.Uint32(d[0x124 : 0x124+4])),
 		Flags:      binary.LittleEndian.Uint16(d[0x8E : 0x8E+2]),
 		TimeOfDay:  int32(binary.LittleEndian.Uint32(d[0x104 : 0x104+4])),
-	}
+	}, nil
 }
 
 func f32(d []byte, off int) float32 {

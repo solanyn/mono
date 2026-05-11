@@ -29,7 +29,10 @@ func TestFullDataPath(t *testing.T) {
 				t.Fatalf("lap %d frame %d: decrypt failed: %v", lap, i, err)
 			}
 
-			frame := telemetry.Parse(decrypted)
+			frame, err := telemetry.Parse(decrypted)
+			if err != nil {
+				t.Fatalf("lap %d frame %d: parse failed: %v", lap, i, err)
+			}
 
 			if frame.PacketID != pktID {
 				t.Fatalf("packet ID mismatch: got %d want %d", frame.PacketID, pktID)
@@ -126,7 +129,7 @@ func TestLapDetection(t *testing.T) {
 			pkt := buildPacket(pktID, track[i], lap, int16(laps), carID, int32(i)*16)
 			encrypted := encrypt(pkt)
 			decrypted, _ := telemetry.Decrypt(encrypted)
-			frame := telemetry.Parse(decrypted)
+			frame, _ := telemetry.Parse(decrypted)
 
 			if currentLap != 0 && frame.CurrentLap > currentLap {
 				sessions = append(sessions, current)
@@ -160,7 +163,8 @@ func TestSessionBoundary(t *testing.T) {
 		pkt := buildPacket(pktID, track[i], 1, 3, 1111, int32(i)*16)
 		encrypted := encrypt(pkt)
 		decrypted, _ := telemetry.Decrypt(encrypted)
-		frames = append(frames, telemetry.Parse(decrypted))
+		f, _ := telemetry.Parse(decrypted)
+		frames = append(frames, f)
 	}
 
 	for i := 0; i < len(track); i++ {
@@ -168,7 +172,8 @@ func TestSessionBoundary(t *testing.T) {
 		pkt := buildPacket(pktID, track[i], 1, 3, 2222, int32(i)*16)
 		encrypted := encrypt(pkt)
 		decrypted, _ := telemetry.Decrypt(encrypted)
-		frames = append(frames, telemetry.Parse(decrypted))
+		f, _ := telemetry.Parse(decrypted)
+		frames = append(frames, f)
 	}
 
 	var sessionBreaks int
@@ -191,7 +196,10 @@ func TestDataIntegrity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	frame := telemetry.Parse(decrypted)
+	frame, err := telemetry.Parse(decrypted)
+	if err != nil {
+		t.Fatal(err)
+	}
 	encoded := frame.Encode()
 	decoded := telemetry.DecodeFrame(encoded)
 	row := decoded.ToRow()
@@ -231,7 +239,10 @@ func TestOffTrackFramesSkipped(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	frame := telemetry.Parse(decrypted)
+	frame, err := telemetry.Parse(decrypted)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if frame.IsOnTrack() {
 		t.Error("expected off-track frame")
 	}
@@ -246,7 +257,10 @@ func TestPausedFrames(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	frame := telemetry.Parse(decrypted)
+	frame, err := telemetry.Parse(decrypted)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !frame.IsOnTrack() {
 		t.Error("expected on-track")
 	}
@@ -265,7 +279,7 @@ func TestDuplicatePacketIDs(t *testing.T) {
 		pkt := buildPacket(pktID, track[i%10], 1, 3, 1234, int32(i)*16)
 		encrypted := encrypt(pkt)
 		decrypted, _ := telemetry.Decrypt(encrypted)
-		frame := telemetry.Parse(decrypted)
+		frame, _ := telemetry.Parse(decrypted)
 
 		if frame.PacketID <= lastPktID {
 			dropped++
@@ -289,7 +303,7 @@ func TestPacketGaps(t *testing.T) {
 		pkt := buildPacket(id, track[i%10], 1, 3, 1234, int32(i)*16)
 		encrypted := encrypt(pkt)
 		decrypted, _ := telemetry.Decrypt(encrypted)
-		frame := telemetry.Parse(decrypted)
+		frame, _ := telemetry.Parse(decrypted)
 
 		if lastPktID > 0 && frame.PacketID-lastPktID > 1 {
 			gaps += int64(frame.PacketID - lastPktID - 1)
@@ -334,7 +348,7 @@ func TestMaxFramesPerLapCap(t *testing.T) {
 		pkt := buildPacket(pktID, track[i%100], 1, 3, 1234, int32(i)*16)
 		encrypted := encrypt(pkt)
 		decrypted, _ := telemetry.Decrypt(encrypted)
-		frame := telemetry.Parse(decrypted)
+		frame, _ := telemetry.Parse(decrypted)
 		rows = append(rows, frame.ToRow())
 
 		if len(rows) >= maxFrames {
@@ -366,7 +380,10 @@ func TestZeroSpeedFrames(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	frame := telemetry.Parse(decrypted)
+	frame, err := telemetry.Parse(decrypted)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if frame.Speed != 0 {
 		t.Errorf("speed = %f, want 0", frame.Speed)
 	}
