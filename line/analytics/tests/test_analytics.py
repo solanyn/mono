@@ -165,9 +165,9 @@ def test_track_database():
 
 
 def test_community_tracks_load():
-    data_path = Path(__file__).parent.parent / "data" / "tracks.json"
+    data_path = Path(__file__).parent.parent.parent / "data" / "tracks.json"
     if not data_path.exists():
-        data_path = Path("line/analytics/data/tracks.json")
+        data_path = Path("line/data/tracks.json")
     if not data_path.exists():
         return
 

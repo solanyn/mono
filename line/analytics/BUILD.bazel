@@ -14,7 +14,7 @@ pip_compile(
 py_library(
     name = "analytics_lib",
     srcs = glob(["src/analytics/**/*.py"]),
-    data = glob(["data/**"]),
+    data = ["//line:data/tracks.json"],
     imports = ["src"],
     visibility = ["//visibility:public"],
     deps = [
@@ -40,7 +40,7 @@ py_binary(
 py_test(
     name = "test_analytics",
     srcs = ["tests/test_analytics.py"],
-    data = glob(["data/**"]),
+    data = ["//line:data/tracks.json"],
     deps = [
         ":analytics_lib",
         "@line_pypi//pytest",

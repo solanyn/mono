@@ -127,3 +127,46 @@ func (c *LLMClient) Generate(ctx context.Context, prompt string) (string, error)
 	}
 	return result.Choices[0].Message.Content, nil
 }
+
+const briefingSystemPrompt = `You are a professional racing engineer preparing a pre-race briefing for a Gran Turismo 7 driver.
+Write clear, structured, actionable briefings based on telemetry data from previous sessions.
+Be specific about corner techniques, braking points, and strategy.
+Address the driver as "you". Be direct and motivating without being cheesy.
+Never say "I" or refer to yourself.`
+
+func (c *LLMClient) GenerateBriefing(ctx context.Context, prompt string) (string, error) {
+	body := chatRequest{
+		Model: c.model,
+		Messages: []chatMessage{
+			{Role: "system", Content: briefingSystemPrompt},
+			{Role: "user", Content: prompt},
+		},
+	}
+	data, _ := json.Marshal(body)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", c.endpoint+"/v1/chat/completions", bytes.NewReader(data))
+	if err != nil {
+		return "", fmt.Errorf("llm briefing request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("llm briefing call: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("llm briefing status: %d", resp.StatusCode)
+	}
+
+	var result chatResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("llm briefing decode: %w", err)
+	}
+
+	if len(result.Choices) == 0 {
+		return "", fmt.Errorf("llm briefing: no choices returned")
+	}
+	return result.Choices[0].Message.Content, nil
+}
