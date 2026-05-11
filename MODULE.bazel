@@ -1715,18 +1715,23 @@ go_deps.module(
 )
 go_deps.module(
     path = "k8s.io/api",
-    sum = "h1:Hw7KqxRusq+6QSplE3NYG4MBxZw1BZnq4aP4cJVINls=",
-    version = "v0.32.3",
+    sum = "h1:tA6Cf3bHnLIrUK4IqEgb2v++/GYUtqiu9sRVk3iBXyw=",
+    version = "v0.33.1",
+)
+go_deps.module(
+    path = "k8s.io/apiextensions-apiserver",
+    sum = "h1:d2qpYL7Mngbsc1taA4IjJPRJ9ilnsXIrndH+r9IimOs=",
+    version = "v0.33.0",
 )
 go_deps.module(
     path = "k8s.io/apimachinery",
-    sum = "h1:JmDuDarhDmA/Li7j3aPrwhpNBA94Nvk5zLeOge9HH1U=",
-    version = "v0.32.3",
+    sum = "h1:mzqXWV8tW9Rw4VeW9rEkqvnxj59k1ezDUl20tFK/oM4=",
+    version = "v0.33.1",
 )
 go_deps.module(
     path = "k8s.io/client-go",
-    sum = "h1:RKPVltzopkSgHS7aS98QdscAgtgah/+zmpAogooIqVU=",
-    version = "v0.32.3",
+    sum = "h1:ZZV/Ks2g92cyxWkRRnfUDsnhNn28eFpt26aGc8KbXF4=",
+    version = "v0.33.1",
 )
 go_deps.module(
     path = "k8s.io/klog/v2",
@@ -1767,6 +1772,16 @@ go_deps.module(
     path = "sigs.k8s.io/json",
     sum = "h1:/Rv+M11QRah1itp8VhT6HoVx1Ray9eB4DBr+K+/sCJ8=",
     version = "v0.0.0-20241010143419-9aa6b5e7a4b3",
+)
+go_deps.module(
+    path = "sigs.k8s.io/controller-runtime",
+    sum = "h1:CYfjpEuicjUecRk+KAeyYh+ouUBn4llGyDYytIGcJS8=",
+    version = "v0.21.0",
+)
+go_deps.module(
+    path = "sigs.k8s.io/controller-tools",
+    sum = "h1:KXDQza3bgjlPY6xLR63tI/40gzjhyUAvkCrwzd2/6cs=",
+    version = "v0.21.0",
 )
 go_deps.module(
     path = "sigs.k8s.io/structured-merge-diff/v4",
@@ -2111,10 +2126,13 @@ use_repo(
     "in_yaml_go_yaml_v3",
     "io_cncf_tags_container_device_interface",
     "io_k8s_api",
+    "io_k8s_apiextensions_apiserver",
     "io_k8s_apimachinery",
     "io_k8s_client_go",
     "io_k8s_klog_v2",
     "io_k8s_kube_openapi",
+    "io_k8s_sigs_controller_runtime",
+    "io_k8s_sigs_controller_tools",
     "io_k8s_sigs_json",
     "io_k8s_sigs_structured_merge_diff_v4",
     "io_k8s_sigs_yaml",
