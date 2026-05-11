@@ -60,6 +60,12 @@ go_library(
     importpath = "github.com/solanyn/mono/line/internal/tracks",
 )
 
+go_library(
+    name = "config_lib",
+    srcs = glob(["internal/config/*.go"]),
+    importpath = "github.com/solanyn/mono/line/internal/config",
+)
+
 go_test(
     name = "telemetry_test",
     srcs = glob(["internal/telemetry/*_test.go"]),
@@ -143,6 +149,7 @@ line_service(
     srcs = ["cmd/capture/main.go"],
     repository = "ghcr.io/solanyn/line-capture",
     deps = [
+        ":config_lib",
         ":kafka_lib",
         ":telemetry_lib",
     ],
@@ -153,6 +160,7 @@ line_service(
     srcs = ["cmd/assembler/main.go"],
     repository = "ghcr.io/solanyn/line-assembler",
     deps = [
+        ":config_lib",
         ":data_lib",
         ":db_lib",
         ":kafka_lib",
@@ -172,6 +180,7 @@ go_binary(
     pure = "on",
     deps = [
         ":coach_lib",
+        ":config_lib",
         ":data_lib",
         ":db_lib",
         ":kafka_lib",

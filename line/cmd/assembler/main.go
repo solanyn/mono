@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 
 	"github.com/solanyn/mono/line/data"
+	"github.com/solanyn/mono/line/internal/config"
 	"github.com/solanyn/mono/line/internal/db"
 	"github.com/solanyn/mono/line/internal/kafka"
 	"github.com/solanyn/mono/line/internal/storage"
@@ -55,17 +55,17 @@ type sessionCompleteEvent struct {
 }
 
 func main() {
-	brokers := strings.Split(envOrDefault("KAFKA_BROKERS", "localhost:9092"), ",")
-	topic := envOrDefault("KAFKA_TOPIC", "line.telemetry.raw")
-	group := envOrDefault("KAFKA_GROUP", "line.assembler")
-	s3Endpoint := envOrDefault("S3_ENDPOINT", "http://localhost:3900")
+	brokers := config.EnvList("KAFKA_BROKERS", "localhost:9092", ",")
+	topic := config.Env("KAFKA_TOPIC", "line.telemetry.raw")
+	group := config.Env("KAFKA_GROUP", "line.assembler")
+	s3Endpoint := config.Env("S3_ENDPOINT", "http://localhost:3900")
 	s3AccessKey := os.Getenv("S3_ACCESS_KEY")
 	s3SecretKey := os.Getenv("S3_SECRET_KEY")
-	s3Region := envOrDefault("S3_REGION", "us-east-1")
-	s3Bucket := envOrDefault("S3_BUCKET", "line-bronze")
-	lapTopic := envOrDefault("KAFKA_LAP_TOPIC", "line.lap.written")
-	sessionTopic := envOrDefault("KAFKA_SESSION_TOPIC", "line.session.complete")
-	databaseURL := envOrDefault("DATABASE_URL", "")
+	s3Region := config.Env("S3_REGION", "us-east-1")
+	s3Bucket := config.Env("S3_BUCKET", "line-bronze")
+	lapTopic := config.Env("KAFKA_LAP_TOPIC", "line.lap.written")
+	sessionTopic := config.Env("KAFKA_SESSION_TOPIC", "line.session.complete")
+	databaseURL := config.Env("DATABASE_URL", "")
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
@@ -376,11 +376,4 @@ func publishSessionComplete(ctx context.Context, producer *kafka.Producer, topic
 	eventData, _ := json.Marshal(event)
 	producer.ProduceAsync(ctx, topic, sess.id, eventData)
 	slog.Info("published session complete", "session", sess.id, "laps", sess.lapCount)
-}
-
-func envOrDefault(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return def
 }

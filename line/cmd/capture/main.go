@@ -7,25 +7,24 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"strconv"
-	"strings"
 	"sync/atomic"
 	"time"
 
+	"github.com/solanyn/mono/line/internal/config"
 	"github.com/solanyn/mono/line/internal/kafka"
 	"github.com/solanyn/mono/line/internal/telemetry"
 )
 
 func main() {
-	ps5IP := envOrDefault("PS5_IP", "")
+	ps5IP := config.Env("PS5_IP", "")
 	if ps5IP == "" {
 		slog.Error("PS5_IP environment variable required")
 		os.Exit(1)
 	}
 
-	brokers := strings.Split(envOrDefault("KAFKA_BROKERS", "localhost:9092"), ",")
-	topic := envOrDefault("KAFKA_TOPIC", "line.telemetry.raw")
-	heartbeatInterval, _ := strconv.Atoi(envOrDefault("HEARTBEAT_INTERVAL", "100"))
+	brokers := config.EnvList("KAFKA_BROKERS", "localhost:9092", ",")
+	topic := config.Env("KAFKA_TOPIC", "line.telemetry.raw")
+	heartbeatInterval := config.EnvInt("HEARTBEAT_INTERVAL", 100)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
@@ -154,9 +153,3 @@ func main() {
 	slog.Info("capture stopped", "total_produced", produced.Load(), "total_dropped", dropped.Load(), "total_gaps", gapFrames.Load(), "total_decrypt_errors", decryptErrors.Load())
 }
 
-func envOrDefault(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return def
-}

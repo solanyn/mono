@@ -24,6 +24,7 @@ import (
 	"github.com/solanyn/mono/line/data"
 	"github.com/solanyn/mono/line/gen/linepb"
 	"github.com/solanyn/mono/line/internal/coach"
+	"github.com/solanyn/mono/line/internal/config"
 	"github.com/solanyn/mono/line/internal/db"
 	"github.com/solanyn/mono/line/internal/kafka"
 	"github.com/solanyn/mono/line/internal/storage"
@@ -110,27 +111,38 @@ func (h *liveHub) getStatus() linepb.LiveStatus {
 	return h.status
 }
 
+func (h *liveHub) drain() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	msg := websocket.FormatCloseMessage(websocket.CloseGoingAway, "server shutting down")
+	for conn := range h.clients {
+		conn.WriteControl(websocket.CloseMessage, msg, time.Now().Add(time.Second))
+		conn.Close()
+		delete(h.clients, conn)
+	}
+}
+
 func main() {
-	brokers := strings.Split(envOrDefault("KAFKA_BROKERS", "localhost:9092"), ",")
-	topic := envOrDefault("KAFKA_TOPIC", "line.telemetry.raw")
-	group := envOrDefault("KAFKA_GROUP", "line.api")
-	s3Endpoint := envOrDefault("S3_ENDPOINT", "http://localhost:3900")
+	brokers := config.EnvList("KAFKA_BROKERS", "localhost:9092", ",")
+	topic := config.Env("KAFKA_TOPIC", "line.telemetry.raw")
+	group := config.Env("KAFKA_GROUP", "line.api")
+	s3Endpoint := config.Env("S3_ENDPOINT", "http://localhost:3900")
 	s3AccessKey := os.Getenv("S3_ACCESS_KEY")
 	s3SecretKey := os.Getenv("S3_SECRET_KEY")
-	s3Region := envOrDefault("S3_REGION", "us-east-1")
-	s3Bucket := envOrDefault("S3_BUCKET", "line-bronze")
-	silverBucket := envOrDefault("S3_SILVER_BUCKET", "line-silver")
-	goldBucket := envOrDefault("S3_GOLD_BUCKET", "line-gold")
-	addr := envOrDefault("ADDR", ":8080")
-	ttsEndpoint := envOrDefault("TTS_ENDPOINT", "http://mac.internal:8000")
-	llmEndpoint := envOrDefault("LLM_ENDPOINT", "http://mac.internal:8080")
-	llmModel := envOrDefault("LLM_MODEL", "mlx-community/gemma-4-e4b-it-4bit")
-	coachVoice := envOrDefault("COACH_VOICE", "af_heart")
-	useLLM := envOrDefault("COACH_USE_LLM", "true") == "true"
-	databaseURL := envOrDefault("DATABASE_URL", "")
-	vapidPublicKey := envOrDefault("VAPID_PUBLIC_KEY", "")
-	vapidPrivateKey := envOrDefault("VAPID_PRIVATE_KEY", "")
-	corsOrigin := envOrDefault("CORS_ORIGIN", "*")
+	s3Region := config.Env("S3_REGION", "us-east-1")
+	s3Bucket := config.Env("S3_BUCKET", "line-bronze")
+	silverBucket := config.Env("S3_SILVER_BUCKET", "line-silver")
+	goldBucket := config.Env("S3_GOLD_BUCKET", "line-gold")
+	addr := config.Env("ADDR", ":8080")
+	ttsEndpoint := config.Env("TTS_ENDPOINT", "http://mac.internal:8000")
+	llmEndpoint := config.Env("LLM_ENDPOINT", "http://mac.internal:8080")
+	llmModel := config.Env("LLM_MODEL", "mlx-community/gemma-4-e4b-it-4bit")
+	coachVoice := config.Env("COACH_VOICE", "af_heart")
+	useLLM := config.EnvBool("COACH_USE_LLM", true)
+	databaseURL := config.Env("DATABASE_URL", "")
+	vapidPublicKey := config.Env("VAPID_PUBLIC_KEY", "")
+	vapidPrivateKey := config.Env("VAPID_PRIVATE_KEY", "")
+	corsOrigin := config.Env("CORS_ORIGIN", "*")
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
@@ -174,8 +186,8 @@ func main() {
 	}
 	defer consumer.Close()
 
-	sessionTopic := envOrDefault("KAFKA_SESSION_TOPIC", "line.session.complete")
-	journalGroup := envOrDefault("KAFKA_JOURNAL_GROUP", "line.api.journal")
+	sessionTopic := config.Env("KAFKA_SESSION_TOPIC", "line.session.complete")
+	journalGroup := config.Env("KAFKA_JOURNAL_GROUP", "line.api.journal")
 	journalConsumer, err := kafka.NewConsumer(brokers, journalGroup, sessionTopic)
 	if err != nil {
 		slog.Warn("journal consumer not started", "err", err)
@@ -265,7 +277,7 @@ func main() {
 	mux.HandleFunc("POST /api/v1/push/subscribe", srv.handlePushSubscribe)
 	mux.HandleFunc("DELETE /api/v1/push/subscribe", srv.handlePushUnsubscribe)
 
-	webDir := envOrDefault("WEB_DIR", "")
+	webDir := config.Env("WEB_DIR", "")
 	if webDir != "" {
 		spa := spaHandler{root: http.Dir(webDir)}
 		mux.Handle("/", spa)
@@ -278,6 +290,8 @@ func main() {
 
 	go func() {
 		<-ctx.Done()
+		hub.drain()
+		coachPipeline.DrainClients()
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer shutdownCancel()
 		httpSrv.Shutdown(shutdownCtx)
@@ -914,13 +928,6 @@ func rowsToFrames(rows []storage.TelemetryRow, downsample int) []linepb.Telemetr
 		frames = append(frames, rowToFrame(row))
 	}
 	return frames
-}
-
-func envOrDefault(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return def
 }
 
 type spaHandler struct {
