@@ -294,6 +294,16 @@ go_deps.module(
     version = "v1.12.0",
 )
 go_deps.module(
+    path = "github.com/SherClockHolmes/webpush-go",
+    sum = "h1:ocnzNKWN23T9nvHi6IfyrQjkIc0oJWv1B1pULsf9i3s=",
+    version = "v1.4.0",
+)
+go_deps.module(
+    path = "github.com/golang-jwt/jwt/v5",
+    sum = "h1:OuVbFODueb089Lh128TAcimifWaLhJwVflnrgM17wHk=",
+    version = "v5.2.1",
+)
+go_deps.module(
     path = "github.com/mmcdole/gofeed",
     sum = "h1:5yn+HeqlcvjMeAI4gu6T+crm7d0anY85+M+v6fIFNG4=",
     version = "v1.3.0",
@@ -2032,6 +2042,7 @@ use_repo(
     "com_github_sergi_go_diff",
     "com_github_serialx_hashring",
     "com_github_sethvargo_go_retry",
+    "com_github_sherclockholmes_webpush_go",
     "com_github_shibumi_go_pathspec",
     "com_github_shirou_gopsutil_v4",
     "com_github_sirupsen_logrus",

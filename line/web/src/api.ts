@@ -287,3 +287,120 @@ export function getCarName(cars: Car[], code: number): string {
   const car = cars.find(c => c.id === code)
   return car ? `${car.maker} ${car.name}` : `Car ${code}`
 }
+
+export interface ReferenceLap {
+  id: number
+  track_id: string
+  car_code: number
+  session_id: string
+  lap_number: number
+  time_ms: number
+  s3_key: string
+  label: string
+  created_at: string
+}
+
+export async function fetchReferenceLaps(trackId?: string, carCode?: number): Promise<ReferenceLap[]> {
+  const params = new URLSearchParams()
+  if (trackId) params.set('track_id', trackId)
+  if (carCode) params.set('car_code', String(carCode))
+  const res = await fetch(`${API_BASE}/reference-laps?${params}`)
+  return res.json()
+}
+
+export async function setReferenceLap(req: {
+  track_id: string
+  car_code: number
+  session_id: string
+  lap_number: number
+  time_ms: number
+  s3_key: string
+  label?: string
+}): Promise<ReferenceLap> {
+  const res = await fetch(`${API_BASE}/reference-laps`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function deleteReferenceLap(id: number): Promise<void> {
+  await fetch(`${API_BASE}/reference-laps/${id}`, { method: 'DELETE' })
+}
+
+export async function fetchReferenceLapTelemetry(
+  trackId: string,
+  carCode: number,
+  label = 'best',
+  downsample = 2,
+): Promise<{ reference: ReferenceLap; frames: TelemetryFrame[]; total: number; returned: number }> {
+  const res = await fetch(
+    `${API_BASE}/reference-laps/${trackId}/${carCode}/telemetry?label=${label}&downsample=${downsample}`,
+  )
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export interface CarComparison {
+  car_code: number
+  track_id: string
+  sessions: number
+  best_lap_ms: number
+  avg_lap_ms: number
+  total_laps: number
+}
+
+export async function fetchComparisonTracks(): Promise<string[]> {
+  const res = await fetch(`${API_BASE}/compare`)
+  const data = await res.json()
+  return data.tracks ?? []
+}
+
+export async function fetchCarComparisons(trackId: string): Promise<CarComparison[]> {
+  const res = await fetch(`${API_BASE}/compare?track_id=${encodeURIComponent(trackId)}`)
+  const data = await res.json()
+  return data.comparisons ?? []
+}
+
+export interface Journal {
+  id: number
+  session_id: string
+  content: string
+  created_at: string
+}
+
+export async function fetchJournal(sessionId: string): Promise<Journal | null> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/journal`)
+  if (!res.ok) return null
+  return res.json()
+}
+
+export async function generateJournal(sessionId: string): Promise<Journal> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/journal`, { method: 'POST' })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function getVAPIDKey(): Promise<string> {
+  const res = await fetch(`${API_BASE}/push/vapid`)
+  const data = await res.json()
+  return data.public_key
+}
+
+export async function subscribePush(subscription: PushSubscription): Promise<void> {
+  await fetch(`${API_BASE}/push/subscribe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(subscription.toJSON()),
+  })
+}
+
+export async function unsubscribePush(subscription: PushSubscription): Promise<void> {
+  await fetch(`${API_BASE}/push/subscribe`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(subscription.toJSON()),
+  })
+}

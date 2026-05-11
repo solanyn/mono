@@ -52,6 +52,12 @@ go_library(
     ],
 )
 
+go_library(
+    name = "tracks_lib",
+    srcs = glob(["internal/tracks/*.go"]),
+    importpath = "github.com/solanyn/mono/line/internal/tracks",
+)
+
 go_test(
     name = "telemetry_test",
     srcs = glob(["internal/telemetry/*_test.go"]),
@@ -145,10 +151,12 @@ line_service(
     srcs = ["cmd/assembler/main.go"],
     repository = "ghcr.io/solanyn/line-assembler",
     deps = [
+        ":data_lib",
         ":db_lib",
         ":kafka_lib",
         ":storage_lib",
         ":telemetry_lib",
+        ":tracks_lib",
         "@com_github_google_uuid//:uuid",
         "@com_github_twmb_franz_go//pkg/kgo",
     ],
@@ -168,6 +176,7 @@ line_service(
         ":telemetry_lib",
         "@com_github_gorilla_websocket//:websocket",
         "@com_github_parquet_go_parquet_go//:parquet-go",
+        "@com_github_sherclockholmes_webpush_go//:webpush-go",
         "@com_github_twmb_franz_go//pkg/kgo",
     ],
 )

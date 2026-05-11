@@ -134,6 +134,48 @@ Be specific about corner techniques, braking points, and strategy.
 Address the driver as "you". Be direct and motivating without being cheesy.
 Never say "I" or refer to yourself.`
 
+const journalSystemPrompt = `You are writing a personal racing journal for a Gran Turismo 7 driver.
+Write reflective, honest entries that capture the session experience.
+Use first person. Be specific about what happened and what was learned.
+Keep it concise but insightful. No fluff.`
+
+func (c *LLMClient) GenerateJournal(ctx context.Context, prompt string) (string, error) {
+	body := chatRequest{
+		Model: c.model,
+		Messages: []chatMessage{
+			{Role: "system", Content: journalSystemPrompt},
+			{Role: "user", Content: prompt},
+		},
+	}
+	data, _ := json.Marshal(body)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", c.endpoint+"/v1/chat/completions", bytes.NewReader(data))
+	if err != nil {
+		return "", fmt.Errorf("llm journal request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("llm journal call: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("llm journal status: %d", resp.StatusCode)
+	}
+
+	var result chatResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("llm journal decode: %w", err)
+	}
+
+	if len(result.Choices) == 0 {
+		return "", fmt.Errorf("llm journal: no choices returned")
+	}
+	return result.Choices[0].Message.Content, nil
+}
+
 func (c *LLMClient) GenerateBriefing(ctx context.Context, prompt string) (string, error) {
 	body := chatRequest{
 		Model: c.model,

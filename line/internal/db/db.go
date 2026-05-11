@@ -67,6 +67,14 @@ func (d *DB) EndSession(ctx context.Context, id string, lapCount int, bestLapMs 
 	return err
 }
 
+func (d *DB) UpdateSessionTrack(ctx context.Context, id string, trackID, trackName *string) error {
+	_, err := d.pool.Exec(ctx,
+		`UPDATE sessions SET track_id = $1, track_name = $2 WHERE id = $3`,
+		trackID, trackName, id,
+	)
+	return err
+}
+
 func (d *DB) InsertLap(ctx context.Context, l *Lap) error {
 	_, err := d.pool.Exec(ctx,
 		`INSERT INTO laps (session_id, lap_number, time_ms, frames, top_speed, s3_key)
@@ -253,4 +261,208 @@ func (d *DB) CreateAnnotation(ctx context.Context, a *Annotation) error {
 func (d *DB) DeleteAnnotation(ctx context.Context, id int64) error {
 	_, err := d.pool.Exec(ctx, `DELETE FROM annotations WHERE id = $1`, id)
 	return err
+}
+
+type ReferenceLap struct {
+	ID        int64     `json:"id"`
+	TrackID   string    `json:"track_id"`
+	CarCode   int32     `json:"car_code"`
+	SessionID string    `json:"session_id"`
+	LapNumber int       `json:"lap_number"`
+	TimeMs    int32     `json:"time_ms"`
+	S3Key     string    `json:"s3_key"`
+	Label     string    `json:"label"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (d *DB) SetReferenceLap(ctx context.Context, r *ReferenceLap) error {
+	err := d.pool.QueryRow(ctx,
+		`INSERT INTO reference_laps (track_id, car_code, session_id, lap_number, time_ms, s3_key, label)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)
+		 ON CONFLICT (track_id, car_code, label) DO UPDATE SET
+		   session_id = EXCLUDED.session_id,
+		   lap_number = EXCLUDED.lap_number,
+		   time_ms = EXCLUDED.time_ms,
+		   s3_key = EXCLUDED.s3_key,
+		   created_at = NOW()
+		 RETURNING id, created_at`,
+		r.TrackID, r.CarCode, r.SessionID, r.LapNumber, r.TimeMs, r.S3Key, r.Label,
+	).Scan(&r.ID, &r.CreatedAt)
+	return err
+}
+
+func (d *DB) GetReferenceLap(ctx context.Context, trackID string, carCode int32, label string) (*ReferenceLap, error) {
+	var r ReferenceLap
+	err := d.pool.QueryRow(ctx,
+		`SELECT id, track_id, car_code, session_id, lap_number, time_ms, s3_key, label, created_at
+		 FROM reference_laps WHERE track_id = $1 AND car_code = $2 AND label = $3`,
+		trackID, carCode, label,
+	).Scan(&r.ID, &r.TrackID, &r.CarCode, &r.SessionID, &r.LapNumber, &r.TimeMs, &r.S3Key, &r.Label, &r.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
+func (d *DB) ListReferenceLaps(ctx context.Context, trackID string, carCode int32) ([]ReferenceLap, error) {
+	query := `SELECT id, track_id, car_code, session_id, lap_number, time_ms, s3_key, label, created_at FROM reference_laps WHERE 1=1`
+	args := []interface{}{}
+	argIdx := 1
+
+	if trackID != "" {
+		query += fmt.Sprintf(" AND track_id = $%d", argIdx)
+		args = append(args, trackID)
+		argIdx++
+	}
+	if carCode > 0 {
+		query += fmt.Sprintf(" AND car_code = $%d", argIdx)
+		args = append(args, carCode)
+		argIdx++
+	}
+
+	query += " ORDER BY track_id, car_code, label"
+
+	rows, err := d.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var refs []ReferenceLap
+	for rows.Next() {
+		var r ReferenceLap
+		if err := rows.Scan(&r.ID, &r.TrackID, &r.CarCode, &r.SessionID, &r.LapNumber, &r.TimeMs, &r.S3Key, &r.Label, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		refs = append(refs, r)
+	}
+	return refs, rows.Err()
+}
+
+func (d *DB) DeleteReferenceLap(ctx context.Context, id int64) error {
+	_, err := d.pool.Exec(ctx, `DELETE FROM reference_laps WHERE id = $1`, id)
+	return err
+}
+
+type CarComparison struct {
+	CarCode   int32  `json:"car_code"`
+	TrackID   string `json:"track_id"`
+	Sessions  int    `json:"sessions"`
+	BestLapMs int32  `json:"best_lap_ms"`
+	AvgLapMs  int32  `json:"avg_lap_ms"`
+	TotalLaps int    `json:"total_laps"`
+}
+
+func (d *DB) GetCarComparisons(ctx context.Context, trackID string) ([]CarComparison, error) {
+	rows, err := d.pool.Query(ctx,
+		`SELECT s.car_code, s.track_id,
+		        COUNT(DISTINCT s.id) as sessions,
+		        MIN(l.time_ms) as best_lap_ms,
+		        AVG(l.time_ms)::INTEGER as avg_lap_ms,
+		        COUNT(l.id) as total_laps
+		 FROM sessions s
+		 JOIN laps l ON l.session_id = s.id
+		 WHERE s.track_id = $1 AND l.time_ms IS NOT NULL AND l.time_ms > 0
+		 GROUP BY s.car_code, s.track_id
+		 ORDER BY MIN(l.time_ms) ASC`,
+		trackID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var comps []CarComparison
+	for rows.Next() {
+		var c CarComparison
+		if err := rows.Scan(&c.CarCode, &c.TrackID, &c.Sessions, &c.BestLapMs, &c.AvgLapMs, &c.TotalLaps); err != nil {
+			return nil, err
+		}
+		comps = append(comps, c)
+	}
+	return comps, rows.Err()
+}
+
+type SessionHistory struct {
+	SessionID string    `json:"session_id"`
+	CarCode   int32     `json:"car_code"`
+	BestLapMs *int32    `json:"best_lap_ms"`
+	LapCount  int       `json:"lap_count"`
+	StartedAt time.Time `json:"started_at"`
+}
+
+func (d *DB) GetTrackHistory(ctx context.Context, trackID string, limit int) ([]SessionHistory, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	rows, err := d.pool.Query(ctx,
+		`SELECT id, car_code, best_lap_ms, lap_count, started_at
+		 FROM sessions
+		 WHERE track_id = $1 AND ended_at IS NOT NULL
+		 ORDER BY started_at DESC LIMIT $2`,
+		trackID, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var history []SessionHistory
+	for rows.Next() {
+		var h SessionHistory
+		if err := rows.Scan(&h.SessionID, &h.CarCode, &h.BestLapMs, &h.LapCount, &h.StartedAt); err != nil {
+			return nil, err
+		}
+		history = append(history, h)
+	}
+	return history, rows.Err()
+}
+
+type Journal struct {
+	ID        int64     `json:"id"`
+	SessionID string    `json:"session_id"`
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (d *DB) GetJournal(ctx context.Context, sessionID string) (*Journal, error) {
+	var j Journal
+	err := d.pool.QueryRow(ctx,
+		`SELECT id, session_id, content, created_at FROM journals WHERE session_id = $1`,
+		sessionID,
+	).Scan(&j.ID, &j.SessionID, &j.Content, &j.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &j, nil
+}
+
+func (d *DB) SaveJournal(ctx context.Context, j *Journal) error {
+	err := d.pool.QueryRow(ctx,
+		`INSERT INTO journals (session_id, content)
+		 VALUES ($1, $2)
+		 ON CONFLICT (session_id) DO UPDATE SET content = EXCLUDED.content, created_at = NOW()
+		 RETURNING id, created_at`,
+		j.SessionID, j.Content,
+	).Scan(&j.ID, &j.CreatedAt)
+	return err
+}
+
+func (d *DB) GetDistinctTracks(ctx context.Context) ([]string, error) {
+	rows, err := d.pool.Query(ctx,
+		`SELECT DISTINCT track_id FROM sessions WHERE track_id IS NOT NULL ORDER BY track_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tracks []string
+	for rows.Next() {
+		var t string
+		if err := rows.Scan(&t); err != nil {
+			return nil, err
+		}
+		tracks = append(tracks, t)
+	}
+	return tracks, rows.Err()
 }
