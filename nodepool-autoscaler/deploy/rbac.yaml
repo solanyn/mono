@@ -18,6 +18,9 @@ rules:
   - apiGroups: ["autoscaling.home-ops.io"]
     resources: ["nodepoolscalers/status"]
     verbs: ["get", "update", "patch"]
+  # Generic target resource access — intentionally broad because NodePoolScaler
+  # can reference any arbitrary GVK via spec.targetRef (e.g. XComputeNodePool,
+  # ManagedInstanceGroup, etc). Scoped to get+patch only.
   - apiGroups: ["*"]
     resources: ["*"]
     verbs: ["get", "patch"]

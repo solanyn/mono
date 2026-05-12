@@ -59,7 +59,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{RequeueAfter: reconcileInterval}, nil
 	}
 
-	metrics.PendingPods.Set(float64(len(pendingPods)))
+	metrics.PendingPods.WithLabelValues(req.String()).Set(float64(len(pendingPods)))
 
 	targetGVK := parseGVK(scaler.Spec.TargetRef)
 	obj := &unstructured.Unstructured{}
@@ -84,14 +84,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 	}
 
-	metrics.TargetSize.Set(float64(currentSize))
-
-	r.mu.Lock()
-	state := r.getState(req.NamespacedName)
-	r.mu.Unlock()
+	metrics.TargetSize.WithLabelValues(req.String()).Set(float64(currentSize))
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	state := r.getState(req.NamespacedName)
 
 	if len(pendingPods) > 0 {
 		now := time.Now()
@@ -130,16 +127,16 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 				r.Log.Error("patching target size", "error", err)
 				return ctrl.Result{RequeueAfter: reconcileInterval}, nil
 			}
-			metrics.TargetSize.Set(float64(desired))
-			metrics.ScaleUpTotal.Inc()
-			metrics.LastScaleUpTime.Set(float64(now.Unix()))
+			metrics.TargetSize.WithLabelValues(req.String()).Set(float64(desired))
+			metrics.ScaleUpTotal.WithLabelValues(req.String()).Inc()
+			metrics.LastScaleUpTime.WithLabelValues(req.String()).Set(float64(now.Unix()))
 
 			nowMeta := metav1.NewTime(now)
 			scaler.Status.LastScaleTime = &nowMeta
 		}
 
 		state.lastActivityTime = now
-		metrics.IdleSeconds.Set(0)
+		metrics.IdleSeconds.WithLabelValues(req.String()).Set(0)
 
 		scaler.Status.CurrentSize = currentSize
 		scaler.Status.DesiredSize = desired
@@ -154,7 +151,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 
 		idleDuration := time.Since(state.lastActivityTime)
-		metrics.IdleSeconds.Set(idleDuration.Seconds())
+		metrics.IdleSeconds.WithLabelValues(req.String()).Set(idleDuration.Seconds())
 
 		idleTimeout := scaler.Spec.Scaling.IdleTimeout.Duration
 		if currentSize > 0 && idleTimeout > 0 && idleDuration >= idleTimeout {
@@ -171,8 +168,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 				r.Log.Error("patching target size to 0", "error", err)
 				return ctrl.Result{RequeueAfter: reconcileInterval}, nil
 			}
-			metrics.TargetSize.Set(0)
-			metrics.ScaleDownTotal.Inc()
+			metrics.TargetSize.WithLabelValues(req.String()).Set(0)
+			metrics.ScaleDownTotal.WithLabelValues(req.String()).Inc()
 			state.lastActivityTime = time.Time{}
 
 			now := metav1.Now()
@@ -218,18 +215,33 @@ func (r *Reconciler) setCondition(ctx context.Context, scaler *v1alpha1.NodePool
 }
 
 func calculateDesiredSize(pods []corev1.Pod, allocatableCPUMillis int64) int64 {
+	if allocatableCPUMillis <= 0 {
+		return int64(len(pods))
+	}
+
 	var totalCPUMillis int64
 	for _, pod := range pods {
+		var containerSum int64
 		for _, c := range pod.Spec.Containers {
 			if cpu := c.Resources.Requests.Cpu(); cpu != nil {
-				totalCPUMillis += cpu.MilliValue()
+				containerSum += cpu.MilliValue()
 			}
 		}
+
+		var initMax int64
 		for _, c := range pod.Spec.InitContainers {
 			if cpu := c.Resources.Requests.Cpu(); cpu != nil {
-				totalCPUMillis += cpu.MilliValue()
+				if v := cpu.MilliValue(); v > initMax {
+					initMax = v
+				}
 			}
 		}
+
+		podCPU := containerSum
+		if initMax > podCPU {
+			podCPU = initMax
+		}
+		totalCPUMillis += podCPU
 	}
 
 	if totalCPUMillis == 0 {
