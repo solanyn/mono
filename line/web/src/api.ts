@@ -404,3 +404,115 @@ export async function unsubscribePush(subscription: PushSubscription): Promise<v
     body: JSON.stringify(subscription.toJSON()),
   })
 }
+
+export interface BrakingEvent {
+  start_idx: number
+  end_idx: number
+  start_speed: number
+  end_speed: number
+  deceleration_g: number
+  duration_s: number
+  distance_m: number
+  trail_brake_pct: number
+  release_smoothness: number
+  efficiency: number
+}
+
+export interface BrakingAnalysis {
+  avg_deceleration_g: number
+  avg_trail_brake_pct: number
+  avg_release_smoothness: number
+  avg_efficiency: number
+  consistency_score: number
+  total_brake_distance_m: number
+  events: BrakingEvent[]
+}
+
+export interface StabilityEvent {
+  start_idx: number
+  end_idx: number
+  event_type: 'oversteer' | 'understeer'
+  severity: number
+  yaw_rate: number
+  steering_angle: number
+  speed: number
+}
+
+export interface StabilityAnalysis {
+  oversteer_count: number
+  understeer_count: number
+  avg_yaw_deviation: number
+  stability_score: number
+  worst_corner_idx: number
+  events: StabilityEvent[]
+}
+
+export interface AlignedLap {
+  distance: number[]
+  speed: number[]
+  throttle: number[]
+  brake: number[]
+  x: number[]
+  z: number[]
+  time_s: number[]
+}
+
+export interface RacingLineAnalysis {
+  consistency: number
+  smoothness: number
+  deviation_avg_m: number
+  deviation_max_m: number
+  worst_sections: { start_pct: number; end_pct: number; deviation_m: number }[]
+  optimal_line: { x: number[]; z: number[]; distance: number[] }
+}
+
+export interface FatigueAnalysis {
+  driver_fatigue_score: number
+  tyre_degradation_score: number
+  lap_time_trend: number
+  consistency_trend: number
+  brake_point_drift_trend: number
+  speed_loss_trend: number
+  separation_confidence: number
+  diagnosis: string
+}
+
+export interface TimeDeltaEntry {
+  lap_number: number
+  total_delta_s: number
+  ahead_pct: number
+  max_gain_m: number
+  max_loss_m: number
+  delta_curve: number[]
+  distance_curve: number[]
+}
+
+export async function fetchLapBraking(sessionId: string, lap: number): Promise<BrakingAnalysis> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/laps/${lap}/braking`)
+  return res.json()
+}
+
+export async function fetchLapStability(sessionId: string, lap: number): Promise<StabilityAnalysis> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/laps/${lap}/stability`)
+  return res.json()
+}
+
+export async function fetchLapAligned(sessionId: string, lap: number): Promise<AlignedLap> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/laps/${lap}/aligned`)
+  return res.json()
+}
+
+export async function fetchRacingLine(sessionId: string): Promise<RacingLineAnalysis> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/racing-line`)
+  return res.json()
+}
+
+export async function fetchFatigue(sessionId: string): Promise<FatigueAnalysis> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/fatigue`)
+  return res.json()
+}
+
+export async function fetchTimeDeltas(sessionId: string): Promise<{ deltas: TimeDeltaEntry[] }> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/time-deltas`)
+  return res.json()
+}
