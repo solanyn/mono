@@ -1,0 +1,166 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_cross_binary", "go_library", "go_test")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
+load("@aspect_bazel_lib//lib:tar.bzl", "tar")
+load("//tools/controller-gen:controller-gen.bzl", "controller_gen_crd")
+load("//tools/helm-oci:helm-oci.bzl", "helm_chart", "helm_oci_push")
+
+go_library(
+    name = "api_lib",
+    srcs = glob(["api/v1alpha1/*.go"]),
+    importpath = "github.com/solanyn/mono/nodepool-autoscaler/api/v1alpha1",
+    deps = [
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
+        "@io_k8s_apimachinery//pkg/runtime",
+        "@io_k8s_apimachinery//pkg/runtime/schema",
+    ],
+)
+
+go_library(
+    name = "nodepool_lib",
+    srcs = glob(["internal/nodepool/*.go"], exclude = ["internal/nodepool/*_test.go"]),
+    importpath = "github.com/solanyn/mono/nodepool-autoscaler/internal/nodepool",
+    deps = [
+        "@io_k8s_apimachinery//pkg/apis/meta/v1/unstructured",
+        "@io_k8s_apimachinery//pkg/runtime/schema",
+        "@io_k8s_apimachinery//pkg/types",
+        "@io_k8s_sigs_controller_runtime//pkg/client",
+    ],
+)
+
+go_test(
+    name = "nodepool_test",
+    srcs = glob(["internal/nodepool/*_test.go"]),
+    embed = [":nodepool_lib"],
+    deps = [
+        "@io_k8s_apimachinery//pkg/apis/meta/v1/unstructured",
+    ],
+)
+
+go_library(
+    name = "metrics_lib",
+    srcs = glob(["internal/metrics/*.go"]),
+    importpath = "github.com/solanyn/mono/nodepool-autoscaler/internal/metrics",
+    deps = [
+        "@com_github_prometheus_client_golang//prometheus",
+        "@io_k8s_sigs_controller_runtime//pkg/metrics",
+    ],
+)
+
+go_library(
+    name = "controller_lib",
+    srcs = glob(["internal/controller/*.go"], exclude = ["internal/controller/*_test.go"]),
+    importpath = "github.com/solanyn/mono/nodepool-autoscaler/internal/controller",
+    deps = [
+        ":api_lib",
+        ":metrics_lib",
+        ":nodepool_lib",
+        "@io_k8s_api//core/v1:core",
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
+        "@io_k8s_apimachinery//pkg/apis/meta/v1/unstructured",
+        "@io_k8s_apimachinery//pkg/runtime/schema",
+        "@io_k8s_apimachinery//pkg/types",
+        "@io_k8s_sigs_controller_runtime//:controller-runtime",
+        "@io_k8s_sigs_controller_runtime//pkg/client",
+    ],
+)
+
+go_test(
+    name = "controller_test",
+    srcs = glob(["internal/controller/*_test.go"]),
+    embed = [":controller_lib"],
+    deps = [
+        ":api_lib",
+        ":nodepool_lib",
+        "@io_k8s_api//core/v1:core",
+        "@io_k8s_apimachinery//pkg/api/resource",
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
+        "@io_k8s_apimachinery//pkg/apis/meta/v1/unstructured",
+        "@io_k8s_apimachinery//pkg/runtime",
+        "@io_k8s_apimachinery//pkg/types",
+        "@io_k8s_sigs_controller_runtime//:controller-runtime",
+        "@io_k8s_sigs_controller_runtime//pkg/client",
+        "@io_k8s_sigs_controller_runtime//pkg/client/fake",
+    ],
+)
+
+go_library(
+    name = "lib",
+    srcs = glob(["cmd/*.go"]),
+    importpath = "github.com/solanyn/mono/nodepool-autoscaler/cmd",
+    deps = [
+        ":api_lib",
+        ":controller_lib",
+        ":metrics_lib",
+        "@io_k8s_api//core/v1:core",
+        "@io_k8s_apimachinery//pkg/runtime",
+        "@io_k8s_apimachinery//pkg/util/runtime",
+        "@io_k8s_client_go//kubernetes/scheme",
+        "@io_k8s_sigs_controller_runtime//:controller-runtime",
+        "@io_k8s_sigs_controller_runtime//pkg/cache",
+        "@io_k8s_sigs_controller_runtime//pkg/client",
+        "@io_k8s_sigs_controller_runtime//pkg/healthz",
+        "@io_k8s_sigs_controller_runtime//pkg/metrics/server",
+    ],
+)
+
+go_binary(
+    name = "nodepool-autoscaler",
+    embed = [":lib"],
+)
+
+go_cross_binary(
+    name = "nodepool-autoscaler_linux_amd64",
+    platform = "@rules_go//go/toolchain:linux_amd64",
+    target = ":nodepool-autoscaler",
+)
+
+tar(
+    name = "binary_layer",
+    srcs = [":nodepool-autoscaler_linux_amd64"],
+)
+
+oci_image(
+    name = "image",
+    base = "@distroless_static",
+    entrypoint = ["/nodepool-autoscaler_linux_amd64"],
+    tars = [":binary_layer"],
+)
+
+oci_load(
+    name = "load",
+    image = ":image",
+    repo_tags = ["nodepool-autoscaler:latest"],
+)
+
+oci_push(
+    name = "push_image",
+    image = ":image",
+    repository = "ghcr.io/solanyn/nodepool-autoscaler",
+)
+
+# CRD generation via controller-gen toolchain
+controller_gen_crd(
+    name = "generate_crd",
+    srcs = glob(["api/v1alpha1/*.go"]),
+    deps = [
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
+        "@io_k8s_apimachinery//pkg/runtime",
+        "@io_k8s_apimachinery//pkg/runtime/schema",
+    ],
+)
+
+helm_chart(
+    name = "crds_chart",
+    chart_name = "nodepool-autoscaler-crds",
+    version = "0.1.0",
+    description = "CRDs for nodepool-autoscaler",
+    crds = [":generate_crd"],
+)
+
+helm_oci_push(
+    name = "push_crds",
+    chart = ":crds_chart",
+    repository = "ghcr.io/solanyn",
+)
+
+

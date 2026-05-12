@@ -19,7 +19,7 @@ bazel_dep(name = "rules_uv", version = "0.89.2")
 
 # go
 go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
-go_sdk.download(version = "1.25.0")
+go_sdk.download(version = "1.26.3")
 
 go_deps = use_extension("@gazelle//:extensions.bzl", "go_deps")
 go_deps.from_file(go_mod = "//cronprint:go.mod")
@@ -1715,18 +1715,23 @@ go_deps.module(
 )
 go_deps.module(
     path = "k8s.io/api",
-    sum = "h1:Hw7KqxRusq+6QSplE3NYG4MBxZw1BZnq4aP4cJVINls=",
-    version = "v0.32.3",
+    sum = "h1:tA6Cf3bHnLIrUK4IqEgb2v++/GYUtqiu9sRVk3iBXyw=",
+    version = "v0.33.1",
+)
+go_deps.module(
+    path = "k8s.io/apiextensions-apiserver",
+    sum = "h1:d2qpYL7Mngbsc1taA4IjJPRJ9ilnsXIrndH+r9IimOs=",
+    version = "v0.33.0",
 )
 go_deps.module(
     path = "k8s.io/apimachinery",
-    sum = "h1:JmDuDarhDmA/Li7j3aPrwhpNBA94Nvk5zLeOge9HH1U=",
-    version = "v0.32.3",
+    sum = "h1:mzqXWV8tW9Rw4VeW9rEkqvnxj59k1ezDUl20tFK/oM4=",
+    version = "v0.33.1",
 )
 go_deps.module(
     path = "k8s.io/client-go",
-    sum = "h1:RKPVltzopkSgHS7aS98QdscAgtgah/+zmpAogooIqVU=",
-    version = "v0.32.3",
+    sum = "h1:ZZV/Ks2g92cyxWkRRnfUDsnhNn28eFpt26aGc8KbXF4=",
+    version = "v0.33.1",
 )
 go_deps.module(
     path = "k8s.io/klog/v2",
@@ -1767,6 +1772,32 @@ go_deps.module(
     path = "sigs.k8s.io/json",
     sum = "h1:/Rv+M11QRah1itp8VhT6HoVx1Ray9eB4DBr+K+/sCJ8=",
     version = "v0.0.0-20241010143419-9aa6b5e7a4b3",
+)
+go_deps.module(
+    path = "sigs.k8s.io/controller-runtime",
+    sum = "h1:CYfjpEuicjUecRk+KAeyYh+ouUBn4llGyDYytIGcJS8=",
+    version = "v0.21.0",
+)
+
+go_deps.module(
+    path = "sigs.k8s.io/randfill",
+    sum = "h1:JfjMILfT8A6RbawdsK2JXGBR5AQVfd+9TbzrlneTyrU=",
+    version = "v1.0.0",
+)
+go_deps.module(
+    path = "github.com/google/btree",
+    sum = "h1:CVpQJjYgC4VbzxeGVHfvZrv1ctoYCAI8vbl07Fcxlyg=",
+    version = "v1.1.3",
+)
+go_deps.module(
+    path = "gomodules.xyz/jsonpatch/v2",
+    sum = "h1:Ci3iUJyx9UeRx7CeFN8ARgGbkESwJK+KB9lLcWxY/Zw=",
+    version = "v2.4.0",
+)
+go_deps.module(
+    path = "github.com/evanphx/json-patch/v5",
+    sum = "h1:/8HVnzMq13/3x9TPvjG08wUGqBTmZBsCWzjTM0wiaDU=",
+    version = "v5.9.11",
 )
 go_deps.module(
     path = "sigs.k8s.io/structured-merge-diff/v4",
@@ -1897,6 +1928,7 @@ use_repo(
     "com_github_envoyproxy_go_control_plane",
     "com_github_envoyproxy_go_control_plane_envoy",
     "com_github_envoyproxy_protoc_gen_validate",
+    "com_github_evanphx_json_patch_v5",
     "com_github_fatih_color",
     "com_github_felixge_httpsnoop",
     "com_github_fogleman_gg",
@@ -1923,6 +1955,7 @@ use_repo(
     "com_github_golang_jwt_jwt_v5",
     "com_github_golang_protobuf",
     "com_github_golang_snappy",
+    "com_github_google_btree",
     "com_github_google_flatbuffers",
     "com_github_google_gnostic_models",
     "com_github_google_go_cmp",
@@ -2111,11 +2144,14 @@ use_repo(
     "in_yaml_go_yaml_v3",
     "io_cncf_tags_container_device_interface",
     "io_k8s_api",
+    "io_k8s_apiextensions_apiserver",
     "io_k8s_apimachinery",
     "io_k8s_client_go",
     "io_k8s_klog_v2",
     "io_k8s_kube_openapi",
+    "io_k8s_sigs_controller_runtime",
     "io_k8s_sigs_json",
+    "io_k8s_sigs_randfill",
     "io_k8s_sigs_structured_merge_diff_v4",
     "io_k8s_sigs_yaml",
     "io_k8s_utils",
@@ -2166,6 +2202,7 @@ use_repo(
     "org_uber_go_atomic",
     "org_uber_go_goleak",
     "org_uber_go_multierr",
+    "xyz_gomodules_jsonpatch_v2",
 )
 
 # python
@@ -2241,3 +2278,41 @@ oci.pull(
     tag = "3.13-slim",
 )
 use_repo(oci, "distroless_base", "distroless_base_linux_amd64", "distroless_static", "distroless_static_linux_amd64", "distroless_static_linux_arm64_v8", "python_slim", "python_slim_linux_amd64")
+
+# tools
+http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
+http_file(
+    name = "controller_gen_linux_amd64",
+    url = "https://github.com/kubernetes-sigs/controller-tools/releases/download/v0.21.0/controller-gen-linux-amd64",
+    sha256 = "3ec7994b7a41515a7ad8aef8e517429c0a78060df59d5587ac8662db6a8b035f",
+    executable = True,
+)
+http_file(
+    name = "controller_gen_darwin_arm64",
+    url = "https://github.com/kubernetes-sigs/controller-tools/releases/download/v0.21.0/controller-gen-darwin-arm64",
+    sha256 = "13ac7abcd90dd2129da972024bea7da5be7df2c5404c8f715010490996f4ab43",
+    executable = True,
+)
+
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+http_archive(
+    name = "helm_linux_amd64",
+    url = "https://get.helm.sh/helm-v3.17.3-linux-amd64.tar.gz",
+    sha256 = "ee88b3c851ae6466a3de507f7be73fe94d54cbf2987cbaa3d1a3832ea331f2cd",
+    strip_prefix = "linux-amd64",
+    build_file_content = """exports_files(["helm"])""",
+)
+http_archive(
+    name = "helm_darwin_arm64",
+    url = "https://get.helm.sh/helm-v3.17.3-darwin-arm64.tar.gz",
+    sha256 = "89aec43ce07b06239f1bba4a6507236bb48ae487bc5065a8e254d3ce58a16997",
+    strip_prefix = "darwin-arm64",
+    build_file_content = """exports_files(["helm"])""",
+)
+
+register_toolchains(
+    "//tools/controller-gen:controller_gen_linux_amd64_toolchain",
+    "//tools/controller-gen:controller_gen_darwin_arm64_toolchain",
+    "//tools/helm-oci:helm_linux_amd64_toolchain",
+    "//tools/helm-oci:helm_darwin_arm64_toolchain",
+)

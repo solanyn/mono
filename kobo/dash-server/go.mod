@@ -1,6 +1,6 @@
 module github.com/solanyn/mono/kobo/dash-server
 
-go 1.25.0
+go 1.26.3
 
 require (
 	github.com/fogleman/gg v1.3.0
