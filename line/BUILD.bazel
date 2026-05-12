@@ -174,7 +174,7 @@ line_service(
 
 go_binary(
     name = "api",
-    srcs = ["cmd/api/main.go"],
+    srcs = glob(["cmd/api/*.go"], exclude = ["cmd/api/*_test.go"]),
     goos = "linux",
     goarch = "amd64",
     pure = "on",

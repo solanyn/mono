@@ -84,7 +84,7 @@ func TestCORSHeaders(t *testing.T) {
 	srv := &server{live: newLiveHub()}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", srv.handleHealth)
-	handler := corsMiddleware(mux)
+	handler := corsMiddleware("*")(mux)
 
 	req := httptest.NewRequest("OPTIONS", "/health", nil)
 	w := httptest.NewRecorder()
