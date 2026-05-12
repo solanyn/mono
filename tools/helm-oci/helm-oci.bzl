@@ -16,10 +16,9 @@ def _helm_chart_impl(ctx):
 
     crds_cmds = []
     for f in ctx.files.crds:
-        crds_cmds.append("cp {src} {dir}/crds/{basename}".format(
+        crds_cmds.append("find {src} -name '*.yaml' -exec cp {{}} {dir}/crds/ \\;".format(
             src = f.path,
             dir = chart_dir.path,
-            basename = f.basename,
         ))
 
     cmd = """
