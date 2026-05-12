@@ -2293,3 +2293,8 @@ http_file(
     sha256 = "13ac7abcd90dd2129da972024bea7da5be7df2c5404c8f715010490996f4ab43",
     executable = True,
 )
+
+register_toolchains(
+    "//tools/controller-gen:controller_gen_linux_amd64_toolchain",
+    "//tools/controller-gen:controller_gen_darwin_arm64_toolchain",
+)

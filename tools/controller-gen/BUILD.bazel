@@ -1,0 +1,35 @@
+load("//tools/controller-gen:toolchain.bzl", "controller_gen_toolchain")
+
+package(default_visibility = ["//visibility:public"])
+
+toolchain_type(name = "toolchain")
+
+controller_gen_toolchain(
+    name = "controller_gen_linux_amd64",
+    controller_gen_bin = "@controller_gen_linux_amd64//file",
+)
+
+toolchain(
+    name = "controller_gen_linux_amd64_toolchain",
+    exec_compatible_with = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+    toolchain = ":controller_gen_linux_amd64",
+    toolchain_type = ":toolchain",
+)
+
+controller_gen_toolchain(
+    name = "controller_gen_darwin_arm64",
+    controller_gen_bin = "@controller_gen_darwin_arm64//file",
+)
+
+toolchain(
+    name = "controller_gen_darwin_arm64_toolchain",
+    exec_compatible_with = [
+        "@platforms//os:osx",
+        "@platforms//cpu:aarch64",
+    ],
+    toolchain = ":controller_gen_darwin_arm64",
+    toolchain_type = ":toolchain",
+)
