@@ -314,6 +314,13 @@ func parseGVK(ref v1alpha1.TargetRef) schema.GroupVersionKind {
 }
 
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &corev1.Pod{}, "status.phase", func(obj client.Object) []string {
+		pod := obj.(*corev1.Pod)
+		return []string{string(pod.Status.Phase)}
+	}); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.NodePoolScaler{}).
 		Named("nodepool-autoscaler").
