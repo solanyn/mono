@@ -122,7 +122,7 @@ tar(
 oci_image(
     name = "image",
     base = "@distroless_static",
-    entrypoint = ["/nodepool-autoscaler_linux_amd64"],
+    entrypoint = ["/nodepool-autoscaler/nodepool-autoscaler_linux_amd64"],
     tars = [":binary_layer"],
 )
 
