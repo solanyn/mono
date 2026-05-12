@@ -91,6 +91,7 @@ go_library(
         ":api_lib",
         ":controller_lib",
         ":metrics_lib",
+        "@com_github_go_logr_logr//:logr",
         "@io_k8s_api//core/v1:core",
         "@io_k8s_apimachinery//pkg/runtime",
         "@io_k8s_apimachinery//pkg/util/runtime",
@@ -99,6 +100,7 @@ go_library(
         "@io_k8s_sigs_controller_runtime//pkg/cache",
         "@io_k8s_sigs_controller_runtime//pkg/client",
         "@io_k8s_sigs_controller_runtime//pkg/healthz",
+        "@io_k8s_sigs_controller_runtime//pkg/log",
         "@io_k8s_sigs_controller_runtime//pkg/metrics/server",
     ],
 )
@@ -142,7 +144,6 @@ oci_push(
     repository = "ghcr.io/solanyn/nodepool-autoscaler",
 )
 
-# CRD generation via controller-gen toolchain
 controller_gen_crd(
     name = "generate_crd",
     srcs = glob(["api/v1alpha1/*.go"]),
@@ -166,6 +167,3 @@ helm_oci_push(
     chart = ":crds_chart",
     repository = "ghcr.io/solanyn",
 )
-
-
-
