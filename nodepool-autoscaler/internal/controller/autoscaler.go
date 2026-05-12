@@ -253,12 +253,15 @@ func calculateDesiredSize(pods []corev1.Pod, allocatableCPUMillis int64) int64 {
 
 func (r *Reconciler) listPendingPods(ctx context.Context, selector v1alpha1.PodSelector) ([]corev1.Pod, error) {
 	var podList corev1.PodList
-	if err := r.List(ctx, &podList, client.MatchingFields{"status.phase": "Pending"}); err != nil {
+	if err := r.List(ctx, &podList); err != nil {
 		return nil, err
 	}
 
 	var result []corev1.Pod
 	for _, pod := range podList.Items {
+		if pod.Status.Phase != corev1.PodPending {
+			continue
+		}
 		if !matchesSelector(&pod, selector) {
 			continue
 		}
@@ -314,13 +317,6 @@ func parseGVK(ref v1alpha1.TargetRef) schema.GroupVersionKind {
 }
 
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
-	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &corev1.Pod{}, "status.phase", func(obj client.Object) []string {
-		pod := obj.(*corev1.Pod)
-		return []string{string(pod.Status.Phase)}
-	}); err != nil {
-		return err
-	}
-
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.NodePoolScaler{}).
 		Named("nodepool-autoscaler").
