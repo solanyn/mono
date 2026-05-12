@@ -2,11 +2,11 @@
   "$schema": "https://opencode.ai/config.json",
   "provider": {
     "agentgateway": {
-      "npm": "@ai-sdk/openai-compatible",
+      "api": "openai",
       "name": "Agent Gateway",
       "options": {
         "baseURL": "https://gateway.goyangi.io/v1/opus",
-        "apiKey": "env:AGENTGATEWAY_API_KEY"
+        "apiKey": "{env:AGENTGATEWAY_API_KEY}"
       },
       "models": {
         "opus": {
