@@ -1,3 +1,5 @@
+// +groupName=autoscaling.home-ops.io
+
 package v1alpha1
 
 import (

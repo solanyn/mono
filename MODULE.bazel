@@ -2294,7 +2294,25 @@ http_file(
     executable = True,
 )
 
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+http_archive(
+    name = "helm_linux_amd64",
+    url = "https://get.helm.sh/helm-v3.17.3-linux-amd64.tar.gz",
+    sha256 = "ee88b3c851ae6466a3de507f7be73fe94d54cbf2987cbaa3d1a3832ea331f2cd",
+    strip_prefix = "linux-amd64",
+    build_file_content = """exports_files(["helm"])""",
+)
+http_archive(
+    name = "helm_darwin_arm64",
+    url = "https://get.helm.sh/helm-v3.17.3-darwin-arm64.tar.gz",
+    sha256 = "89aec43ce07b06239f1bba4a6507236bb48ae487bc5065a8e254d3ce58a16997",
+    strip_prefix = "darwin-arm64",
+    build_file_content = """exports_files(["helm"])""",
+)
+
 register_toolchains(
     "//tools/controller-gen:controller_gen_linux_amd64_toolchain",
     "//tools/controller-gen:controller_gen_darwin_arm64_toolchain",
+    "//tools/helm-oci:helm_linux_amd64_toolchain",
+    "//tools/helm-oci:helm_darwin_arm64_toolchain",
 )
