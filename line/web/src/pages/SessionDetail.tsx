@@ -4,7 +4,7 @@ import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Line } from '@react-three/drei'
 import * as THREE from 'three'
 import clsx from 'clsx'
-import { fetchLaps, fetchTelemetry, fetchLapMetrics, fetchSessionSummary, fetchSession, fetchReferenceLapTelemetry, setReferenceLap, fetchJournal, generateJournal, type Lap, type TelemetryFrame, type LapMetrics, type SessionSummary, type Journal } from '../api'
+import { fetchLaps, fetchTelemetry, fetchLapMetrics, fetchSessionSummary, fetchSession, fetchReferenceLapTelemetry, setReferenceLap, fetchJournal, generateJournal, fetchLapBraking, fetchLapStability, fetchRacingLine, fetchFatigue, fetchTimeDeltas, type Lap, type TelemetryFrame, type LapMetrics, type SessionSummary, type Journal, type BrakingAnalysis, type StabilityAnalysis, type RacingLineAnalysis, type FatigueAnalysis, type TimeDeltaEntry } from '../api'
 import { TelemetryChart } from '../TelemetryChart'
 
 export function SessionDetail() {
@@ -18,11 +18,16 @@ export function SessionDetail() {
   const [metrics, setMetrics] = useState<LapMetrics | null>(null)
   const [summary, setSummary] = useState<SessionSummary | null>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'track' | 'metrics' | 'summary' | 'journal'>('track')
+  const [tab, setTab] = useState<'track' | 'metrics' | 'analytics' | 'summary' | 'journal'>('track')
   const [session, setSession] = useState<{ car_code: number; track_id?: string } | null>(null)
   const [refSaving, setRefSaving] = useState(false)
   const [journal, setJournal] = useState<Journal | null>(null)
   const [journalLoading, setJournalLoading] = useState(false)
+  const [braking, setBraking] = useState<BrakingAnalysis | null>(null)
+  const [stability, setStability] = useState<StabilityAnalysis | null>(null)
+  const [racingLine, setRacingLine] = useState<RacingLineAnalysis | null>(null)
+  const [fatigue, setFatigue] = useState<FatigueAnalysis | null>(null)
+  const [timeDeltas, setTimeDeltas] = useState<TimeDeltaEntry[]>([])
 
   useEffect(() => {
     if (!id) return
@@ -34,6 +39,9 @@ export function SessionDetail() {
     }).catch(() => setLoading(false))
     fetchSessionSummary(id).then(setSummary).catch(() => {})
     fetchJournal(id).then(setJournal).catch(() => {})
+    fetchRacingLine(id).then(setRacingLine).catch(() => setRacingLine(null))
+    fetchFatigue(id).then(setFatigue).catch(() => setFatigue(null))
+    fetchTimeDeltas(id).then(d => setTimeDeltas(d.deltas ?? [])).catch(() => setTimeDeltas([]))
   }, [id])
 
   useEffect(() => {
@@ -47,6 +55,8 @@ export function SessionDetail() {
     if (!id || selectedLap === null) return
     fetchTelemetry(id, selectedLap, 2).then(({ frames }) => setFrames(frames ?? []))
     fetchLapMetrics(id, selectedLap).then(setMetrics).catch(() => setMetrics(null))
+    fetchLapBraking(id, selectedLap).then(setBraking).catch(() => setBraking(null))
+    fetchLapStability(id, selectedLap).then(setStability).catch(() => setStability(null))
   }, [id, selectedLap])
 
   useEffect(() => {
@@ -109,7 +119,7 @@ export function SessionDetail() {
 
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex items-center gap-1 px-4 py-2 border-b border-border">
-          {(['track', 'metrics', 'summary', 'journal'] as const).map((t) => (
+          {(['track', 'metrics', 'analytics', 'summary', 'journal'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -202,6 +212,12 @@ export function SessionDetail() {
         {tab === 'metrics' && !metrics && (
           <div className="flex-1 flex items-center justify-center text-text-dim text-sm">
             No metrics available for this lap
+          </div>
+        )}
+
+        {tab === 'analytics' && (
+          <div className="flex-1 overflow-auto p-5">
+            <AnalyticsPanel braking={braking} stability={stability} racingLine={racingLine} fatigue={fatigue} timeDeltas={timeDeltas} />
           </div>
         )}
 
@@ -361,6 +377,144 @@ function StatCard({ label, value, accent }: { label: string; value: string; acce
     <div className="bg-surface-2 rounded-lg border border-border p-3">
       <div className="text-[10px] text-text-muted uppercase tracking-wider">{label}</div>
       <div className={clsx('text-sm font-mono font-medium mt-1', colorClass)}>{value}</div>
+    </div>
+  )
+}
+
+function AnalyticsPanel({ braking, stability, racingLine, fatigue, timeDeltas }: {
+  braking: BrakingAnalysis | null
+  stability: StabilityAnalysis | null
+  racingLine: RacingLineAnalysis | null
+  fatigue: FatigueAnalysis | null
+  timeDeltas: TimeDeltaEntry[]
+}) {
+  return (
+    <div className="space-y-6">
+      {braking && braking.events && braking.events.length > 0 && (
+        <div>
+          <h3 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Braking Analysis</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <StatCard label="Avg Decel" value={`${braking.avg_deceleration_g.toFixed(2)} G`} />
+            <StatCard label="Trail Brake" value={`${braking.avg_trail_brake_pct.toFixed(0)}%`} accent="accent" />
+            <StatCard label="Release Smooth" value={`${(braking.avg_release_smoothness * 100).toFixed(0)}%`} accent={braking.avg_release_smoothness > 0.7 ? 'green' : 'yellow'} />
+            <StatCard label="Efficiency" value={`${(braking.avg_efficiency * 100).toFixed(0)}%`} accent={braking.avg_efficiency > 0.7 ? 'green' : 'yellow'} />
+            <StatCard label="Consistency" value={`${(braking.consistency_score * 100).toFixed(0)}%`} accent={braking.consistency_score > 0.8 ? 'green' : 'red'} />
+            <StatCard label="Total Brake Dist" value={`${braking.total_brake_distance_m.toFixed(0)} m`} />
+          </div>
+          <div className="grid gap-2 max-h-60 overflow-auto">
+            {braking.events.map((e, i) => (
+              <div key={i} className="flex items-center gap-3 bg-surface-2 rounded-lg px-3 py-2 border border-border">
+                <span className="text-xs font-mono text-text-dim w-6">B{i + 1}</span>
+                <div className="flex-1 grid grid-cols-4 gap-2 text-xs">
+                  <div><span className="text-text-dim">Speed</span> <span className="font-mono text-text ml-1">{e.start_speed.toFixed(0)}&rarr;{e.end_speed.toFixed(0)}</span></div>
+                  <div><span className="text-text-dim">Decel</span> <span className="font-mono text-text ml-1">{e.deceleration_g.toFixed(2)}G</span></div>
+                  <div><span className="text-text-dim">Trail</span> <span className="font-mono text-text ml-1">{e.trail_brake_pct.toFixed(0)}%</span></div>
+                  <div><span className="text-text-dim">Dist</span> <span className="font-mono text-text ml-1">{e.distance_m.toFixed(0)}m</span></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {stability && (stability.oversteer_count > 0 || stability.understeer_count > 0) && (
+        <div>
+          <h3 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Stability</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <StatCard label="Stability Score" value={`${(stability.stability_score * 100).toFixed(0)}%`} accent={stability.stability_score > 0.8 ? 'green' : 'red'} />
+            <StatCard label="Oversteer" value={`${stability.oversteer_count}`} accent={stability.oversteer_count > 3 ? 'red' : 'yellow'} />
+            <StatCard label="Understeer" value={`${stability.understeer_count}`} accent={stability.understeer_count > 3 ? 'red' : 'yellow'} />
+            <StatCard label="Avg Yaw Dev" value={`${stability.avg_yaw_deviation.toFixed(3)}`} />
+          </div>
+          {stability.events.length > 0 && (
+            <div className="grid gap-2 max-h-48 overflow-auto">
+              {stability.events.map((e, i) => (
+                <div key={i} className="flex items-center gap-3 bg-surface-2 rounded-lg px-3 py-2 border border-border">
+                  <span className={clsx('text-xs px-1.5 py-0.5 rounded', e.event_type === 'oversteer' ? 'bg-red/10 text-red' : 'bg-orange/10 text-orange')}>
+                    {e.event_type === 'oversteer' ? 'OS' : 'US'}
+                  </span>
+                  <div className="flex-1 grid grid-cols-3 gap-2 text-xs">
+                    <div><span className="text-text-dim">Severity</span> <span className="font-mono text-text ml-1">{e.severity.toFixed(2)}</span></div>
+                    <div><span className="text-text-dim">Speed</span> <span className="font-mono text-text ml-1">{e.speed.toFixed(0)} km/h</span></div>
+                    <div><span className="text-text-dim">Yaw</span> <span className="font-mono text-text ml-1">{e.yaw_rate.toFixed(2)}</span></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {racingLine && racingLine.consistency > 0 && (
+        <div>
+          <h3 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Racing Line</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <StatCard label="Consistency" value={`${(racingLine.consistency * 100).toFixed(0)}%`} accent={racingLine.consistency > 0.8 ? 'green' : 'yellow'} />
+            <StatCard label="Smoothness" value={`${(racingLine.smoothness * 100).toFixed(0)}%`} accent={racingLine.smoothness > 0.7 ? 'green' : 'yellow'} />
+            <StatCard label="Avg Deviation" value={`${racingLine.deviation_avg_m.toFixed(2)} m`} />
+            <StatCard label="Max Deviation" value={`${racingLine.deviation_max_m.toFixed(2)} m`} />
+          </div>
+          {racingLine.worst_sections.length > 0 && (
+            <div className="bg-surface-2 rounded-lg border border-border p-3">
+              <h4 className="text-[10px] text-text-muted uppercase tracking-wider mb-2">Worst Sections</h4>
+              <div className="space-y-1">
+                {racingLine.worst_sections.map((s, i) => (
+                  <div key={i} className="flex justify-between text-xs">
+                    <span className="text-text-muted">{s.start_pct.toFixed(0)}% - {s.end_pct.toFixed(0)}%</span>
+                    <span className="font-mono text-orange">{s.deviation_m.toFixed(2)} m</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {fatigue && fatigue.diagnosis !== 'insufficient_data' && (
+        <div>
+          <h3 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Fatigue / Degradation</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <StatCard label="Diagnosis" value={fatigue.diagnosis.replace('_', ' ')} accent={fatigue.diagnosis === 'stable' ? 'green' : fatigue.diagnosis === 'driver_fatigue' ? 'red' : 'orange'} />
+            <StatCard label="Driver Fatigue" value={`${(fatigue.driver_fatigue_score * 100).toFixed(0)}%`} accent={fatigue.driver_fatigue_score > 0.5 ? 'red' : 'green'} />
+            <StatCard label="Tyre Deg" value={`${(fatigue.tyre_degradation_score * 100).toFixed(0)}%`} accent={fatigue.tyre_degradation_score > 0.5 ? 'red' : 'green'} />
+            <StatCard label="Confidence" value={`${(fatigue.separation_confidence * 100).toFixed(0)}%`} />
+          </div>
+          <div className="bg-surface-2 rounded-lg border border-border p-3">
+            <div className="space-y-1 text-xs">
+              <div className="flex justify-between"><span className="text-text-muted">Lap Time Trend</span><span className="font-mono">{fatigue.lap_time_trend > 0 ? '+' : ''}{fatigue.lap_time_trend.toFixed(0)} ms/lap</span></div>
+              <div className="flex justify-between"><span className="text-text-muted">Speed Loss</span><span className="font-mono">{fatigue.speed_loss_trend.toFixed(2)} km/h/lap</span></div>
+              <div className="flex justify-between"><span className="text-text-muted">Consistency Trend</span><span className="font-mono">{fatigue.consistency_trend > 0 ? '+' : ''}{(fatigue.consistency_trend * 100).toFixed(1)}%</span></div>
+              <div className="flex justify-between"><span className="text-text-muted">Brake Drift</span><span className="font-mono">{fatigue.brake_point_drift_trend.toFixed(2)} frames/lap</span></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {timeDeltas.length > 0 && (
+        <div>
+          <h3 className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">Time Deltas (vs Best Lap)</h3>
+          <div className="grid gap-2">
+            {timeDeltas.map((d, i) => (
+              <div key={i} className="flex items-center gap-3 bg-surface-2 rounded-lg px-3 py-2 border border-border">
+                <span className="text-xs font-mono text-text-dim w-12">Lap {d.lap_number}</span>
+                <span className={clsx('text-xs font-mono font-medium', d.total_delta_s > 0 ? 'text-red' : 'text-green')}>
+                  {d.total_delta_s > 0 ? '+' : ''}{d.total_delta_s.toFixed(3)}s
+                </span>
+                <div className="flex-1 grid grid-cols-2 gap-2 text-xs">
+                  <div><span className="text-text-dim">Ahead</span> <span className="font-mono text-text ml-1">{d.ahead_pct.toFixed(0)}%</span></div>
+                  <div><span className="text-text-dim">Max gain @</span> <span className="font-mono text-text ml-1">{d.max_gain_m.toFixed(0)}m</span></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!braking && !stability && !racingLine && !fatigue && timeDeltas.length === 0 && (
+        <div className="flex items-center justify-center h-40 text-text-dim text-sm">
+          No analytics data available yet. Complete a session to generate analysis.
+        </div>
+      )}
     </div>
   )
 }

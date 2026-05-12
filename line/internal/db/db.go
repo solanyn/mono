@@ -8,6 +8,36 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+type Store interface {
+	Close()
+	CreateSession(ctx context.Context, s *Session) error
+	EndSession(ctx context.Context, id string, lapCount int, bestLapMs *int32) error
+	UpdateSessionTrack(ctx context.Context, id string, trackID, trackName *string) error
+	InsertLap(ctx context.Context, l *Lap) error
+	ListSessions(ctx context.Context, limit, offset int) ([]Session, error)
+	GetSession(ctx context.Context, id string) (*Session, error)
+	GetProgression(ctx context.Context, trackID string, limit int) ([]ProgressionPoint, error)
+	GetLapTimesForSession(ctx context.Context, sessionID string) ([]int32, error)
+	ListLaps(ctx context.Context, sessionID string) ([]Lap, error)
+	ListAnnotations(ctx context.Context, sessionID string, lapNumber int) ([]Annotation, error)
+	CreateAnnotation(ctx context.Context, a *Annotation) error
+	DeleteAnnotation(ctx context.Context, id int64) error
+	SetReferenceLap(ctx context.Context, r *ReferenceLap) error
+	GetReferenceLap(ctx context.Context, trackID string, carCode int32, label string) (*ReferenceLap, error)
+	ListReferenceLaps(ctx context.Context, trackID string, carCode int32) ([]ReferenceLap, error)
+	DeleteReferenceLap(ctx context.Context, id int64) error
+	GetCarComparisons(ctx context.Context, trackID string) ([]CarComparison, error)
+	GetTrackHistory(ctx context.Context, trackID string, limit int) ([]SessionHistory, error)
+	GetJournal(ctx context.Context, sessionID string) (*Journal, error)
+	SaveJournal(ctx context.Context, j *Journal) error
+	GetDistinctTracks(ctx context.Context) ([]string, error)
+	ListPushSubscriptions(ctx context.Context) ([]PushSubscription, error)
+	SavePushSubscription(ctx context.Context, s *PushSubscription) error
+	DeletePushSubscription(ctx context.Context, endpoint string) error
+}
+
+var _ Store = (*DB)(nil)
+
 type DB struct {
 	pool *pgxpool.Pool
 }

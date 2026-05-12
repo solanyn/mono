@@ -13,6 +13,15 @@ import (
 	"github.com/google/uuid"
 )
 
+type ObjectStore interface {
+	PutLap(ctx context.Context, sessionID string, lapNum int, data []byte) (string, error)
+	GetObject(ctx context.Context, key string) ([]byte, error)
+	GetLatestByPrefix(ctx context.Context, prefix string) ([]byte, error)
+	GetLap(ctx context.Context, sessionID string, lapNum int) ([]byte, error)
+}
+
+var _ ObjectStore = (*S3Client)(nil)
+
 type S3Client struct {
 	client *s3.Client
 	bucket string

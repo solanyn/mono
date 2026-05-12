@@ -273,6 +273,12 @@ func main() {
 	mux.HandleFunc("DELETE /api/v1/reference-laps/{id}", srv.handleDeleteReferenceLap)
 	mux.HandleFunc("GET /api/v1/reference-laps/{trackId}/{carCode}/telemetry", srv.handleReferenceLapTelemetry)
 	mux.HandleFunc("GET /api/v1/compare", srv.handleCarComparison)
+	mux.HandleFunc("GET /api/v1/sessions/{id}/laps/{lap}/braking", srv.handleLapBraking)
+	mux.HandleFunc("GET /api/v1/sessions/{id}/laps/{lap}/stability", srv.handleLapStability)
+	mux.HandleFunc("GET /api/v1/sessions/{id}/laps/{lap}/aligned", srv.handleLapAligned)
+	mux.HandleFunc("GET /api/v1/sessions/{id}/racing-line", srv.handleRacingLine)
+	mux.HandleFunc("GET /api/v1/sessions/{id}/fatigue", srv.handleFatigue)
+	mux.HandleFunc("GET /api/v1/sessions/{id}/time-deltas", srv.handleTimeDeltas)
 	mux.HandleFunc("GET /api/v1/push/vapid", srv.handleVAPIDKey)
 	mux.HandleFunc("POST /api/v1/push/subscribe", srv.handlePushSubscribe)
 	mux.HandleFunc("DELETE /api/v1/push/subscribe", srv.handlePushUnsubscribe)
@@ -488,6 +494,165 @@ func (s *server) handleSessionSummary(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(data)
+}
+
+func (s *server) handleLapBraking(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("id")
+	lapStr := r.PathValue("lap")
+	lapNum, err := strconv.Atoi(lapStr)
+	if err != nil {
+		http.Error(w, "invalid lap number", http.StatusBadRequest)
+		return
+	}
+
+	key := "laps/" + sessionID + "/" + fmt.Sprintf("%03d", lapNum) + "/metrics.json"
+	raw, err := s.silver.GetObject(r.Context(), key)
+	if err != nil {
+		http.Error(w, "metrics not found", http.StatusNotFound)
+		return
+	}
+
+	var metrics map[string]interface{}
+	if err := json.Unmarshal(raw, &metrics); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	braking, ok := metrics["braking"]
+	if !ok {
+		writeJSON(w, map[string]interface{}{})
+		return
+	}
+	writeJSON(w, braking)
+}
+
+func (s *server) handleLapStability(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("id")
+	lapStr := r.PathValue("lap")
+	lapNum, err := strconv.Atoi(lapStr)
+	if err != nil {
+		http.Error(w, "invalid lap number", http.StatusBadRequest)
+		return
+	}
+
+	key := "laps/" + sessionID + "/" + fmt.Sprintf("%03d", lapNum) + "/metrics.json"
+	raw, err := s.silver.GetObject(r.Context(), key)
+	if err != nil {
+		http.Error(w, "metrics not found", http.StatusNotFound)
+		return
+	}
+
+	var metrics map[string]interface{}
+	if err := json.Unmarshal(raw, &metrics); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	stability, ok := metrics["stability"]
+	if !ok {
+		writeJSON(w, map[string]interface{}{})
+		return
+	}
+	writeJSON(w, stability)
+}
+
+func (s *server) handleLapAligned(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("id")
+	lapStr := r.PathValue("lap")
+	lapNum, err := strconv.Atoi(lapStr)
+	if err != nil {
+		http.Error(w, "invalid lap number", http.StatusBadRequest)
+		return
+	}
+
+	key := "laps/" + sessionID + "/" + fmt.Sprintf("%03d", lapNum) + "/metrics.json"
+	raw, err := s.silver.GetObject(r.Context(), key)
+	if err != nil {
+		http.Error(w, "metrics not found", http.StatusNotFound)
+		return
+	}
+
+	var metrics map[string]interface{}
+	if err := json.Unmarshal(raw, &metrics); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	aligned, ok := metrics["aligned"]
+	if !ok {
+		writeJSON(w, map[string]interface{}{})
+		return
+	}
+	writeJSON(w, aligned)
+}
+
+func (s *server) handleRacingLine(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("id")
+	key := "sessions/" + sessionID + "/summary.json"
+	raw, err := s.gold.GetObject(r.Context(), key)
+	if err != nil {
+		http.Error(w, "summary not found", http.StatusNotFound)
+		return
+	}
+
+	var summary map[string]interface{}
+	if err := json.Unmarshal(raw, &summary); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	racingLine, ok := summary["racing_line"]
+	if !ok {
+		writeJSON(w, map[string]interface{}{})
+		return
+	}
+	writeJSON(w, racingLine)
+}
+
+func (s *server) handleFatigue(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("id")
+	key := "sessions/" + sessionID + "/summary.json"
+	raw, err := s.gold.GetObject(r.Context(), key)
+	if err != nil {
+		http.Error(w, "summary not found", http.StatusNotFound)
+		return
+	}
+
+	var summary map[string]interface{}
+	if err := json.Unmarshal(raw, &summary); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	fatigue, ok := summary["fatigue"]
+	if !ok {
+		writeJSON(w, map[string]interface{}{})
+		return
+	}
+	writeJSON(w, fatigue)
+}
+
+func (s *server) handleTimeDeltas(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("id")
+	key := "sessions/" + sessionID + "/summary.json"
+	raw, err := s.gold.GetObject(r.Context(), key)
+	if err != nil {
+		http.Error(w, "summary not found", http.StatusNotFound)
+		return
+	}
+
+	var summary map[string]interface{}
+	if err := json.Unmarshal(raw, &summary); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	deltas, ok := summary["time_deltas"]
+	if !ok {
+		writeJSON(w, map[string]interface{}{"deltas": []interface{}{}})
+		return
+	}
+	writeJSON(w, map[string]interface{}{"deltas": deltas})
 }
 
 func (s *server) handleListTracks(w http.ResponseWriter, r *http.Request) {
