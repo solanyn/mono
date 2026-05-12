@@ -11,13 +11,6 @@ common --incompatible_enable_proto_toolchain_resolution
 # CI configuration
 build:ci --stamp
 build:ci --workspace_status_command=tools/workspace_status.sh
-build:ci --bes_results_url=https://goyangi.buildbuddy.io/invocation/
-build:ci --bes_backend=grpcs://goyangi.buildbuddy.io
-build:ci --bes_header=x-buildbuddy-api-key=${BUILDBUDDY_API_KEY}
-build:ci --bes_upload_mode=nowait_for_upload_complete
-build:ci --remote_cache=grpcs://goyangi.buildbuddy.io
-build:ci --remote_timeout=10m
-build:ci --remote_header=x-buildbuddy-api-key=${BUILDBUDDY_API_KEY}
 
 test:ci --stamp
 
