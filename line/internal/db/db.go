@@ -142,19 +142,27 @@ func (d *DB) GetProgression(ctx context.Context, trackID string, limit int) ([]P
 	if limit <= 0 {
 		limit = 100
 	}
-	query := `SELECT id, started_at, track_id, track_name, car_code, best_lap_ms, lap_count
-		FROM sessions
-		WHERE best_lap_ms IS NOT NULL AND best_lap_ms > 0`
+	query := `SELECT s.id, s.started_at, s.track_id, s.track_name, s.car_code, s.best_lap_ms, s.lap_count,
+		CASE WHEN lap_stats.avg_time > 0 AND lap_stats.cnt > 1
+			THEN GREATEST(0, 1.0 - (lap_stats.stddev_time / lap_stats.avg_time) * 10)
+			ELSE NULL
+		END as consistency_score
+		FROM sessions s
+		LEFT JOIN LATERAL (
+			SELECT AVG(time_ms)::float8 as avg_time, STDDEV_POP(time_ms)::float8 as stddev_time, COUNT(*) as cnt
+			FROM laps WHERE session_id = s.id AND time_ms IS NOT NULL AND time_ms > 0
+		) lap_stats ON true
+		WHERE s.best_lap_ms IS NOT NULL AND s.best_lap_ms > 0`
 	args := []interface{}{}
 	argIdx := 1
 
 	if trackID != "" {
-		query += fmt.Sprintf(" AND track_id = $%d", argIdx)
+		query += fmt.Sprintf(" AND s.track_id = $%d", argIdx)
 		args = append(args, trackID)
 		argIdx++
 	}
 
-	query += " ORDER BY started_at ASC"
+	query += " ORDER BY s.started_at ASC"
 	query += fmt.Sprintf(" LIMIT $%d", argIdx)
 	args = append(args, limit)
 
@@ -167,7 +175,7 @@ func (d *DB) GetProgression(ctx context.Context, trackID string, limit int) ([]P
 	var points []ProgressionPoint
 	for rows.Next() {
 		var p ProgressionPoint
-		if err := rows.Scan(&p.SessionID, &p.Date, &p.TrackID, &p.TrackName, &p.CarCode, &p.BestLapMs, &p.LapCount); err != nil {
+		if err := rows.Scan(&p.SessionID, &p.Date, &p.TrackID, &p.TrackName, &p.CarCode, &p.BestLapMs, &p.LapCount, &p.ConsistencyScore); err != nil {
 			return nil, err
 		}
 		points = append(points, p)
@@ -465,4 +473,43 @@ func (d *DB) GetDistinctTracks(ctx context.Context) ([]string, error) {
 		tracks = append(tracks, t)
 	}
 	return tracks, rows.Err()
+}
+
+type PushSubscription struct {
+	ID       int64  `json:"id"`
+	Endpoint string `json:"endpoint"`
+	P256dh   string `json:"p256dh"`
+	Auth     string `json:"auth"`
+}
+
+func (d *DB) ListPushSubscriptions(ctx context.Context) ([]PushSubscription, error) {
+	rows, err := d.pool.Query(ctx, `SELECT id, endpoint, p256dh, auth FROM push_subscriptions`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var subs []PushSubscription
+	for rows.Next() {
+		var s PushSubscription
+		if err := rows.Scan(&s.ID, &s.Endpoint, &s.P256dh, &s.Auth); err != nil {
+			return nil, err
+		}
+		subs = append(subs, s)
+	}
+	return subs, rows.Err()
+}
+
+func (d *DB) SavePushSubscription(ctx context.Context, s *PushSubscription) error {
+	_, err := d.pool.Exec(ctx,
+		`INSERT INTO push_subscriptions (endpoint, p256dh, auth)
+		 VALUES ($1, $2, $3)
+		 ON CONFLICT (endpoint) DO UPDATE SET p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth`,
+		s.Endpoint, s.P256dh, s.Auth)
+	return err
+}
+
+func (d *DB) DeletePushSubscription(ctx context.Context, endpoint string) error {
+	_, err := d.pool.Exec(ctx, `DELETE FROM push_subscriptions WHERE endpoint = $1`, endpoint)
+	return err
 }

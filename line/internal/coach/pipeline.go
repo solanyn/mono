@@ -71,6 +71,17 @@ func (p *Pipeline) RemoveClient(conn *websocket.Conn) {
 	p.mu.Unlock()
 }
 
+func (p *Pipeline) DrainClients() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	msg := websocket.FormatCloseMessage(websocket.CloseGoingAway, "server shutting down")
+	for conn := range p.clients {
+		conn.WriteControl(websocket.CloseMessage, msg, time.Now().Add(time.Second))
+		conn.Close()
+		delete(p.clients, conn)
+	}
+}
+
 func (p *Pipeline) Run(ctx context.Context) {
 	for {
 		select {

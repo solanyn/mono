@@ -95,6 +95,44 @@ func TestEncodeDecodeRoundtrip(t *testing.T) {
 	if decoded.Flags != original.Flags {
 		t.Errorf("Flags = %d, want %d", decoded.Flags, original.Flags)
 	}
+	if decoded.TimeOfDay != original.TimeOfDay {
+		t.Errorf("TimeOfDay = %d, want %d", decoded.TimeOfDay, original.TimeOfDay)
+	}
+}
+
+func TestTimeOfDayLargeValue(t *testing.T) {
+	f := Frame{TimeOfDay: 86400000}
+	encoded := f.Encode()
+	decoded := DecodeFrame(encoded)
+	if decoded.TimeOfDay != 86400000 {
+		t.Errorf("TimeOfDay = %d, want 86400000 (large value truncated)", decoded.TimeOfDay)
+	}
+}
+
+func TestTimeOfDayMaxInt32(t *testing.T) {
+	f := Frame{TimeOfDay: 2147483647}
+	encoded := f.Encode()
+	decoded := DecodeFrame(encoded)
+	if decoded.TimeOfDay != 2147483647 {
+		t.Errorf("TimeOfDay = %d, want 2147483647", decoded.TimeOfDay)
+	}
+}
+
+func TestParseShortBuffer(t *testing.T) {
+	_, err := Parse(make([]byte, 10))
+	if err == nil {
+		t.Error("expected error for short buffer")
+	}
+
+	_, err = Parse(make([]byte, PacketSize-1))
+	if err == nil {
+		t.Error("expected error for buffer one byte short")
+	}
+
+	_, err = Parse(make([]byte, PacketSize))
+	if err != nil {
+		t.Errorf("unexpected error for valid-size buffer: %v", err)
+	}
 }
 
 func TestFrameFlags(t *testing.T) {

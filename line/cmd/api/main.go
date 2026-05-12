@@ -24,6 +24,7 @@ import (
 	"github.com/solanyn/mono/line/data"
 	"github.com/solanyn/mono/line/gen/linepb"
 	"github.com/solanyn/mono/line/internal/coach"
+	"github.com/solanyn/mono/line/internal/config"
 	"github.com/solanyn/mono/line/internal/db"
 	"github.com/solanyn/mono/line/internal/kafka"
 	"github.com/solanyn/mono/line/internal/storage"
@@ -41,6 +42,7 @@ type server struct {
 	live           *liveHub
 	coach          *coach.Pipeline
 	database       *db.DB
+	llm            *coach.LLMClient
 	cars           []carEntry
 	pushSubs       []webpush.Subscription
 	pushMu         sync.RWMutex
@@ -69,16 +71,20 @@ func newLiveHub() *liveHub {
 }
 
 func (h *liveHub) broadcast(frame *linepb.TelemetryFrame) {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
+	h.mu.Lock()
 	data, _ := json.Marshal(frame)
+	var failed []*websocket.Conn
 	for conn := range h.clients {
 		conn.SetWriteDeadline(time.Now().Add(100 * time.Millisecond))
 		if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
-			conn.Close()
-			go h.remove(conn)
+			failed = append(failed, conn)
 		}
 	}
+	for _, conn := range failed {
+		conn.Close()
+		delete(h.clients, conn)
+	}
+	h.mu.Unlock()
 }
 
 func (h *liveHub) add(conn *websocket.Conn) {
@@ -105,26 +111,38 @@ func (h *liveHub) getStatus() linepb.LiveStatus {
 	return h.status
 }
 
+func (h *liveHub) drain() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	msg := websocket.FormatCloseMessage(websocket.CloseGoingAway, "server shutting down")
+	for conn := range h.clients {
+		conn.WriteControl(websocket.CloseMessage, msg, time.Now().Add(time.Second))
+		conn.Close()
+		delete(h.clients, conn)
+	}
+}
+
 func main() {
-	brokers := strings.Split(envOrDefault("KAFKA_BROKERS", "localhost:9092"), ",")
-	topic := envOrDefault("KAFKA_TOPIC", "line.telemetry.raw")
-	group := envOrDefault("KAFKA_GROUP", "line.api")
-	s3Endpoint := envOrDefault("S3_ENDPOINT", "http://localhost:3900")
+	brokers := config.EnvList("KAFKA_BROKERS", "localhost:9092", ",")
+	topic := config.Env("KAFKA_TOPIC", "line.telemetry.raw")
+	group := config.Env("KAFKA_GROUP", "line.api")
+	s3Endpoint := config.Env("S3_ENDPOINT", "http://localhost:3900")
 	s3AccessKey := os.Getenv("S3_ACCESS_KEY")
 	s3SecretKey := os.Getenv("S3_SECRET_KEY")
-	s3Region := envOrDefault("S3_REGION", "us-east-1")
-	s3Bucket := envOrDefault("S3_BUCKET", "line-bronze")
-	silverBucket := envOrDefault("S3_SILVER_BUCKET", "line-silver")
-	goldBucket := envOrDefault("S3_GOLD_BUCKET", "line-gold")
-	addr := envOrDefault("ADDR", ":8080")
-	ttsEndpoint := envOrDefault("TTS_ENDPOINT", "http://mac.internal:8000")
-	llmEndpoint := envOrDefault("LLM_ENDPOINT", "http://mac.internal:8080")
-	llmModel := envOrDefault("LLM_MODEL", "mlx-community/gemma-4-e4b-it-4bit")
-	coachVoice := envOrDefault("COACH_VOICE", "af_heart")
-	useLLM := envOrDefault("COACH_USE_LLM", "true") == "true"
-	databaseURL := envOrDefault("DATABASE_URL", "")
-	vapidPublicKey := envOrDefault("VAPID_PUBLIC_KEY", "")
-	vapidPrivateKey := envOrDefault("VAPID_PRIVATE_KEY", "")
+	s3Region := config.Env("S3_REGION", "us-east-1")
+	s3Bucket := config.Env("S3_BUCKET", "line-bronze")
+	silverBucket := config.Env("S3_SILVER_BUCKET", "line-silver")
+	goldBucket := config.Env("S3_GOLD_BUCKET", "line-gold")
+	addr := config.Env("ADDR", ":8080")
+	ttsEndpoint := config.Env("TTS_ENDPOINT", "http://mac.internal:8000")
+	llmEndpoint := config.Env("LLM_ENDPOINT", "http://mac.internal:8080")
+	llmModel := config.Env("LLM_MODEL", "mlx-community/gemma-4-e4b-it-4bit")
+	coachVoice := config.Env("COACH_VOICE", "af_heart")
+	useLLM := config.EnvBool("COACH_USE_LLM", true)
+	databaseURL := config.Env("DATABASE_URL", "")
+	vapidPublicKey := config.Env("VAPID_PUBLIC_KEY", "")
+	vapidPrivateKey := config.Env("VAPID_PRIVATE_KEY", "")
+	corsOrigin := config.Env("CORS_ORIGIN", "*")
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
@@ -157,8 +175,9 @@ func main() {
 		UseLLM:      useLLM,
 	})
 
-	srv := &server{s3: s3Client, silver: silverClient, gold: goldClient, live: hub, coach: coachPipeline, database: database, vapidPublicKey: vapidPublicKey, vapidPrivate: vapidPrivateKey}
+	srv := &server{s3: s3Client, silver: silverClient, gold: goldClient, live: hub, coach: coachPipeline, database: database, llm: coach.NewLLMClient(llmEndpoint, llmModel), vapidPublicKey: vapidPublicKey, vapidPrivate: vapidPrivateKey}
 	srv.loadCars(ctx)
+	srv.loadPushSubscriptions(ctx)
 
 	consumer, err := kafka.NewConsumer(brokers, group, topic)
 	if err != nil {
@@ -167,8 +186,8 @@ func main() {
 	}
 	defer consumer.Close()
 
-	sessionTopic := envOrDefault("KAFKA_SESSION_TOPIC", "line.session.complete")
-	journalGroup := envOrDefault("KAFKA_JOURNAL_GROUP", "line.api.journal")
+	sessionTopic := config.Env("KAFKA_SESSION_TOPIC", "line.session.complete")
+	journalGroup := config.Env("KAFKA_JOURNAL_GROUP", "line.api.journal")
 	journalConsumer, err := kafka.NewConsumer(brokers, journalGroup, sessionTopic)
 	if err != nil {
 		slog.Warn("journal consumer not started", "err", err)
@@ -258,7 +277,7 @@ func main() {
 	mux.HandleFunc("POST /api/v1/push/subscribe", srv.handlePushSubscribe)
 	mux.HandleFunc("DELETE /api/v1/push/subscribe", srv.handlePushUnsubscribe)
 
-	webDir := envOrDefault("WEB_DIR", "")
+	webDir := config.Env("WEB_DIR", "")
 	if webDir != "" {
 		spa := spaHandler{root: http.Dir(webDir)}
 		mux.Handle("/", spa)
@@ -266,11 +285,13 @@ func main() {
 
 	httpSrv := &http.Server{
 		Addr:    addr,
-		Handler: corsMiddleware(mux),
+		Handler: corsMiddleware(corsOrigin)(mux),
 	}
 
 	go func() {
 		<-ctx.Done()
+		hub.drain()
+		coachPipeline.DrainClients()
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer shutdownCancel()
 		httpSrv.Shutdown(shutdownCtx)
@@ -384,31 +405,7 @@ func (s *server) handleGetTelemetry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	frames := make([]linepb.TelemetryFrame, 0, len(rows)/downsample+1)
-	for i, row := range rows {
-		if i%downsample != 0 {
-			continue
-		}
-		frames = append(frames, linepb.TelemetryFrame{
-			PacketID:    row.PacketID,
-			X:           row.PosX,
-			Y:           row.PosY,
-			Z:           row.PosZ,
-			Speed:       row.Speed,
-			Throttle:    float32(row.Throttle) / 255.0,
-			Brake:       float32(row.Brake) / 255.0,
-			Steering:    float32(row.Steering) / 127.0,
-			Rpm:         row.RPM,
-			Gear:        row.Gear,
-			TireTempFL:  row.TireTempFL,
-			TireTempFR:  row.TireTempFR,
-			TireTempRL:  row.TireTempRL,
-			TireTempRR:  row.TireTempRR,
-			FuelLevel:   row.FuelLevel,
-			CurrentLap:  row.CurrentLap,
-			CurrentTime: row.CurrentTime,
-		})
-	}
+	frames := rowsToFrames(rows, downsample)
 
 	writeJSON(w, map[string]interface{}{
 		"session_id": sessionID,
@@ -427,11 +424,11 @@ func (s *server) handleLiveWS(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	s.live.add(conn)
-	defer s.live.remove(conn)
-
 	status, _ := json.Marshal(s.live.getStatus())
 	conn.WriteMessage(websocket.TextMessage, status)
+
+	s.live.add(conn)
+	defer s.live.remove(conn)
 
 	for {
 		_, _, err := conn.ReadMessage()
@@ -538,6 +535,29 @@ func (s *server) loadCars(ctx context.Context) {
 	slog.Info("loaded cars from S3", "count", len(rows))
 }
 
+func (s *server) loadPushSubscriptions(ctx context.Context) {
+	if s.database == nil {
+		return
+	}
+	subs, err := s.database.ListPushSubscriptions(ctx)
+	if err != nil {
+		slog.Warn("failed to load push subscriptions from DB", "err", err)
+		return
+	}
+	s.pushMu.Lock()
+	for _, sub := range subs {
+		s.pushSubs = append(s.pushSubs, webpush.Subscription{
+			Endpoint: sub.Endpoint,
+			Keys: webpush.Keys{
+				P256dh: sub.P256dh,
+				Auth:   sub.Auth,
+			},
+		})
+	}
+	s.pushMu.Unlock()
+	slog.Info("loaded push subscriptions from DB", "count", len(subs))
+}
+
 func readCarsParquet(buf []byte) ([]carEntry, error) {
 	type parquetCar struct {
 		ID      int32  `parquet:"id"`
@@ -589,32 +609,6 @@ func (s *server) handleProgression(w http.ResponseWriter, r *http.Request) {
 		points = []db.ProgressionPoint{}
 	}
 
-	for i := range points {
-		times, err := s.database.GetLapTimesForSession(r.Context(), points[i].SessionID)
-		if err == nil && len(times) > 1 {
-			mean := float64(0)
-			for _, t := range times {
-				mean += float64(t)
-			}
-			mean /= float64(len(times))
-			variance := float64(0)
-			for _, t := range times {
-				d := float64(t) - mean
-				variance += d * d
-			}
-			variance /= float64(len(times))
-			cv := 0.0
-			if mean > 0 {
-				cv = (variance / (mean * mean))
-			}
-			score := 1.0 - cv*100
-			if score < 0 {
-				score = 0
-			}
-			points[i].ConsistencyScore = &score
-		}
-	}
-
 	writeJSON(w, map[string]interface{}{"points": points})
 }
 
@@ -659,6 +653,7 @@ func (s *server) handleCreateAnnotation(w http.ResponseWriter, r *http.Request) 
 		FrameIdx int    `json:"frame_idx"`
 		Text     string `json:"text"`
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
@@ -754,10 +749,6 @@ func (s *server) handleGenerateBriefing(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	llmEndpoint := envOrDefault("LLM_ENDPOINT", "http://mac.internal:8080")
-	llmModel := envOrDefault("LLM_MODEL", "mlx-community/gemma-4-e4b-it-4bit")
-	llm := coach.NewLLMClient(llmEndpoint, llmModel)
-
 	prompt := buildBriefingPrompt(summary.TrackName, summary.CarCode, summary.LapCount,
 		summary.Consistency.ConsistencyScore, summary.Consistency.LapTimeCV, summary.Consistency.BestWorstDeltaMs,
 		summary.Journal.BestLapMs, summary.Journal.WorstLapMs,
@@ -766,7 +757,7 @@ func (s *server) handleGenerateBriefing(w http.ResponseWriter, r *http.Request) 
 		summary.Journal.Highlights, summary.Journal.AreasToImprove, summary.Journal.CornerNotes,
 		trackHistory, s.cars)
 
-	briefing, err := llm.GenerateBriefing(r.Context(), prompt)
+	briefing, err := s.llm.GenerateBriefing(r.Context(), prompt)
 	if err != nil {
 		slog.Error("llm briefing generation", "err", err)
 		http.Error(w, "briefing generation failed", http.StatusInternalServerError)
@@ -884,17 +875,19 @@ func formatLapTimeMs(ms int) string {
 	return strconv.Itoa(minutes) + ":" + fmt.Sprintf("%02d.%03d", seconds, millis)
 }
 
-func corsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
+func corsMiddleware(allowedOrigin string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 func writeJSON(w http.ResponseWriter, v interface{}) {
@@ -904,11 +897,37 @@ func writeJSON(w http.ResponseWriter, v interface{}) {
 	}
 }
 
-func envOrDefault(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
+func rowToFrame(row storage.TelemetryRow) linepb.TelemetryFrame {
+	return linepb.TelemetryFrame{
+		PacketID:    row.PacketID,
+		X:           row.PosX,
+		Y:           row.PosY,
+		Z:           row.PosZ,
+		Speed:       row.Speed,
+		Throttle:    float32(row.Throttle) / 255.0,
+		Brake:       float32(row.Brake) / 255.0,
+		Steering:    float32(row.Steering) / 127.0,
+		Rpm:         row.RPM,
+		Gear:        row.Gear,
+		TireTempFL:  row.TireTempFL,
+		TireTempFR:  row.TireTempFR,
+		TireTempRL:  row.TireTempRL,
+		TireTempRR:  row.TireTempRR,
+		FuelLevel:   row.FuelLevel,
+		CurrentLap:  row.CurrentLap,
+		CurrentTime: row.CurrentTime,
 	}
-	return def
+}
+
+func rowsToFrames(rows []storage.TelemetryRow, downsample int) []linepb.TelemetryFrame {
+	frames := make([]linepb.TelemetryFrame, 0, len(rows)/downsample+1)
+	for i, row := range rows {
+		if i%downsample != 0 {
+			continue
+		}
+		frames = append(frames, rowToFrame(row))
+	}
+	return frames
 }
 
 type spaHandler struct {
@@ -984,6 +1003,7 @@ func (s *server) handleSetReferenceLap(w http.ResponseWriter, r *http.Request) {
 		S3Key     string `json:"s3_key"`
 		Label     string `json:"label"`
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
@@ -1065,30 +1085,7 @@ func (s *server) handleReferenceLapTelemetry(w http.ResponseWriter, r *http.Requ
 		}
 	}
 	var frames []linepb.TelemetryFrame
-	for i, row := range rows {
-		if i%downsample != 0 {
-			continue
-		}
-		frames = append(frames, linepb.TelemetryFrame{
-			PacketID:    row.PacketID,
-			X:           row.PosX,
-			Y:           row.PosY,
-			Z:           row.PosZ,
-			Speed:       row.Speed,
-			Throttle:    float32(row.Throttle) / 255.0,
-			Brake:       float32(row.Brake) / 255.0,
-			Steering:    float32(row.Steering) / 127.0,
-			Rpm:         row.RPM,
-			Gear:        row.Gear,
-			TireTempFL:  row.TireTempFL,
-			TireTempFR:  row.TireTempFR,
-			TireTempRL:  row.TireTempRL,
-			TireTempRR:  row.TireTempRR,
-			FuelLevel:   row.FuelLevel,
-			CurrentLap:  row.CurrentLap,
-			CurrentTime: row.CurrentTime,
-		})
-	}
+	frames = rowsToFrames(rows, downsample)
 	writeJSON(w, map[string]interface{}{
 		"reference": ref,
 		"frames":    frames,
@@ -1183,10 +1180,6 @@ func (s *server) handleGenerateJournal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	llmEndpoint := envOrDefault("LLM_ENDPOINT", "http://mac.internal:8080")
-	llmModel := envOrDefault("LLM_MODEL", "mlx-community/gemma-4-e4b-it-4bit")
-	llm := coach.NewLLMClient(llmEndpoint, llmModel)
-
 	prompt := buildJournalPrompt(summary.TrackName, summary.CarCode, summary.LapCount,
 		summary.Consistency.ConsistencyScore, summary.Consistency.BestWorstDeltaMs,
 		summary.Consistency.BestLapIdx, summary.Consistency.WorstLapIdx,
@@ -1195,7 +1188,7 @@ func (s *server) handleGenerateJournal(w http.ResponseWriter, r *http.Request) {
 		summary.Journal.Highlights, summary.Journal.AreasToImprove, summary.Journal.CornerNotes,
 		s.cars)
 
-	content, err := llm.GenerateJournal(r.Context(), prompt)
+	content, err := s.llm.GenerateJournal(r.Context(), prompt)
 	if err != nil {
 		slog.Error("llm journal generation", "err", err)
 		http.Error(w, "journal generation failed", http.StatusInternalServerError)
@@ -1333,10 +1326,6 @@ func (s *server) runJournalWorker(ctx context.Context, consumer *kafka.Consumer)
 			return nil
 		}
 
-		llmEndpoint := envOrDefault("LLM_ENDPOINT", "http://mac.internal:8080")
-		llmModel := envOrDefault("LLM_MODEL", "mlx-community/gemma-4-e4b-it-4bit")
-		llm := coach.NewLLMClient(llmEndpoint, llmModel)
-
 		prompt := buildJournalPrompt(summary.TrackName, summary.CarCode, summary.LapCount,
 			summary.Consistency.ConsistencyScore, summary.Consistency.BestWorstDeltaMs,
 			summary.Consistency.BestLapIdx, summary.Consistency.WorstLapIdx,
@@ -1345,7 +1334,7 @@ func (s *server) runJournalWorker(ctx context.Context, consumer *kafka.Consumer)
 			summary.Journal.Highlights, summary.Journal.AreasToImprove, summary.Journal.CornerNotes,
 			s.cars)
 
-		content, err := llm.GenerateJournal(ctx, prompt)
+		content, err := s.llm.GenerateJournal(ctx, prompt)
 		if err != nil {
 			slog.Error("journal worker: llm generation", "session", event.SessionID, "err", err)
 			return nil
@@ -1372,6 +1361,7 @@ func (s *server) handleVAPIDKey(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) handlePushSubscribe(w http.ResponseWriter, r *http.Request) {
 	var sub webpush.Subscription
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {
 		http.Error(w, "invalid subscription", http.StatusBadRequest)
 		return
@@ -1379,11 +1369,19 @@ func (s *server) handlePushSubscribe(w http.ResponseWriter, r *http.Request) {
 	s.pushMu.Lock()
 	s.pushSubs = append(s.pushSubs, sub)
 	s.pushMu.Unlock()
+	if s.database != nil {
+		s.database.SavePushSubscription(r.Context(), &db.PushSubscription{
+			Endpoint: sub.Endpoint,
+			P256dh:   sub.Keys.P256dh,
+			Auth:     sub.Keys.Auth,
+		})
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *server) handlePushUnsubscribe(w http.ResponseWriter, r *http.Request) {
 	var sub webpush.Subscription
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {
 		http.Error(w, "invalid subscription", http.StatusBadRequest)
 		return
@@ -1396,6 +1394,9 @@ func (s *server) handlePushUnsubscribe(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.pushMu.Unlock()
+	if s.database != nil {
+		s.database.DeletePushSubscription(r.Context(), sub.Endpoint)
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -1429,6 +1430,9 @@ func (s *server) sendPushNotification(title, body string) {
 				}
 			}
 			s.pushMu.Unlock()
+			if s.database != nil {
+				s.database.DeletePushSubscription(context.Background(), sub.Endpoint)
+			}
 		}
 	}
 }

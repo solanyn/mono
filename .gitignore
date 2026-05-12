@@ -235,4 +235,6 @@ scrib/scrib
 meet/meet
 result
 line/api
+line/capture
+line/assembler
 line/simulator

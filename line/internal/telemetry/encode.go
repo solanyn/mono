@@ -5,7 +5,7 @@ import (
 	"math"
 )
 
-const EncodedFrameSize = 180
+const EncodedFrameSize = 182
 
 func (f *Frame) Encode() []byte {
 	b := make([]byte, EncodedFrameSize)
@@ -58,7 +58,7 @@ func (f *Frame) Encode() []byte {
 	b[171] = f.Gear
 	binary.LittleEndian.PutUint32(b[172:], uint32(f.CarID))
 	binary.LittleEndian.PutUint16(b[176:], f.Flags)
-	binary.LittleEndian.PutUint16(b[178:], uint16(f.TimeOfDay))
+	binary.LittleEndian.PutUint32(b[178:], uint32(f.TimeOfDay))
 	return b
 }
 
@@ -113,7 +113,7 @@ func DecodeFrame(b []byte) Frame {
 		Gear:        b[171],
 		CarID:       int32(binary.LittleEndian.Uint32(b[172:])),
 		Flags:       binary.LittleEndian.Uint16(b[176:]),
-		TimeOfDay:   int32(binary.LittleEndian.Uint16(b[178:])),
+		TimeOfDay:   int32(binary.LittleEndian.Uint32(b[178:])),
 	}
 }
 

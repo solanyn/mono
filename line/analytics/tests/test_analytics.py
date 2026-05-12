@@ -260,3 +260,134 @@ def test_generate_journal():
     assert journal.worst_lap_ms == 91000
     assert journal.consistency_score > 0.8
     assert len(journal.summary) > 0
+
+
+def test_align_lap():
+    from analytics.alignment import align_lap, compute_distance
+
+    t = np.linspace(0, 2 * np.pi, 600)
+    x = np.cos(t) * 100
+    z = np.sin(t) * 100
+    speed = 80 + 40 * np.abs(np.cos(t))
+    throttle = np.where(speed > 100, 200.0, 50.0)
+    brake = np.where(speed < 70, 150.0, 0.0)
+    time_s = np.linspace(0, 60, 600)
+
+    aligned = align_lap(x, z, speed, throttle, brake, time_s, num_points=500)
+    assert len(aligned.distance) == 500
+    assert len(aligned.speed) == 500
+    assert aligned.distance[0] == 0
+    assert aligned.distance[-1] > 0
+
+
+def test_compute_time_delta():
+    from analytics.alignment import align_lap, compute_time_delta
+
+    t = np.linspace(0, 2 * np.pi, 600)
+    x = np.cos(t) * 100
+    z = np.sin(t) * 100
+    speed1 = 80 + 40 * np.abs(np.cos(t))
+    speed2 = 82 + 40 * np.abs(np.cos(t))
+    throttle = np.where(speed1 > 100, 200.0, 50.0)
+    brake = np.where(speed1 < 70, 150.0, 0.0)
+    time1 = np.linspace(0, 60, 600)
+    time2 = np.linspace(0, 58, 600)
+
+    ref = align_lap(x, z, speed1, throttle, brake, time1, num_points=500)
+    cmp = align_lap(x, z, speed2, throttle, brake, time2, num_points=500)
+
+    delta = compute_time_delta(ref, cmp)
+    assert delta.total_delta_s < 0
+    assert len(delta.distance) == 500
+    assert len(delta.delta_s) == 500
+
+
+def test_analyze_braking():
+    from analytics.braking import analyze_braking
+
+    n = 1200
+    t = np.linspace(0, 4 * np.pi, n)
+    x = np.cos(t) * 200
+    z = np.sin(t) * 200
+    speed = 120 + 60 * np.cos(t)
+    brake = np.zeros(n)
+    brake[100:150] = 180
+    brake[400:460] = 200
+    brake[700:770] = 160
+
+    result = analyze_braking(speed, brake, x, z)
+    assert len(result.events) == 3
+    assert result.avg_deceleration_g > 0
+    assert result.total_brake_distance_m > 0
+    assert 0 <= result.consistency_score <= 1
+
+
+def test_racing_line_deviation():
+    from analytics.racing_line import compute_racing_line_deviation
+
+    rng = np.random.default_rng(42)
+    t = np.linspace(0, 2 * np.pi, 600)
+    laps_x = [np.cos(t) * 100 + rng.normal(0, 0.5, 600) for _ in range(5)]
+    laps_z = [np.sin(t) * 100 + rng.normal(0, 0.5, 600) for _ in range(5)]
+
+    result = compute_racing_line_deviation(laps_x, laps_z)
+    assert result.consistency > 0.5
+    assert result.deviation_avg_m > 0
+    assert result.deviation_max_m >= result.deviation_avg_m
+
+
+def test_analyze_stability():
+    from analytics.stability import analyze_stability
+
+    n = 1200
+    t = np.linspace(0, 4 * np.pi, n)
+    x = np.cos(t) * 200
+    z = np.sin(t) * 200
+    speed = 100 + 50 * np.cos(t)
+    steering = np.sin(t) * 30
+
+    result = analyze_stability(x, z, speed, steering)
+    assert result.oversteer_count >= 0
+    assert result.understeer_count >= 0
+    assert 0 <= result.stability_score <= 1
+
+
+def test_classify_corners():
+    from analytics.corners import Corner
+    from analytics.classification import classify_corners
+
+    t = np.linspace(0, 2 * np.pi, 3600)
+    x = np.cos(t) * 200
+    z = np.sin(t) * 100
+
+    corners = [
+        Corner(entry_idx=100, apex_idx=200, exit_idx=300, entry_speed=150, apex_speed=60, exit_speed=130, direction="left", curvature=0.02, length_m=80),
+        Corner(entry_idx=900, apex_idx=950, exit_idx=1000, entry_speed=200, apex_speed=180, exit_speed=195, direction="right", curvature=0.003, length_m=40),
+    ]
+
+    classified = classify_corners(corners, x, z)
+    assert len(classified) == 2
+    assert classified[0].classification in ("hairpin", "tight", "medium", "sweeper", "kink")
+    assert classified[0].radius_m > 0
+    assert classified[0].angle_deg > 0
+
+
+def test_analyze_fatigue():
+    from analytics.fatigue import analyze_fatigue
+
+    lap_times = [90000, 90200, 90500, 91000, 91500, 92000, 92800, 93500]
+    top_speeds = [250, 249, 248, 247, 246, 245, 244, 243]
+    brake_counts = [12, 12, 13, 13, 14, 14, 15, 15]
+    tire_temps = [75, 77, 79, 82, 85, 88, 91, 94]
+
+    result = analyze_fatigue(lap_times, top_speeds, brake_counts, tire_temps)
+    assert result.diagnosis in ("stable", "driver_fatigue", "tyre_degradation", "mixed")
+    assert result.lap_time_trend > 0
+    assert result.tyre_degradation_score > 0
+
+
+def test_fatigue_insufficient_data():
+    from analytics.fatigue import analyze_fatigue
+
+    result = analyze_fatigue([90000, 91000], [250, 248], [12, 13], [75, 77])
+    assert result.diagnosis == "insufficient_data"

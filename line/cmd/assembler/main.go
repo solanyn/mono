@@ -7,13 +7,15 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/twmb/franz-go/pkg/kgo"
 
 	"github.com/solanyn/mono/line/data"
+	"github.com/solanyn/mono/line/internal/config"
 	"github.com/solanyn/mono/line/internal/db"
 	"github.com/solanyn/mono/line/internal/kafka"
 	"github.com/solanyn/mono/line/internal/storage"
@@ -22,6 +24,7 @@ import (
 )
 
 const maxFramesPerLap = 30000
+const maxConcurrentLaps = 5
 
 type session struct {
 	id        string
@@ -52,17 +55,17 @@ type sessionCompleteEvent struct {
 }
 
 func main() {
-	brokers := strings.Split(envOrDefault("KAFKA_BROKERS", "localhost:9092"), ",")
-	topic := envOrDefault("KAFKA_TOPIC", "line.telemetry.raw")
-	group := envOrDefault("KAFKA_GROUP", "line.assembler")
-	s3Endpoint := envOrDefault("S3_ENDPOINT", "http://localhost:3900")
+	brokers := config.EnvList("KAFKA_BROKERS", "localhost:9092", ",")
+	topic := config.Env("KAFKA_TOPIC", "line.telemetry.raw")
+	group := config.Env("KAFKA_GROUP", "line.assembler")
+	s3Endpoint := config.Env("S3_ENDPOINT", "http://localhost:3900")
 	s3AccessKey := os.Getenv("S3_ACCESS_KEY")
 	s3SecretKey := os.Getenv("S3_SECRET_KEY")
-	s3Region := envOrDefault("S3_REGION", "us-east-1")
-	s3Bucket := envOrDefault("S3_BUCKET", "line-bronze")
-	lapTopic := envOrDefault("KAFKA_LAP_TOPIC", "line.lap.written")
-	sessionTopic := envOrDefault("KAFKA_SESSION_TOPIC", "line.session.complete")
-	databaseURL := envOrDefault("DATABASE_URL", "")
+	s3Region := config.Env("S3_REGION", "us-east-1")
+	s3Bucket := config.Env("S3_BUCKET", "line-bronze")
+	lapTopic := config.Env("KAFKA_LAP_TOPIC", "line.lap.written")
+	sessionTopic := config.Env("KAFKA_SESSION_TOPIC", "line.session.complete")
+	databaseURL := config.Env("DATABASE_URL", "")
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
@@ -101,11 +104,12 @@ func main() {
 
 	slog.Info("assembler started", "brokers", brokers, "topic", topic, "group", group)
 
+	var mu sync.Mutex
 	var sess *session
 	var idleTimeout *time.Timer
-	var totalFrames int64
-	var totalLapsFlushed int64
-	var totalSessionsClosed int64
+	var totalFrames atomic.Int64
+	var totalLapsFlushed atomic.Int64
+	var totalSessionsClosed atomic.Int64
 
 	go func() {
 		ticker := time.NewTicker(10 * time.Second)
@@ -117,16 +121,18 @@ func main() {
 			case <-ticker.C:
 				var bufferedFrames int
 				var bufferedLaps int
+				mu.Lock()
 				if sess != nil {
 					for _, rows := range sess.laps {
 						bufferedFrames += len(rows)
 					}
 					bufferedLaps = len(sess.laps)
 				}
+				mu.Unlock()
 				slog.Info("assembler stats",
-					"total_frames", totalFrames,
-					"total_laps_flushed", totalLapsFlushed,
-					"total_sessions", totalSessionsClosed,
+					"total_frames", totalFrames.Load(),
+					"total_laps_flushed", totalLapsFlushed.Load(),
+					"total_sessions", totalSessionsClosed.Load(),
 					"buffered_frames", bufferedFrames,
 					"buffered_laps", bufferedLaps,
 				)
@@ -139,10 +145,13 @@ func main() {
 			idleTimeout.Stop()
 		}
 		idleTimeout = time.AfterFunc(30*time.Second, func() {
+			mu.Lock()
+			defer mu.Unlock()
 			if sess != nil {
 				slog.Info("session idle timeout, flushing remaining laps", "session", sess.id)
 				flushSession(ctx, sess, s3Client, producer, lapTopic, database, trackDB)
 				publishSessionComplete(ctx, producer, sessionTopic, sess, database)
+				totalSessionsClosed.Add(1)
 				sess = nil
 			}
 		})
@@ -155,17 +164,20 @@ func main() {
 		}
 
 		frame := telemetry.DecodeFrame(record.Value)
-		totalFrames++
+		totalFrames.Add(1)
+
+		mu.Lock()
+		defer mu.Unlock()
 
 		if sess == nil || frame.CarID != sess.carID {
 			if sess != nil {
 				slog.Info("session ended (car change)", "session", sess.id, "old_car", sess.carID, "new_car", frame.CarID)
 				flushSession(ctx, sess, s3Client, producer, lapTopic, database, trackDB)
 				publishSessionComplete(ctx, producer, sessionTopic, sess, database)
-				totalSessionsClosed++
+				totalSessionsClosed.Add(1)
 			}
 			sess = &session{
-				id:        uuid.NewString()[:8],
+				id:        uuid.NewString()[:16],
 				carID:     frame.CarID,
 				startTime: time.Now(),
 				laps:      make(map[int16][]storage.TelemetryRow),
@@ -188,12 +200,30 @@ func main() {
 		row := frame.ToRow()
 		sess.laps[frame.CurrentLap] = append(sess.laps[frame.CurrentLap], row)
 
+		if len(sess.laps) > maxConcurrentLaps {
+			var oldestLap int16
+			var found bool
+			for lapNum := range sess.laps {
+				if lapNum != frame.CurrentLap && (!found || lapNum < oldestLap) {
+					oldestLap = lapNum
+					found = true
+				}
+			}
+			if found {
+				slog.Warn("too many concurrent lap buffers, flushing oldest", "session", sess.id, "lap", oldestLap, "concurrent", len(sess.laps))
+				if err := flushLap(ctx, sess, oldestLap, nil, s3Client, producer, lapTopic, database, trackDB); err != nil {
+					slog.Error("flush oldest lap failed", "lap", oldestLap, "err", err)
+				}
+				totalLapsFlushed.Add(1)
+			}
+		}
+
 		if len(sess.laps[frame.CurrentLap]) >= maxFramesPerLap {
 			slog.Warn("lap frame cap reached, force flushing", "session", sess.id, "lap", frame.CurrentLap, "frames", maxFramesPerLap)
 			if err := flushLap(ctx, sess, frame.CurrentLap, nil, s3Client, producer, lapTopic, database, trackDB); err != nil {
 				slog.Error("force flush lap failed", "lap", frame.CurrentLap, "err", err)
 			}
-			totalLapsFlushed++
+			totalLapsFlushed.Add(1)
 		}
 
 		if frame.CurrentLap > sess.lastLap {
@@ -205,7 +235,7 @@ func main() {
 			if err := flushLap(ctx, sess, sess.lastLap, lapTimeMs, s3Client, producer, lapTopic, database, trackDB); err != nil {
 				slog.Error("flush lap failed", "lap", sess.lastLap, "err", err)
 			}
-			totalLapsFlushed++
+			totalLapsFlushed.Add(1)
 			sess.lastLap = frame.CurrentLap
 		}
 
@@ -217,12 +247,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	if idleTimeout != nil {
+		idleTimeout.Stop()
+	}
+	mu.Lock()
 	if sess != nil {
 		flushSession(context.Background(), sess, s3Client, producer, lapTopic, database, trackDB)
 		publishSessionComplete(context.Background(), producer, sessionTopic, sess, database)
-		totalSessionsClosed++
+		totalSessionsClosed.Add(1)
 	}
-	slog.Info("assembler stopped", "total_frames", totalFrames, "total_laps", totalLapsFlushed, "total_sessions", totalSessionsClosed)
+	mu.Unlock()
+	slog.Info("assembler stopped", "total_frames", totalFrames.Load(), "total_laps", totalLapsFlushed.Load(), "total_sessions", totalSessionsClosed.Load())
 }
 
 func flushLap(ctx context.Context, sess *session, lapNum int16, lapTimeMs *int32, s3Client *storage.S3Client, producer *kafka.Producer, lapTopic string, database *db.DB, trackDB *tracks.Database) error {
@@ -341,11 +376,4 @@ func publishSessionComplete(ctx context.Context, producer *kafka.Producer, topic
 	eventData, _ := json.Marshal(event)
 	producer.ProduceAsync(ctx, topic, sess.id, eventData)
 	slog.Info("published session complete", "session", sess.id, "laps", sess.lapCount)
-}
-
-func envOrDefault(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return def
 }

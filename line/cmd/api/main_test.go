@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -141,5 +142,63 @@ func TestLiveWebSocket(t *testing.T) {
 	}
 	if frame.Gear != 4 {
 		t.Fatalf("expected gear 4, got %d", frame.Gear)
+	}
+}
+
+func TestLiveHubConcurrentBroadcast(t *testing.T) {
+	hub := newLiveHub()
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		hub.add(conn)
+		defer hub.remove(conn)
+		for {
+			if _, _, err := conn.ReadMessage(); err != nil {
+				return
+			}
+		}
+	}))
+	defer ts.Close()
+
+	const numClients = 10
+	conns := make([]*websocket.Conn, numClients)
+	for i := range conns {
+		wsURL := "ws" + ts.URL[4:]
+		c, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+		if err != nil {
+			t.Fatalf("dial %d: %v", i, err)
+		}
+		conns[i] = c
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func(n int) {
+			defer wg.Done()
+			hub.broadcast(&linepb.TelemetryFrame{PacketID: int32(n), Speed: float32(n)})
+		}(i)
+	}
+
+	conns[0].Close()
+	conns[1].Close()
+
+	wg.Wait()
+
+	time.Sleep(50 * time.Millisecond)
+
+	hub.mu.RLock()
+	remaining := len(hub.clients)
+	hub.mu.RUnlock()
+
+	if remaining > numClients {
+		t.Errorf("expected <= %d clients, got %d", numClients, remaining)
+	}
+
+	for _, c := range conns[2:] {
+		c.Close()
 	}
 }
