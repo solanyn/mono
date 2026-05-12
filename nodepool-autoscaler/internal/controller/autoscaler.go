@@ -179,7 +179,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		scaler.Status.CurrentSize = currentSize
 		scaler.Status.DesiredSize = 0
 		scaler.Status.PendingPods = 0
-		scaler.Status.IdleSeconds = idleDuration.Seconds()
+		scaler.Status.IdleSeconds = int64(idleDuration.Seconds())
 		r.setCondition(ctx, scaler, "Ready", metav1.ConditionTrue, "Idle", "no pending pods")
 	}
 

@@ -43,7 +43,7 @@ type NodePoolScalerStatus struct {
 	DesiredSize    int64        `json:"desiredSize,omitempty"`
 	PendingPods    int64        `json:"pendingPods,omitempty"`
 	LastScaleTime  *metav1.Time `json:"lastScaleTime,omitempty"`
-	IdleSeconds    float64      `json:"idleSeconds,omitempty"`
+	IdleSeconds    int64      `json:"idleSeconds,omitempty"`
 	Conditions     []metav1.Condition `json:"conditions,omitempty"`
 }
 
