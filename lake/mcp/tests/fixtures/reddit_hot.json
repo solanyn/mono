@@ -1,0 +1,48 @@
+{
+  "data": {
+    "children": [
+      {
+        "kind": "t3",
+        "data": {
+          "id": "abc123",
+          "title": "RBA cuts rates again - what does this mean for mortgages?",
+          "score": 245,
+          "num_comments": 89,
+          "upvote_ratio": 0.92,
+          "link_flair_text": "Property",
+          "selftext": "Just saw the RBA cut rates by 25bp. How will this affect variable rate mortgages?",
+          "url": "https://www.reddit.com/r/AusFinance/comments/abc123",
+          "created_utc": 1711670400
+        }
+      },
+      {
+        "kind": "t3",
+        "data": {
+          "id": "def456",
+          "title": "CPI coming in hot - inflation not dead yet",
+          "score": 178,
+          "num_comments": 56,
+          "upvote_ratio": 0.88,
+          "link_flair_text": "Tax",
+          "selftext": "Latest CPI numbers suggest inflation is stickier than expected.",
+          "url": "https://www.reddit.com/r/AusFinance/comments/def456",
+          "created_utc": 1711584000
+        }
+      },
+      {
+        "kind": "t3",
+        "data": {
+          "id": "ghi789",
+          "title": "Energy bills through the roof in NSW",
+          "score": 92,
+          "num_comments": 34,
+          "upvote_ratio": 0.85,
+          "link_flair_text": null,
+          "selftext": "My electricity bill doubled this quarter.",
+          "url": "https://www.reddit.com/r/AusFinance/comments/ghi789",
+          "created_utc": 1711497600
+        }
+      }
+    ]
+  }
+}

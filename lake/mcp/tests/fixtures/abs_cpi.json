@@ -1,0 +1,114 @@
+{
+  "meta": {
+    "schema": "https://raw.githubusercontent.com/sdmx-twg/sdmx-json/master/data-message/tools/schemas/2.0.0/sdmx-json-data-schema.json",
+    "id": "TEST001",
+    "prepared": "2026-03-29T00:00:00Z",
+    "test": true,
+    "contentLanguages": ["en"],
+    "sender": {"id": "test", "name": "test"}
+  },
+  "data": {
+    "dataSets": [
+      {
+        "structure": 0,
+        "action": "Information",
+        "series": {
+          "0:0:0:0:0": {
+            "attributes": [0],
+            "annotations": [],
+            "observations": {
+              "0": [100.0, null, 0, null],
+              "1": [98.9, null, 0, null],
+              "2": [99.1, null, 0, null]
+            }
+          },
+          "1:1:0:0:0": {
+            "attributes": [0],
+            "annotations": [],
+            "observations": {
+              "0": [2.5, null, 0, null],
+              "1": [3.1, null, 0, null]
+            }
+          }
+        }
+      }
+    ],
+    "structures": [
+      {
+        "name": "Monthly CPI",
+        "names": {"en": "Monthly CPI"},
+        "description": "Test",
+        "descriptions": {"en": "Test"},
+        "dimensions": {
+          "dataSet": [],
+          "series": [
+            {
+              "id": "MEASURE",
+              "name": "Measure",
+              "names": {"en": "Measure"},
+              "keyPosition": 0,
+              "values": [
+                {"id": "1", "order": 0, "name": "Index Numbers", "names": {"en": "Index Numbers"}},
+                {"id": "3", "order": 2, "name": "Percentage Change from Previous Year", "names": {"en": "Percentage Change from Previous Year"}}
+              ]
+            },
+            {
+              "id": "INDEX",
+              "name": "Index",
+              "names": {"en": "Index"},
+              "keyPosition": 1,
+              "values": [
+                {"id": "20004", "name": "Furnishings", "names": {"en": "Furnishings"}},
+                {"id": "131179", "name": "Food products", "names": {"en": "Food products"}}
+              ]
+            },
+            {
+              "id": "TSEST",
+              "name": "Adjustment",
+              "names": {"en": "Adjustment"},
+              "keyPosition": 2,
+              "values": [{"id": "10", "name": "Original"}]
+            },
+            {
+              "id": "REGION",
+              "name": "Region",
+              "names": {"en": "Region"},
+              "keyPosition": 3,
+              "values": [{"id": "50", "name": "Weighted average of eight capital cities"}]
+            },
+            {
+              "id": "FREQ",
+              "name": "Frequency",
+              "names": {"en": "Frequency"},
+              "keyPosition": 4,
+              "values": [{"id": "M", "name": "Monthly"}]
+            }
+          ],
+          "observation": [
+            {
+              "id": "TIME_PERIOD",
+              "name": "Time Period",
+              "names": {"en": "Time Period"},
+              "values": [
+                {"id": "2024-01"},
+                {"id": "2024-02"},
+                {"id": "2024-03"}
+              ]
+            }
+          ]
+        },
+        "attributes": {
+          "dataSet": [],
+          "dimensionGroup": [],
+          "series": [],
+          "observation": [
+            {"id": "OBS_STATUS"},
+            {"id": "DECIMALS"},
+            {"id": "OBS_COMMENT"}
+          ]
+        }
+      }
+    ]
+  },
+  "errors": []
+}

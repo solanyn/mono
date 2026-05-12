@@ -1,0 +1,36 @@
+{
+  "description": "Golden fixture for align() — realistic multi-speaker meeting excerpt. If you intentionally change alignment behaviour, regenerate via tests/regenerate_align_golden.py.",
+  "duration": 12.0,
+  "diar_segments": [
+    {"speaker": "SPEAKER_0", "start": 0.0, "end": 2.8},
+    {"speaker": "SPEAKER_1", "start": 2.9, "end": 5.4},
+    {"speaker": "SPEAKER_0", "start": 5.4, "end": 7.2},
+    {"speaker": "SPEAKER_2", "start": 7.5, "end": 11.8}
+  ],
+  "words": [
+    {"word": "morning", "start": 0.10, "end": 0.55},
+    {"word": "team",    "start": 0.58, "end": 0.95},
+    {"word": "quick",   "start": 1.00, "end": 1.40},
+    {"word": "update",  "start": 1.45, "end": 1.95},
+    {"word": "on",      "start": 2.00, "end": 2.15},
+    {"word": "the",     "start": 2.20, "end": 2.40},
+    {"word": "release", "start": 2.45, "end": 2.95},
+    {"word": "sure",    "start": 3.00, "end": 3.35},
+    {"word": "go",      "start": 3.40, "end": 3.60},
+    {"word": "ahead",   "start": 3.65, "end": 4.05},
+    {"word": "um",      "start": 5.15, "end": 5.38},
+    {"word": "ok",      "start": 5.50, "end": 5.85},
+    {"word": "so",      "start": 5.90, "end": 6.15},
+    {"word": "build",   "start": 6.20, "end": 6.60},
+    {"word": "passed",  "start": 6.65, "end": 7.10},
+    {"word": "great",   "start": 7.60, "end": 7.95},
+    {"word": "shipping","start": 8.00, "end": 8.70},
+    {"word": "today",   "start": 8.75, "end": 9.25}
+  ],
+  "expected": [
+    {"speaker": "SPEAKER_0", "start": 0.10, "end": 2.95, "text": "morning team quick update on the release", "uncertain": false},
+    {"speaker": "SPEAKER_1", "start": 3.00, "end": 5.38, "text": "sure go ahead um", "uncertain": false},
+    {"speaker": "SPEAKER_0", "start": 5.50, "end": 7.10, "text": "ok so build passed", "uncertain": false},
+    {"speaker": "SPEAKER_2", "start": 7.60, "end": 9.25, "text": "great shipping today", "uncertain": false}
+  ]
+}

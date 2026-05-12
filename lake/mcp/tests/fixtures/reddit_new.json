@@ -1,0 +1,34 @@
+{
+  "data": {
+    "children": [
+      {
+        "kind": "t3",
+        "data": {
+          "id": "def456",
+          "title": "CPI coming in hot - inflation not dead yet",
+          "score": 178,
+          "num_comments": 56,
+          "upvote_ratio": 0.88,
+          "link_flair_text": "Tax",
+          "selftext": "Latest CPI numbers suggest inflation is stickier than expected.",
+          "url": "https://www.reddit.com/r/AusFinance/comments/def456",
+          "created_utc": 1711584000
+        }
+      },
+      {
+        "kind": "t3",
+        "data": {
+          "id": "jkl012",
+          "title": "Best HISA rates after the rate cut?",
+          "score": 45,
+          "num_comments": 23,
+          "upvote_ratio": 0.95,
+          "link_flair_text": "Investing",
+          "selftext": "Looking for the best high interest savings account after the latest cut.",
+          "url": "https://www.reddit.com/r/AusFinance/comments/jkl012",
+          "created_utc": 1711411200
+        }
+      }
+    ]
+  }
+}

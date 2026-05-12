@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Guardian Australia - Business</title>
+    <link>https://www.theguardian.com/au/business</link>
+    <item>
+      <title>RBA holds rates steady amid inflation concerns</title>
+      <link>https://www.theguardian.com/business/2026/mar/29/rba-holds-rates</link>
+      <description>The Reserve Bank has kept the cash rate on hold at 3.85%.</description>
+      <pubDate>Sat, 29 Mar 2026 10:00:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Housing market shows signs of cooling in Sydney</title>
+      <link>https://www.theguardian.com/business/2026/mar/28/housing-cooling</link>
+      <description>Sydney auction clearance rates drop below 60% for first time in months.</description>
+      <pubDate>Fri, 28 Mar 2026 08:00:00 +0000</pubDate>
+    </item>
+  </channel>
+</rss>

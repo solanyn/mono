@@ -1,0 +1,80 @@
+load("@rules_python//python:py_binary.bzl", "py_binary")
+load("@rules_python//python:py_library.bzl", "py_library")
+load("@rules_python//python:py_test.bzl", "py_test")
+load("@rules_uv//uv:pip.bzl", "pip_compile")
+load("@rules_uv//uv:venv.bzl", "create_venv")
+
+pip_compile(
+    name = "generate_requirements_txt",
+    requirements_in = "pyproject.toml",
+    requirements_txt = "requirements_lock.txt",
+    python_platform = "aarch64-apple-darwin",
+    target_compatible_with = ["@platforms//os:macos"],
+)
+
+create_venv(
+    name = "create_venv",
+    requirements_txt = "requirements_lock.txt",
+    target_compatible_with = ["@platforms//os:macos"],
+)
+
+py_library(
+    name = "scrib_ml_lib",
+    srcs = glob(["src/scrib_ml/**/*.py"]),
+    imports = ["src"],
+    target_compatible_with = ["@platforms//os:macos"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@scrib_ml_pypi//fastapi",
+        "@scrib_ml_pypi//uvicorn",
+        "@scrib_ml_pypi//mlx_audio",
+        "@scrib_ml_pypi//senko",
+        "@scrib_ml_pypi//soundfile",
+        "@scrib_ml_pypi//numpy",
+        "@scrib_ml_pypi//python_multipart",
+    ],
+)
+
+py_binary(
+    name = "scrib-ml",
+    srcs = ["src/scrib_ml/__main__.py"],
+    imports = ["src"],
+    main = "src/scrib_ml/__main__.py",
+    visibility = ["//visibility:public"],
+    deps = [":scrib_ml_lib"],
+    target_compatible_with = ["@platforms//os:macos"],
+)
+
+py_test(
+    name = "test_align",
+    srcs = ["tests/test_align.py"],
+    deps = [
+        ":scrib_ml_lib",
+        "@scrib_ml_pypi//pytest",
+    ],
+    args = ["-v"],
+    target_compatible_with = ["@platforms//os:macos"],
+)
+
+py_test(
+    name = "test_align_golden",
+    srcs = ["tests/test_align_golden.py"],
+    data = ["tests/fixtures/align_golden.json"],
+    deps = [
+        ":scrib_ml_lib",
+        "@scrib_ml_pypi//pytest",
+    ],
+    args = ["-v"],
+    target_compatible_with = ["@platforms//os:macos"],
+)
+
+py_test(
+    name = "test_diarize_stitch",
+    srcs = ["tests/test_diarize_stitch.py"],
+    deps = [
+        ":scrib_ml_lib",
+        "@scrib_ml_pypi//pytest",
+    ],
+    args = ["-v"],
+    target_compatible_with = ["@platforms//os:macos"],
+)

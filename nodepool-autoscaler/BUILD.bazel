@@ -1,6 +1,6 @@
 load("@rules_go//go:def.bzl", "go_binary", "go_cross_binary", "go_library", "go_test")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
-load("@aspect_bazel_lib//lib:tar.bzl", "tar")
+load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 load("//tools/controller-gen:controller-gen.bzl", "controller_gen_crd")
 load("//tools/helm-oci:helm-oci.bzl", "helm_chart", "helm_oci_push")
 
@@ -114,9 +114,10 @@ go_cross_binary(
     target = ":nodepool-autoscaler",
 )
 
-tar(
+pkg_tar(
     name = "binary_layer",
     srcs = [":nodepool-autoscaler_linux_amd64"],
+    strip_prefix = ".",
 )
 
 oci_image(
