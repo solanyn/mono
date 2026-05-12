@@ -1,6 +1,6 @@
 load("@rules_go//go:def.bzl", "go_binary", "go_cross_binary", "go_library", "go_test")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
-load("@aspect_bazel_lib//lib:tar.bzl", "tar")
+load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 load("//tools/controller-gen:controller-gen.bzl", "controller_gen_crd")
 load("//tools/helm-oci:helm-oci.bzl", "helm_chart", "helm_oci_push")
 
@@ -108,21 +108,24 @@ go_binary(
     embed = [":lib"],
 )
 
-go_cross_binary(
+go_binary(
     name = "nodepool-autoscaler_linux_amd64",
-    platform = "@rules_go//go/toolchain:linux_amd64",
-    target = ":nodepool-autoscaler",
+    embed = [":lib"],
+    goos = "linux",
+    goarch = "amd64",
+    pure = "on",
 )
 
-tar(
+pkg_tar(
     name = "binary_layer",
     srcs = [":nodepool-autoscaler_linux_amd64"],
+    strip_prefix = ".",
 )
 
 oci_image(
     name = "image",
     base = "@distroless_static",
-    entrypoint = ["/nodepool-autoscaler/nodepool-autoscaler_linux_amd64"],
+    entrypoint = ["/nodepool-autoscaler_linux_amd64_/nodepool-autoscaler_linux_amd64"],
     labels = {"org.opencontainers.image.source": "https://github.com/solanyn/mono"},
     tars = [":binary_layer"],
 )
