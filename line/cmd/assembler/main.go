@@ -197,6 +197,10 @@ func main() {
 
 		resetIdle()
 
+		if frame.Speed == 0 && frame.Throttle == 0 && frame.Brake == 0 {
+			return nil
+		}
+
 		row := frame.ToRow()
 		sess.laps[frame.CurrentLap] = append(sess.laps[frame.CurrentLap], row)
 
