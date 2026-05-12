@@ -123,6 +123,7 @@ oci_image(
     name = "image",
     base = "@distroless_static",
     entrypoint = ["/nodepool-autoscaler/nodepool-autoscaler_linux_amd64"],
+    labels = {"org.opencontainers.image.source": "https://github.com/solanyn/mono"},
     tars = [":binary_layer"],
 )
 
