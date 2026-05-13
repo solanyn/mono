@@ -128,6 +128,14 @@ def diarize_array(
         except OSError:
             pass
 
+    if result is None:
+        log.warning("diarize: diarizer returned None for %.0fs chunk, treating as empty", duration)
+        return DiarResult(
+            segments=[],
+            num_speakers=0,
+            duration_seconds=round(duration, 3),
+        )
+
     segments_raw = result.get("merged_segments", [])
     speaker_set: set[str] = set()
     segments: list[DiarSegment] = []
