@@ -30,27 +30,64 @@ def _make_test_parquet(num_frames: int = 3600) -> bytes:
     x = np.cos(t) * 100 + rng.normal(0, 0.1, num_frames)
     y = np.zeros(num_frames)
     z = np.sin(t) * 100 + rng.normal(0, 0.1, num_frames)
-    speed = 80 + 40 * np.abs(np.sin(t)) + rng.normal(0, 2, num_frames)
-    throttle = np.where(speed > 100, 200.0, 50.0) + rng.normal(0, 5, num_frames)
-    brake = np.where(speed < 60, 150.0, 0.0) + rng.normal(0, 3, num_frames)
-    brake = np.clip(brake, 0, 255)
-    throttle = np.clip(throttle, 0, 255)
-    rpm = speed * 50 + rng.normal(0, 100, num_frames)
-    fuel = np.linspace(100, 95, num_frames)
+    speed = (80 + 40 * np.abs(np.sin(t)) + rng.normal(0, 2, num_frames)).astype(np.float32)
+    throttle = np.clip(np.where(speed > 100, 200, 50) + rng.integers(-5, 5, num_frames), 0, 255).astype(np.int32)
+    brake = np.clip(np.where(speed < 60, 150, 0) + rng.integers(-3, 3, num_frames), 0, 255).astype(np.int32)
+    steering = np.clip((np.sin(t * 2) * 60).astype(np.int32), -128, 127)
+    rpm = (speed * 50 + rng.normal(0, 100, num_frames)).astype(np.float32)
+    fuel = np.linspace(100, 95, num_frames, dtype=np.float32)
 
     table = pa.table({
+        "packet_id": pa.array(np.arange(num_frames, dtype=np.int32)),
         "pos_x": pa.array(x, type=pa.float32()),
         "pos_y": pa.array(y, type=pa.float32()),
         "pos_z": pa.array(z, type=pa.float32()),
-        "speed": pa.array(speed, type=pa.float32()),
-        "throttle": pa.array(throttle, type=pa.float32()),
-        "brake": pa.array(brake, type=pa.float32()),
-        "rpm": pa.array(rpm, type=pa.float32()),
-        "fuel_level": pa.array(fuel, type=pa.float32()),
-        "tire_fl_temp": pa.array(rng.normal(80, 5, num_frames), type=pa.float32()),
-        "tire_fr_temp": pa.array(rng.normal(82, 5, num_frames), type=pa.float32()),
-        "tire_rl_temp": pa.array(rng.normal(78, 5, num_frames), type=pa.float32()),
-        "tire_rr_temp": pa.array(rng.normal(79, 5, num_frames), type=pa.float32()),
+        "vel_x": pa.array(np.gradient(x).astype(np.float32)),
+        "vel_y": pa.array(np.zeros(num_frames, dtype=np.float32)),
+        "vel_z": pa.array(np.gradient(z).astype(np.float32)),
+        "rot_pitch": pa.array(np.zeros(num_frames, dtype=np.float32)),
+        "rot_yaw": pa.array(np.arctan2(np.gradient(z), np.gradient(x)).astype(np.float32)),
+        "rot_roll": pa.array(np.zeros(num_frames, dtype=np.float32)),
+        "ang_vel_x": pa.array(np.zeros(num_frames, dtype=np.float32)),
+        "ang_vel_y": pa.array(rng.normal(0, 0.1, num_frames).astype(np.float32)),
+        "ang_vel_z": pa.array(np.zeros(num_frames, dtype=np.float32)),
+        "ride_height": pa.array(np.full(num_frames, 0.12, dtype=np.float32)),
+        "rpm": pa.array(rpm),
+        "fuel_level": pa.array(fuel),
+        "fuel_cap": pa.array(np.full(num_frames, 100.0, dtype=np.float32)),
+        "speed": pa.array(speed),
+        "boost": pa.array(np.zeros(num_frames, dtype=np.float32)),
+        "oil_pressure": pa.array(np.full(num_frames, 4.5, dtype=np.float32)),
+        "water_temp": pa.array(np.full(num_frames, 85.0, dtype=np.float32)),
+        "oil_temp": pa.array(np.full(num_frames, 95.0, dtype=np.float32)),
+        "tire_temp_fl": pa.array(rng.normal(80, 5, num_frames).astype(np.float32)),
+        "tire_temp_fr": pa.array(rng.normal(82, 5, num_frames).astype(np.float32)),
+        "tire_temp_rl": pa.array(rng.normal(78, 5, num_frames).astype(np.float32)),
+        "tire_temp_rr": pa.array(rng.normal(79, 5, num_frames).astype(np.float32)),
+        "susp_fl": pa.array(rng.normal(0.1, 0.01, num_frames).astype(np.float32)),
+        "susp_fr": pa.array(rng.normal(0.1, 0.01, num_frames).astype(np.float32)),
+        "susp_rl": pa.array(rng.normal(0.1, 0.01, num_frames).astype(np.float32)),
+        "susp_rr": pa.array(rng.normal(0.1, 0.01, num_frames).astype(np.float32)),
+        "wheel_fl": pa.array(rng.normal(50, 2, num_frames).astype(np.float32)),
+        "wheel_fr": pa.array(rng.normal(50, 2, num_frames).astype(np.float32)),
+        "wheel_rl": pa.array(rng.normal(50, 2, num_frames).astype(np.float32)),
+        "wheel_rr": pa.array(rng.normal(50, 2, num_frames).astype(np.float32)),
+        "tire_rad_fl": pa.array(np.full(num_frames, 0.30, dtype=np.float32)),
+        "tire_rad_fr": pa.array(np.full(num_frames, 0.30, dtype=np.float32)),
+        "tire_rad_rl": pa.array(np.full(num_frames, 0.31, dtype=np.float32)),
+        "tire_rad_rr": pa.array(np.full(num_frames, 0.31, dtype=np.float32)),
+        "current_lap": pa.array(np.ones(num_frames, dtype=np.int32)),
+        "total_laps": pa.array(np.full(num_frames, 5, dtype=np.int32)),
+        "best_lap_ms": pa.array(np.full(num_frames, 90000, dtype=np.int32)),
+        "last_lap_ms": pa.array(np.full(num_frames, 91000, dtype=np.int32)),
+        "current_time_ms": pa.array(np.linspace(0, 60000, num_frames, dtype=np.int32)),
+        "throttle": pa.array(throttle),
+        "brake": pa.array(brake),
+        "steering": pa.array(steering),
+        "gear": pa.array(np.clip((speed / 40).astype(np.int32), 1, 6)),
+        "car_id": pa.array(np.full(num_frames, 3447, dtype=np.int32)),
+        "flags": pa.array(np.ones(num_frames, dtype=np.int32)),
+        "time_of_day": pa.array(np.linspace(43200000, 43260000, num_frames, dtype=np.int32)),
     })
 
     buf = io.BytesIO()
@@ -344,7 +381,7 @@ def test_analyze_stability():
     x = np.cos(t) * 200
     z = np.sin(t) * 200
     speed = 100 + 50 * np.cos(t)
-    steering = np.sin(t) * 30
+    steering = (np.sin(t) * 80).astype(np.int32)
 
     result = analyze_stability(x, z, speed, steering)
     assert result.oversteer_count >= 0
@@ -391,3 +428,157 @@ def test_fatigue_insufficient_data():
 
     result = analyze_fatigue([90000, 91000], [250, 248], [12, 13], [75, 77])
     assert result.diagnosis == "insufficient_data"
+
+
+class FakeS3:
+    def __init__(self):
+        self.objects = {}
+
+    def get_object(self, Bucket, Key):
+        data = self.objects.get(f"{Bucket}/{Key}")
+        if data is None:
+            raise Exception(f"NoSuchKey: {Bucket}/{Key}")
+        return {"Body": io.BytesIO(data)}
+
+    def put_object(self, Bucket, Key, Body, ContentType=None):
+        self.objects[f"{Bucket}/{Key}"] = Body if isinstance(Body, bytes) else Body.encode()
+
+
+def test_worker_process_lap_e2e():
+    from analytics.worker import AnalyticsWorker
+
+    parquet_data = _make_test_parquet(1800)
+
+    worker = AnalyticsWorker.__new__(AnalyticsWorker)
+    worker.s3 = FakeS3()
+    worker.bronze_bucket = "line-bronze"
+    worker.silver_bucket = "line-silver"
+    worker.gold_bucket = "line-gold"
+    worker.track_db = None
+
+    from analytics.tracks import TrackDatabase
+    worker.track_db = TrackDatabase(None)
+
+    worker.s3.objects["line-bronze/bronze/telemetry/sess-e2e/2026/05/12/lap-001-abc12345.parquet"] = parquet_data
+
+    event = {
+        "session_id": "sess-e2e",
+        "lap_number": 1,
+        "s3_key": "bronze/telemetry/sess-e2e/2026/05/12/lap-001-abc12345.parquet",
+    }
+    worker.process_lap(event)
+
+    silver_key = "line-silver/laps/sess-e2e/001/metrics.json"
+    assert silver_key in worker.s3.objects
+
+    metrics = json.loads(worker.s3.objects[silver_key])
+    assert metrics["session_id"] == "sess-e2e"
+    assert metrics["lap_number"] == 1
+    assert metrics["frame_count"] == 1800
+    assert metrics["total_distance_m"] > 0
+    assert metrics["top_speed"] > 0
+    assert metrics["brake_count"] >= 0
+    assert 0 <= metrics["throttle_pct"] <= 100
+    assert 0 <= metrics["brake_pct"] <= 100
+    assert len(metrics["avg_tire_temps"]) == 4
+    assert metrics["fuel_used"] > 0
+
+    assert "corners" in metrics
+    assert "classified_corners" in metrics
+    assert "braking" in metrics
+    assert metrics["braking"]["avg_deceleration_g"] >= 0
+    assert metrics["braking"]["total_brake_distance_m"] >= 0
+    assert "stability" in metrics
+    assert metrics["stability"]["stability_score"] >= 0
+    assert "aligned" in metrics
+    assert len(metrics["aligned"]["distance"]) == 1000
+    assert len(metrics["aligned"]["speed"]) == 1000
+
+
+def test_worker_process_session_e2e():
+    from analytics.worker import AnalyticsWorker
+    from analytics.tracks import TrackDatabase
+
+    worker = AnalyticsWorker.__new__(AnalyticsWorker)
+    worker.s3 = FakeS3()
+    worker.bronze_bucket = "line-bronze"
+    worker.silver_bucket = "line-silver"
+    worker.gold_bucket = "line-gold"
+    worker.track_db = TrackDatabase(None)
+
+    for lap_num in range(1, 5):
+        parquet_data = _make_test_parquet(1800)
+        bronze_key = f"bronze/telemetry/sess-e2e2/2026/05/12/lap-{lap_num:03d}-abc.parquet"
+        worker.s3.objects[f"line-bronze/{bronze_key}"] = parquet_data
+
+        event = {"session_id": "sess-e2e2", "lap_number": lap_num, "s3_key": bronze_key}
+        worker.process_lap(event)
+
+    for lap_num in range(1, 5):
+        silver_key = f"line-silver/laps/sess-e2e2/{lap_num:03d}/metrics.json"
+        assert silver_key in worker.s3.objects
+
+    session_event = {
+        "session_id": "sess-e2e2",
+        "car_code": 3447,
+        "track_name": "Test Circuit",
+        "lap_count": 4,
+    }
+    worker.process_session_complete(session_event)
+
+    gold_key = "line-gold/sessions/sess-e2e2/summary.json"
+    assert gold_key in worker.s3.objects
+
+    summary = json.loads(worker.s3.objects[gold_key])
+    assert summary["session_id"] == "sess-e2e2"
+    assert summary["car_code"] == 3447
+    assert summary["track_name"] == "Test Circuit"
+    assert summary["lap_count"] == 4
+
+    assert "consistency" in summary
+    assert summary["consistency"]["lap_count"] >= 2
+
+    assert "tyre_degradation" in summary
+    assert len(summary["tyre_degradation"]["avg_temp_per_lap"]) == 4
+
+    assert "fuel_strategy" in summary
+    assert summary["fuel_strategy"]["consumption_per_lap"] > 0
+
+    assert "journal" in summary
+    assert summary["journal"]["total_laps"] == 4
+
+    assert "racing_line" in summary
+    assert summary["racing_line"]["consistency"] > 0
+    assert summary["racing_line"]["deviation_avg_m"] > 0
+
+    assert "fatigue" in summary
+    assert summary["fatigue"]["diagnosis"] in ("stable", "driver_fatigue", "tyre_degradation", "mixed", "insufficient_data")
+
+    assert "time_deltas" in summary
+
+
+def test_worker_steering_int32_handling():
+    parquet_data = _make_test_parquet(600)
+
+    table = pq.read_table(io.BytesIO(parquet_data))
+    df = table.to_pandas()
+
+    assert df["throttle"].dtype in (np.int32, np.int64)
+    assert df["brake"].dtype in (np.int32, np.int64)
+    assert df["steering"].dtype in (np.int32, np.int64)
+
+    assert df["throttle"].min() >= 0
+    assert df["throttle"].max() <= 255
+    assert df["brake"].min() >= 0
+    assert df["brake"].max() <= 255
+    assert df["steering"].min() >= -128
+    assert df["steering"].max() <= 127
+
+    from analytics.stability import analyze_stability
+    x = df["pos_x"].values.astype(float)
+    z = df["pos_z"].values.astype(float)
+    speed = df["speed"].values.astype(float)
+    steering = df["steering"].values.astype(float)
+
+    result = analyze_stability(x, z, speed, steering)
+    assert 0 <= result.stability_score <= 1

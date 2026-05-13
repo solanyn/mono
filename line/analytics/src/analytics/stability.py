@@ -35,9 +35,11 @@ def compute_expected_yaw(
     speed: np.ndarray,
     steering: np.ndarray,
     wheelbase: float = 2.5,
+    max_steer_deg: float = 30.0,
 ) -> np.ndarray:
     speed_ms = speed / 3.6
-    steering_rad = steering * np.pi / 180.0
+    steering_normalized = steering / 128.0
+    steering_rad = steering_normalized * max_steer_deg * np.pi / 180.0
     speed_ms = np.where(speed_ms < 1.0, 1.0, speed_ms)
     expected = speed_ms * np.tan(steering_rad) / wheelbase
     return expected
