@@ -86,28 +86,67 @@ func (s *server) handleGetTelemetry(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	data, err := s.s3.GetLap(r.Context(), sessionID, lapNum)
-	if err != nil {
-		slog.Error("get lap from s3", "session", sessionID, "lap", lapNum, "err", err)
-		http.Error(w, "lap not found", http.StatusNotFound)
-		return
+	offset := 0
+	if o := r.URL.Query().Get("offset"); o != "" {
+		if v, err := strconv.Atoi(o); err == nil && v >= 0 {
+			offset = v
+		}
+	}
+	limit := 0
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+			limit = v
+		}
 	}
 
-	rows, err := storage.ReadParquet(data)
-	if err != nil {
-		slog.Error("read parquet", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
+	cacheKey := "telemetry:" + sessionID + ":" + lapStr
+	var rows []storage.TelemetryRow
+
+	if cachedRaw, ok := s.cache.Get(cacheKey); ok {
+		var err error
+		rows, err = storage.ReadParquet(cachedRaw)
+		if err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		data, err := s.s3.GetLap(r.Context(), sessionID, lapNum)
+		if err != nil {
+			slog.Error("get lap from s3", "session", sessionID, "lap", lapNum, "err", err)
+			http.Error(w, "lap not found", http.StatusNotFound)
+			return
+		}
+		s.cache.Set(cacheKey, data)
+
+		rows, err = storage.ReadParquet(data)
+		if err != nil {
+			slog.Error("read parquet", "err", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	total := len(rows)
+
+	if offset > 0 && offset < len(rows) {
+		rows = rows[offset:]
+	} else if offset >= len(rows) {
+		rows = nil
+	}
+	if limit > 0 && limit < len(rows) {
+		rows = rows[:limit]
 	}
 
 	frames := rowsToFrames(rows, downsample)
 
+	w.Header().Set("Cache-Control", "public, max-age=86400, immutable")
 	writeJSON(w, map[string]interface{}{
 		"session_id": sessionID,
 		"lap_number": lapNum,
 		"frames":     frames,
-		"total":      len(rows),
+		"total":      total,
 		"returned":   len(frames),
+		"offset":     offset,
 	})
 }
 

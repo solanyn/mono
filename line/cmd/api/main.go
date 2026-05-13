@@ -36,6 +36,7 @@ type server struct {
 	coach          *coach.Pipeline
 	database       *db.DB
 	llm            *coach.LLMClient
+	cache          *responseCache
 	cars           []carEntry
 	pushSubs       []webpush.Subscription
 	pushMu         sync.RWMutex
@@ -104,6 +105,7 @@ func main() {
 		coach:          coachPipeline,
 		database:       database,
 		llm:            coach.NewLLMClient(llmEndpoint, llmModel),
+		cache:          newResponseCache(256, 5*time.Minute),
 		vapidPublicKey: vapidPublicKey,
 		vapidPrivate:   vapidPrivateKey,
 	}

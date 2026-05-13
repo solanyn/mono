@@ -5,6 +5,7 @@ import os
 import signal
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 
 import boto3
@@ -44,6 +45,8 @@ class AnalyticsWorker:
         self.gold_bucket = os.environ.get("S3_GOLD_BUCKET", "line-gold")
         self.track_db = TrackDatabase(os.environ.get("TRACK_DATA_DIR", None))
         self.running = True
+        self.max_workers = int(os.environ.get("MAX_WORKERS", "4"))
+        self.executor = ThreadPoolExecutor(max_workers=self.max_workers)
 
     def process_lap(self, event: dict):
         session_id = event.get("session_id", "")
@@ -354,11 +357,16 @@ class AnalyticsWorker:
         signal.signal(signal.SIGINT, shutdown)
         signal.signal(signal.SIGTERM, shutdown)
 
-        logger.info("analytics worker started", extra={"topics": topics, "group": group})
+        logger.info("analytics worker started", extra={"topics": topics, "group": group, "workers": self.max_workers})
+
+        pending_futures = []
 
         while self.running:
-            msg = consumer.poll(1.0)
+            msg = consumer.poll(0.5)
             if msg is None:
+                if pending_futures:
+                    self._drain_futures(pending_futures, consumer)
+                    pending_futures = []
                 continue
             if msg.error():
                 if msg.error().code() == KafkaError._PARTITION_EOF:
@@ -371,16 +379,37 @@ class AnalyticsWorker:
                 topic = msg.topic()
 
                 if topic == "line.lap.written":
-                    self.process_lap(event)
+                    future = self.executor.submit(self.process_lap, event)
+                    pending_futures.append((future, msg))
                 elif topic == "line.session.complete":
+                    if pending_futures:
+                        self._drain_futures(pending_futures, consumer)
+                        pending_futures = []
                     self.process_session_complete(event)
+                    consumer.commit(msg)
 
-                consumer.commit(msg)
+                if len(pending_futures) >= self.max_workers:
+                    self._drain_futures(pending_futures, consumer)
+                    pending_futures = []
+
             except Exception as e:
                 logger.error("processing error: %s", e, exc_info=True)
 
+        if pending_futures:
+            self._drain_futures(pending_futures, consumer)
+        self.executor.shutdown(wait=True)
         consumer.close()
         logger.info("analytics worker stopped")
+
+    def _drain_futures(self, futures_and_msgs, consumer):
+        for future, msg in futures_and_msgs:
+            try:
+                future.result(timeout=120)
+            except Exception as e:
+                logger.error("lap processing failed: %s", e, exc_info=True)
+        if futures_and_msgs:
+            _, last_msg = futures_and_msgs[-1]
+            consumer.commit(last_msg)
 
 
 if __name__ == "__main__":
