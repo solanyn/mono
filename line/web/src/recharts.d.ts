@@ -7,6 +7,9 @@ declare module 'recharts' {
     width?: number
     height?: number
     margin?: { top?: number; right?: number; bottom?: number; left?: number }
+    onMouseDown?: (e: unknown) => void
+    onMouseMove?: (e: unknown) => void
+    onMouseUp?: (e: unknown) => void
   }
   export const LineChart: FC<LineChartProps>
 
@@ -18,6 +21,7 @@ declare module 'recharts' {
     strokeWidth?: number
     strokeDasharray?: string
     opacity?: number
+    animationDuration?: number
   }
   export const Line: FC<LineProps>
 
@@ -50,7 +54,7 @@ declare module 'recharts' {
   export interface TooltipProps {
     contentStyle?: object
     formatter?: (...args: unknown[]) => unknown
-    labelFormatter?: (label: string) => string
+    labelFormatter?: (label: string | number) => string
   }
   export const Tooltip: FC<TooltipProps>
 
@@ -60,6 +64,18 @@ declare module 'recharts' {
     children?: React.ReactNode
   }
   export const ResponsiveContainer: FC<ResponsiveContainerProps>
+
+  export interface ReferenceAreaProps {
+    x1?: string | number
+    x2?: string | number
+    y1?: string | number
+    y2?: string | number
+    stroke?: string
+    strokeOpacity?: number
+    fill?: string
+    fillOpacity?: number
+  }
+  export const ReferenceArea: FC<ReferenceAreaProps>
 
   export interface ScatterChartProps {
     data?: unknown[]

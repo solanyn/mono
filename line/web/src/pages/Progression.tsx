@@ -124,7 +124,7 @@ export function ProgressionPage() {
                 <Tooltip
                   contentStyle={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '6px', fontSize: '11px' }}
                   formatter={(value: unknown) => [`${Number(value).toFixed(3)}s`, 'Best Lap']}
-                  labelFormatter={(label: string) => label}
+                  labelFormatter={(label) => String(label)}
                 />
                 <Line type="monotone" dataKey="bestLap" stroke="var(--color-accent)" dot={{ r: 3, fill: 'var(--color-accent)' }} strokeWidth={2} />
               </LineChart>

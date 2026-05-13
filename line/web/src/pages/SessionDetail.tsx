@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useParams, Link } from 'react-router'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Line } from '@react-three/drei'
@@ -6,6 +6,11 @@ import * as THREE from 'three'
 import clsx from 'clsx'
 import { fetchLaps, fetchTelemetry, fetchLapMetrics, fetchSessionSummary, fetchSession, fetchReferenceLapTelemetry, setReferenceLap, fetchJournal, generateJournal, fetchLapBraking, fetchLapStability, fetchRacingLine, fetchFatigue, fetchTimeDeltas, type Lap, type TelemetryFrame, type LapMetrics, type SessionSummary, type Journal, type BrakingAnalysis, type StabilityAnalysis, type RacingLineAnalysis, type FatigueAnalysis, type TimeDeltaEntry } from '../api'
 import { TelemetryChart } from '../TelemetryChart'
+import { LapListSkeleton, ChartSkeleton, MetricCardSkeleton } from '../components/Skeleton'
+import { useSwipe } from '../hooks/useSwipe'
+
+const TABS = ['track', 'metrics', 'analytics', 'summary', 'journal'] as const
+type Tab = typeof TABS[number]
 
 export function SessionDetail() {
   const { id } = useParams<{ id: string }>()
@@ -18,7 +23,8 @@ export function SessionDetail() {
   const [metrics, setMetrics] = useState<LapMetrics | null>(null)
   const [summary, setSummary] = useState<SessionSummary | null>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'track' | 'metrics' | 'analytics' | 'summary' | 'journal'>('track')
+  const [telemetryLoading, setTelemetryLoading] = useState(false)
+  const [tab, setTab] = useState<Tab>('track')
   const [session, setSession] = useState<{ car_code: number; track_id?: string } | null>(null)
   const [refSaving, setRefSaving] = useState(false)
   const [journal, setJournal] = useState<Journal | null>(null)
@@ -53,10 +59,13 @@ export function SessionDetail() {
 
   useEffect(() => {
     if (!id || selectedLap === null) return
-    fetchTelemetry(id, selectedLap, 2).then(({ frames }) => setFrames(frames ?? []))
-    fetchLapMetrics(id, selectedLap).then(setMetrics).catch(() => setMetrics(null))
-    fetchLapBraking(id, selectedLap).then(setBraking).catch(() => setBraking(null))
-    fetchLapStability(id, selectedLap).then(setStability).catch(() => setStability(null))
+    setTelemetryLoading(true)
+    Promise.all([
+      fetchTelemetry(id, selectedLap, 2).then(({ frames }) => setFrames(frames ?? [])),
+      fetchLapMetrics(id, selectedLap).then(setMetrics).catch(() => setMetrics(null)),
+      fetchLapBraking(id, selectedLap).then(setBraking).catch(() => setBraking(null)),
+      fetchLapStability(id, selectedLap).then(setStability).catch(() => setStability(null)),
+    ]).finally(() => setTelemetryLoading(false))
   }, [id, selectedLap])
 
   useEffect(() => {
@@ -68,10 +77,37 @@ export function SessionDetail() {
     if (compareLap === null) setCompareFrames([])
   }, [compareLap])
 
+  const handleTabKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const idx = TABS.indexOf(tab)
+    if (e.key === 'ArrowRight') {
+      e.preventDefault()
+      setTab(TABS[(idx + 1) % TABS.length])
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault()
+      setTab(TABS[(idx - 1 + TABS.length) % TABS.length])
+    }
+  }, [tab])
+
+  const swipeHandlers = useSwipe({
+    onSwipeLeft: () => {
+      const idx = TABS.indexOf(tab)
+      if (idx < TABS.length - 1) setTab(TABS[idx + 1])
+    },
+    onSwipeRight: () => {
+      const idx = TABS.indexOf(tab)
+      if (idx > 0) setTab(TABS[idx - 1])
+    },
+  })
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      <div className="flex flex-col md:flex-row h-full">
+        <aside className="w-full md:w-52 border-b md:border-b-0 md:border-r border-border">
+          <LapListSkeleton />
+        </aside>
+        <div className="flex-1 p-4">
+          <ChartSkeleton />
+        </div>
       </div>
     )
   }
@@ -80,19 +116,23 @@ export function SessionDetail() {
 
   return (
     <div className="flex flex-col md:flex-row h-full">
-      <aside className="w-full md:w-52 border-b md:border-b-0 md:border-r border-border overflow-auto p-3 flex md:flex-col gap-1 max-h-24 md:max-h-none">
+      <aside className="w-full md:w-52 border-b md:border-b-0 md:border-r border-border overflow-auto p-3 flex md:flex-col gap-1 max-h-24 md:max-h-none" aria-label="Lap list" role="listbox" aria-activedescendant={selectedLap !== null ? `lap-${selectedLap}` : undefined}>
         <h3 className="hidden md:block text-xs font-medium text-text-muted uppercase tracking-wider mb-2">Laps</h3>
         {laps.length === 0 && <p className="text-xs text-text-dim">No laps yet</p>}
         {laps.map((lap) => (
           <button
             key={lap.lap_number}
+            id={`lap-${lap.lap_number}`}
+            role="option"
+            aria-selected={selectedLap === lap.lap_number}
+            aria-label={`Lap ${lap.lap_number}, ${formatLapTime(lap.time_ms)}${lap.lap_number === bestLap?.lap_number ? ', best lap' : ''}`}
             onClick={() => setSelectedLap(lap.lap_number)}
             onContextMenu={(e) => {
               e.preventDefault()
               setCompareLap(compareLap === lap.lap_number ? null : lap.lap_number)
             }}
             className={clsx(
-              'flex justify-between items-center w-full px-2.5 py-1.5 rounded text-xs transition-colors text-left',
+              'flex justify-between items-center w-full px-2.5 py-1.5 rounded text-xs transition-all duration-150 text-left',
               selectedLap === lap.lap_number
                 ? 'bg-accent-dim border border-accent/50 text-text'
                 : compareLap === lap.lap_number
@@ -101,7 +141,7 @@ export function SessionDetail() {
             )}
           >
             <span className="flex items-center gap-1.5">
-              {lap.lap_number === bestLap?.lap_number && <span className="text-yellow text-[10px]">&#9733;</span>}
+              {lap.lap_number === bestLap?.lap_number && <span className="text-yellow text-[10px]" aria-hidden="true">&#9733;</span>}
               Lap {lap.lap_number}
             </span>
             <span className={clsx(
@@ -113,18 +153,22 @@ export function SessionDetail() {
           </button>
         ))}
         {laps.length > 1 && (
-          <p className="text-[10px] text-text-dim mt-2 px-1">Right-click a lap to compare</p>
+          <p className="text-[10px] text-text-dim mt-2 px-1" aria-hidden="true">Right-click a lap to compare</p>
         )}
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0">
-        <div className="flex items-center gap-1 px-4 py-2 border-b border-border">
-          {(['track', 'metrics', 'analytics', 'summary', 'journal'] as const).map((t) => (
+      <div className="flex-1 flex flex-col min-w-0" {...swipeHandlers}>
+        <div className="flex items-center gap-1 px-4 py-2 border-b border-border overflow-x-auto" role="tablist" aria-label="Session detail tabs" onKeyDown={handleTabKeyDown}>
+          {TABS.map((t) => (
             <button
               key={t}
+              role="tab"
+              aria-selected={tab === t}
+              aria-controls={`tabpanel-${t}`}
+              tabIndex={tab === t ? 0 : -1}
               onClick={() => setTab(t)}
               className={clsx(
-                'px-3 py-1 rounded text-xs font-medium transition-colors capitalize',
+                'px-3 py-1 rounded text-xs font-medium transition-all duration-150 capitalize whitespace-nowrap',
                 tab === t ? 'bg-accent/15 text-accent' : 'text-text-muted hover:text-text',
               )}
             >
@@ -134,14 +178,14 @@ export function SessionDetail() {
           {selectedLap !== null && (
             <Link
               to={`/sessions/${id}/replay?lap=${selectedLap}`}
-              className="px-3 py-1 rounded text-xs font-medium text-text-muted hover:text-accent transition-colors"
+              className="px-3 py-1 rounded text-xs font-medium text-text-muted hover:text-accent transition-colors whitespace-nowrap"
             >
               Replay
             </Link>
           )}
           <Link
             to={`/sessions/${id}/briefing`}
-            className="px-3 py-1 rounded text-xs font-medium text-text-muted hover:text-accent transition-colors"
+            className="px-3 py-1 rounded text-xs font-medium text-text-muted hover:text-accent transition-colors whitespace-nowrap"
           >
             Briefing
           </Link>
@@ -168,25 +212,31 @@ export function SessionDetail() {
                 setRefSaving(false)
               }}
               disabled={refSaving}
-              className="px-3 py-1 rounded text-xs font-medium text-text-muted hover:text-green transition-colors disabled:opacity-50"
+              className="px-3 py-1 rounded text-xs font-medium text-text-muted hover:text-green transition-colors disabled:opacity-50 whitespace-nowrap"
+              aria-label="Set current lap as reference"
             >
               {refSaving ? 'Saving...' : 'Set as Reference'}
             </button>
           )}
           {refFrames.length > 0 && (
-            <span className="text-[10px] text-green ml-1">ref loaded</span>
+            <span className="text-[10px] text-green ml-1" aria-label="Reference lap loaded">ref loaded</span>
           )}
           {compareLap !== null && (
-            <span className="ml-auto text-xs text-orange">
+            <span className="ml-auto text-xs text-orange whitespace-nowrap">
               Comparing with Lap {compareLap}
-              <button onClick={() => setCompareLap(null)} className="ml-2 text-text-dim hover:text-text">&times;</button>
+              <button onClick={() => setCompareLap(null)} className="ml-2 text-text-dim hover:text-text" aria-label="Clear comparison">&times;</button>
             </span>
           )}
         </div>
 
         {tab === 'track' && (
-          <div className="flex-1 flex flex-col min-h-0">
-            <div className="flex-1 min-h-0 bg-surface">
+          <div id="tabpanel-track" role="tabpanel" aria-labelledby="tab-track" className="flex-1 flex flex-col min-h-0 animate-fade-in">
+            <div className="flex-1 min-h-0 bg-surface relative" aria-label="3D track visualization">
+              {telemetryLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-bg/60 backdrop-blur-sm z-10">
+                  <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
               <Canvas camera={{ position: [0, 200, 200], fov: 60 }}>
                 <ambientLight intensity={0.4} />
                 <directionalLight position={[100, 200, 100]} intensity={0.8} />
@@ -203,40 +253,44 @@ export function SessionDetail() {
           </div>
         )}
 
-        {tab === 'metrics' && metrics && (
-          <div className="flex-1 overflow-auto p-5">
-            <MetricsPanel metrics={metrics} />
-          </div>
-        )}
-
-        {tab === 'metrics' && !metrics && (
-          <div className="flex-1 flex items-center justify-center text-text-dim text-sm">
-            No metrics available for this lap
+        {tab === 'metrics' && (
+          <div id="tabpanel-metrics" role="tabpanel" aria-labelledby="tab-metrics" className="flex-1 overflow-auto p-5 animate-fade-in">
+            {telemetryLoading ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {Array.from({ length: 8 }).map((_, i) => <MetricCardSkeleton key={i} />)}
+              </div>
+            ) : metrics ? (
+              <MetricsPanel metrics={metrics} />
+            ) : (
+              <div className="flex items-center justify-center h-40 text-text-dim text-sm">
+                No metrics available for this lap
+              </div>
+            )}
           </div>
         )}
 
         {tab === 'analytics' && (
-          <div className="flex-1 overflow-auto p-5">
+          <div id="tabpanel-analytics" role="tabpanel" aria-labelledby="tab-analytics" className="flex-1 overflow-auto p-5 animate-fade-in">
             <AnalyticsPanel braking={braking} stability={stability} racingLine={racingLine} fatigue={fatigue} timeDeltas={timeDeltas} />
           </div>
         )}
 
-        {tab === 'summary' && summary && (
-          <div className="flex-1 overflow-auto p-5">
-            <SummaryPanel summary={summary} />
-          </div>
-        )}
-
-        {tab === 'summary' && !summary && (
-          <div className="flex-1 flex items-center justify-center text-text-dim text-sm">
-            No session summary available yet
+        {tab === 'summary' && (
+          <div id="tabpanel-summary" role="tabpanel" aria-labelledby="tab-summary" className="flex-1 overflow-auto p-5 animate-fade-in">
+            {summary ? (
+              <SummaryPanel summary={summary} />
+            ) : (
+              <div className="flex items-center justify-center h-40 text-text-dim text-sm">
+                No session summary available yet
+              </div>
+            )}
           </div>
         )}
 
         {tab === 'journal' && (
-          <div className="flex-1 overflow-auto p-5">
+          <div id="tabpanel-journal" role="tabpanel" aria-labelledby="tab-journal" className="flex-1 overflow-auto p-5 animate-fade-in">
             {journal ? (
-              <div className="bg-surface-2 rounded-lg border border-border p-5">
+              <div className="bg-surface-2 rounded-lg border border-border p-5 animate-scale-in">
                 <div className="flex items-center justify-between mb-4">
                   <h4 className="text-xs font-medium text-text-muted uppercase tracking-wider">Session Journal</h4>
                   <span className="text-[10px] text-text-dim">{new Date(journal.created_at).toLocaleString()}</span>
@@ -259,7 +313,8 @@ export function SessionDetail() {
                     setJournalLoading(false)
                   }}
                   disabled={journalLoading}
-                  className="px-4 py-2 rounded-lg bg-accent/15 text-accent text-sm font-medium hover:bg-accent/25 transition-colors disabled:opacity-50"
+                  className="px-4 py-2 rounded-lg bg-accent/15 text-accent text-sm font-medium hover:bg-accent/25 transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-accent/50"
+                  aria-label="Generate session journal using AI"
                 >
                   {journalLoading ? 'Generating...' : 'Generate Journal'}
                 </button>

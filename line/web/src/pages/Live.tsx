@@ -14,6 +14,7 @@ export function LivePage() {
   const [coachMessages, setCoachMessages] = useState<CoachMessage[]>([])
   const [cars, setCars] = useState<Car[]>([])
   const [coachEnabled, setCoachEnabled] = useState(true)
+  const [connected, setConnected] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
   const coachRef = useRef<WebSocket | null>(null)
   const audioCtxRef = useRef<AudioContext | null>(null)
@@ -46,6 +47,8 @@ export function LivePage() {
       },
       (s) => setStatus(s),
     )
+    ws.onopen = () => setConnected(true)
+    ws.onclose = () => setConnected(false)
     wsRef.current = ws
     return () => ws.close()
   }, [])
@@ -66,20 +69,28 @@ export function LivePage() {
 
   return (
     <div className="flex flex-col-reverse md:flex-row h-full">
-      <div className="flex-1 min-h-0 bg-surface">
+      <div className="flex-1 min-h-0 bg-surface relative" role="img" aria-label="Live track visualization">
         <Canvas camera={{ position: [0, 200, 200], fov: 60 }}>
           <ambientLight intensity={0.4} />
           <directionalLight position={[100, 200, 100]} intensity={0.8} />
           {frames.length > 1 && <LiveTrail frames={frames} />}
-          <gridHelper args={[800, 40, '#333333', '#222222']} />
+          <gridHelper args={[800, 40, '#333', '#222222']} />
           <OrbitControls enableDamping dampingFactor={0.1} maxPolarAngle={Math.PI / 2.1} />
         </Canvas>
+        {!connected && (
+          <div className="absolute inset-0 flex items-center justify-center bg-bg/80 backdrop-blur-sm animate-fade-in">
+            <div className="text-center space-y-2">
+              <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="text-xs text-text-muted">Connecting to live feed...</p>
+            </div>
+          </div>
+        )}
       </div>
-      <aside className="w-full md:w-72 border-b md:border-b-0 md:border-l border-border p-4 overflow-auto flex flex-col gap-5 max-h-64 md:max-h-none">
+      <aside className="w-full md:w-72 border-b md:border-b-0 md:border-l border-border p-4 overflow-auto flex flex-col gap-5 max-h-64 md:max-h-none" aria-label="Live telemetry sidebar">
         <StatusBadge active={status.active} />
 
         {status.active && (
-          <div className="text-xs text-text-muted space-y-1">
+          <div className="text-xs text-text-muted space-y-1 animate-fade-in">
             <div>Car: <span className="text-text font-mono">{getCarName(cars, status.car_code ?? 0)}</span></div>
             <div>Lap: <span className="text-text font-mono">{status.current_lap}</span></div>
             {status.track_id && <div>Track: <span className="text-text">{status.track_id}</span></div>}
@@ -87,7 +98,7 @@ export function LivePage() {
         )}
 
         {latest && (
-          <div>
+          <div className="animate-fade-in" aria-label="Current telemetry values" role="region">
             <h3 className="text-xs font-medium text-text-muted mb-3 uppercase tracking-wider">Telemetry</h3>
             <div className="space-y-2">
               <Gauge label="Speed" value={latest.speed} unit="km/h" max={350} color="bg-accent" />
@@ -95,8 +106,8 @@ export function LivePage() {
               <Gauge label="Throttle" value={latest.throttle * 100} unit="%" max={100} color="bg-green" />
               <Gauge label="Brake" value={latest.brake * 100} unit="%" max={100} color="bg-red" />
             </div>
-            <div className="mt-3 text-center">
-              <span className="text-3xl font-mono font-bold text-text">{latest.gear}</span>
+            <div className="mt-3 text-center" aria-label={`Gear ${latest.gear}`}>
+              <span className="text-3xl font-mono font-bold text-text transition-all duration-75">{latest.gear}</span>
               <span className="text-xs text-text-muted ml-1">gear</span>
             </div>
           </div>
@@ -107,20 +118,22 @@ export function LivePage() {
             <h3 className="text-xs font-medium text-text-muted uppercase tracking-wider">Coach</h3>
             <button
               onClick={() => setCoachEnabled((v) => !v)}
+              aria-pressed={coachEnabled}
+              aria-label={`Coach ${coachEnabled ? 'enabled' : 'disabled'}`}
               className={clsx(
-                'px-2 py-0.5 rounded text-xs font-medium transition-colors',
+                'px-2 py-0.5 rounded text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-accent/50',
                 coachEnabled ? 'bg-green text-white' : 'bg-border-2 text-text-muted',
               )}
             >
               {coachEnabled ? 'ON' : 'OFF'}
             </button>
           </div>
-          <div className="space-y-2 max-h-48 overflow-auto">
+          <div className="space-y-2 max-h-48 overflow-auto" role="log" aria-label="Coach messages" aria-live="polite">
             {coachMessages.length === 0 && (
               <p className="text-xs text-text-dim">Waiting for coaching events...</p>
             )}
             {coachMessages.map((msg, i) => (
-              <div key={i} className="text-xs text-text-muted border-l-2 border-accent pl-2">
+              <div key={i} className="text-xs text-text-muted border-l-2 border-accent pl-2 animate-slide-in">
                 <div className="text-text">{msg.text}</div>
                 <div className="text-text-dim mt-0.5">{msg.latency_ms}ms</div>
               </div>
@@ -156,11 +169,11 @@ function LiveTrail({ frames }: { frames: TelemetryFrame[] }) {
 
 function StatusBadge({ active }: { active: boolean }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2" role="status" aria-label={active ? 'Session active' : 'Waiting for session'}>
       <div className={clsx(
-        'w-2.5 h-2.5 rounded-full',
-        active ? 'bg-green shadow-[0_0_8px_var(--color-green)]' : 'bg-text-dim',
-      )} />
+        'w-2.5 h-2.5 rounded-full transition-colors',
+        active ? 'bg-green shadow-[0_0_8px_var(--color-green)] animate-pulse' : 'bg-text-dim',
+      )} aria-hidden="true" />
       <span className={clsx('text-sm', active ? 'text-green' : 'text-text-dim')}>
         {active ? 'Live' : 'Waiting for session'}
       </span>
@@ -171,7 +184,7 @@ function StatusBadge({ active }: { active: boolean }) {
 function Gauge({ label, value, unit, max, color }: { label: string; value: number; unit: string; max: number; color: string }) {
   const pct = Math.min(100, (value / max) * 100)
   return (
-    <div>
+    <div role="meter" aria-label={label} aria-valuenow={Math.round(value)} aria-valuemin={0} aria-valuemax={max}>
       <div className="flex justify-between text-xs mb-0.5">
         <span className="text-text-muted">{label}</span>
         <span className="text-text font-mono">{Math.round(value)}{unit && ` ${unit}`}</span>
