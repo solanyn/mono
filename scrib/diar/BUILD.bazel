@@ -1,0 +1,12 @@
+load("@rules_swift_package_manager//swiftpkg:defs.bzl", "swift_package")
+load("@build_bazel_rules_swift//swift:swift.bzl", "swift_binary")
+
+swift_binary(
+    name = "scrib-diar",
+    srcs = glob(["Sources/**/*.swift"]),
+    deps = [
+        "@swiftpkg_hummingbird//:Hummingbird",
+        "@swiftpkg_fluid_audio//:FluidAudio",
+    ],
+    visibility = ["//visibility:public"],
+)
