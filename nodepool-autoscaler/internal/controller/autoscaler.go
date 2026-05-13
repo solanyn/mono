@@ -286,9 +286,11 @@ func matchesSelector(pod *corev1.Pod, selector v1alpha1.PodSelector) bool {
 	for _, required := range selector.Tolerations {
 		found := false
 		for _, t := range pod.Spec.Tolerations {
-			if t.Key == required.Key && t.Value == required.Value && string(t.Effect) == required.Effect {
-				found = true
-				break
+			if t.Key == required.Key && string(t.Effect) == required.Effect {
+				if required.Value == "" || t.Value == required.Value {
+					found = true
+					break
+				}
 			}
 		}
 		if !found {
