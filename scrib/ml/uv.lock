@@ -1388,7 +1388,7 @@ wheels = [
 ]
 
 [[package]]
-name = "scrib-audio"
+name = "scrib-ml"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

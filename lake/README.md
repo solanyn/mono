@@ -1,58 +1,37 @@
 # lake
 
-Medallion architecture data lake (bronze/silver/gold S3 buckets) with event-driven promotion via Redpanda.
-
-## Architecture
+Medallion architecture data lake. Ingests Australian macro-financial data into S3 (Garage), promotes through bronze/silver/gold layers via Redpanda events.
 
 ```mermaid
 graph LR
+    sources["Data Sources<br/>RBA, ABS, AEMO,<br/>RSS, Reddit,<br/>Domain, NSW VG"] --> ingest
     subgraph lake["lake (Go)"]
-        ingest["ingest<br/>(cron)"]
-        promote["promote"]
-        aggregate["aggregate"]
+        ingest --> promote --> aggregate
     end
-
     subgraph s3["S3 (Garage)"]
-        bronze["bronze"]
-        silver["silver"]
-        gold["gold"]
+        bronze --> silver --> gold
     end
-
-    redpanda["Redpanda"]
-    lakemcp["lake-mcp<br/>(Python)"]
-
     ingest -->|write| bronze
-    ingest -->|bronze.written| redpanda
-    redpanda --> promote
     promote -->|write| silver
-    redpanda --> aggregate
     aggregate -->|write| gold
-    lakemcp -->|read| silver
-    lakemcp -->|read| gold
+    redpanda["Redpanda"] -.->|events| promote
+    redpanda -.->|events| aggregate
+    ingest -.->|publish| redpanda
+    mcp["mcp/ (Python)"] -->|read| silver
+    mcp -->|read| gold
 ```
 
-## Data Sources
+## Services
 
-- **RBA** — Reserve Bank of Australia statistical tables
-- **ABS** — Australian Bureau of Statistics
-- **AEMO** — Australian Energy Market Operator
-- **RSS** — RSS feed collector with full article extraction
-- **Reddit** — Subreddit data
-- **Domain** — Property listings
-- **NSW VG** — NSW Valuer General
+| Target | What |
+|--------|------|
+| `//lake:ingest` | Cron-based data ingestion from external sources |
+| `//lake:promote` | Event-driven bronze → silver promotion |
+| `//lake:aggregate` | Event-driven silver → gold aggregation |
+| `mcp/` | MCP server exposing data to AI agents (FastMCP + Pydantic AI) |
 
 ## Build
 
 ```bash
 bazel build //lake:ingest //lake:promote //lake:aggregate
-```
-
-## Deploy
-
-Container images built via `rules_oci` and pushed to GHCR. Deployed to k8s via FluxCD.
-
-```bash
-bazel run //lake:push_ingest -- --tag latest
-bazel run //lake:push_promote -- --tag latest
-bazel run //lake:push_aggregate -- --tag latest
 ```

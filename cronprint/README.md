@@ -1,31 +1,20 @@
 # cronprint
 
-Scheduled printing service using CUPS.
+Scheduled document printing service. Runs cron jobs that send PDFs to a CUPS printer via IPP.
 
-## Development
-
-```bash
-bazelisk run //cronprint:app
+```mermaid
+graph LR
+    cron["Cron Scheduler"] --> render["Render PDF"]
+    render --> cups["CUPS/IPP Printer"]
+    api["HTTP API :8080"] --> cron
 ```
 
-## Usage
-
-Service runs on `http://0.0.0.0:8080`
-
-## Configuration
-
-Configure via environment variables:
+## Run
 
 ```bash
-export CRONPRINT_HOST=0.0.0.0
-export CRONPRINT_PORT=8080
-export CRONPRINT_TIMEZONE=America/New_York
-export CRONPRINT_JOB_DAILY_SCHEDULE="0 9 * * MON-FRI"
-export CRONPRINT_JOB_DAILY_FILE="/tmp/report.pdf"
+bazel run //cronprint:app
 ```
 
-## Container
+## Config
 
-```bash
-bazelisk build //cronprint:image
-```
+Env vars: `CRONPRINT_HOST`, `CRONPRINT_PORT`, `CRONPRINT_TIMEZONE`, `CRONPRINT_JOB_DAILY_SCHEDULE`, `CRONPRINT_JOB_DAILY_FILE`

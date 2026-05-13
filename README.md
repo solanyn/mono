@@ -1,15 +1,15 @@
 # mono
 
-Personal monorepo built with Bazel.
+Personal monorepo built with [Bazel](https://bazel.build/) (Aspect CLI).
 
-## Projects
-
-| Project | Description |
-|---|---|
-| [lake](./lake/) | Data lake ingest/promote/aggregate pipeline — RBA, ABS, AEMO, RSS, Reddit, Domain, NSW VG |
-| [lake-mcp](./lake-mcp/) | MCP server for querying the data lake with Pydantic AI |
-| [yield](./yield/) | Property analysis tool — rent fairness, investment tracking, listing analysis |
-| [libs/datalake](./libs/datalake/) | Shared S3 parquet read/write library |
-| [kobo](./kobo/) | E-ink dashboard for Kobo e-reader — server renders markdown to PNG, client writes to framebuffer |
-| [cronprint](./cronprint/) | Scheduled printing service using IPP |
-| [website](./website/) | Personal blog built with Astro |
+| Project | Lang | Description |
+|---------|------|-------------|
+| [cronprint](./cronprint/) | Go | Scheduled printing service (IPP/CUPS) |
+| [kobo](./kobo/) | Go | E-ink dashboard for Kobo e-reader |
+| [lake](./lake/) | Go + Python | Data lake platform (pipeline + MCP server) |
+| [libs/datalake](./libs/datalake/) | Python | Shared S3 parquet library |
+| [line](./line/) | Go + TS | Market data platform |
+| [resume](./resume/) | Typst | Resume/CV |
+| [scrib](./scrib/) | Go + Python | Meeting audio capture & transcription |
+| [website](./website/) | Astro 6 | Personal blog (goyangi.io) |
+| [yield](./yield/) | Go + Python + TS | Property analysis tool |
