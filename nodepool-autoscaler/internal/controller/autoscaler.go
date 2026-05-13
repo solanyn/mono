@@ -253,12 +253,15 @@ func calculateDesiredSize(pods []corev1.Pod, allocatableCPUMillis int64) int64 {
 
 func (r *Reconciler) listPendingPods(ctx context.Context, selector v1alpha1.PodSelector) ([]corev1.Pod, error) {
 	var podList corev1.PodList
-	if err := r.List(ctx, &podList, client.MatchingFields{"status.phase": "Pending"}); err != nil {
+	if err := r.List(ctx, &podList); err != nil {
 		return nil, err
 	}
 
 	var result []corev1.Pod
 	for _, pod := range podList.Items {
+		if pod.Status.Phase != corev1.PodPending {
+			continue
+		}
 		if !matchesSelector(&pod, selector) {
 			continue
 		}
@@ -283,9 +286,11 @@ func matchesSelector(pod *corev1.Pod, selector v1alpha1.PodSelector) bool {
 	for _, required := range selector.Tolerations {
 		found := false
 		for _, t := range pod.Spec.Tolerations {
-			if t.Key == required.Key && t.Value == required.Value && string(t.Effect) == required.Effect {
-				found = true
-				break
+			if t.Key == required.Key && string(t.Effect) == required.Effect {
+				if required.Value == "" || t.Value == required.Value {
+					found = true
+					break
+				}
 			}
 		}
 		if !found {
