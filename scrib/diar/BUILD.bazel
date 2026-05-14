@@ -1,0 +1,3 @@
+# Built with Swift Package Manager directly (not Bazel)
+# Build: swift build -c release
+# Binary: .build/release/scrib-diar
