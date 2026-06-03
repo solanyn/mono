@@ -2264,7 +2264,7 @@ oci.pull(
 
 oci.pull(
     name = "distroless_base",
-    digest = "sha256:aeb2e6aa676c55b201822f3b88c01c8a10b0a72ac1b2bdac8f5958e2eb2e71e9",
+    digest = "sha256:0b38c2ae0e6a2c1df28d8cada49a691b83d642286f21b4e49a598a2588612fb2",
     image = "gcr.io/distroless/base-debian12",
     platforms = [
         "linux/amd64",
