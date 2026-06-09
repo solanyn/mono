@@ -91,6 +91,7 @@ go_library(
         ":api_lib",
         ":controller_lib",
         ":metrics_lib",
+        "@com_github_go_logr_logr//:logr",
         "@io_k8s_api//core/v1:core",
         "@io_k8s_apimachinery//pkg/runtime",
         "@io_k8s_apimachinery//pkg/util/runtime",
@@ -99,6 +100,7 @@ go_library(
         "@io_k8s_sigs_controller_runtime//pkg/cache",
         "@io_k8s_sigs_controller_runtime//pkg/client",
         "@io_k8s_sigs_controller_runtime//pkg/healthz",
+        "@io_k8s_sigs_controller_runtime//pkg/log",
         "@io_k8s_sigs_controller_runtime//pkg/metrics/server",
     ],
 )
