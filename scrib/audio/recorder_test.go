@@ -132,6 +132,8 @@ func TestTimestampAlignmentWithOffset(t *testing.T) {
 	r := &Recorder{sampleRate: 16000}
 	r.mu.Lock()
 	r.recording = true
+	r.sysReady = true
+	r.sysAnchor = 1.0
 	r.mu.Unlock()
 
 	mic := make([]int16, 160)
@@ -259,6 +261,8 @@ func TestZeroPadLaggingChannel(t *testing.T) {
 	r := &Recorder{sampleRate: 16000}
 	r.mu.Lock()
 	r.recording = true
+	r.sysReady = true
+	r.sysAnchor = 1.0
 	r.mu.Unlock()
 
 	mic := make([]int16, 320)

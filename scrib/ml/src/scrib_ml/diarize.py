@@ -140,12 +140,20 @@ def diarize_array(
     speaker_set: set[str] = set()
     segments: list[DiarSegment] = []
 
+    overall_rms = float(np.sqrt(np.mean(data**2))) if len(data) > 0 else 0.0
+
     for seg in segments_raw:
         speaker = seg.get("speaker", "UNKNOWN")
         start = seg.get("start", 0.0)
         end = seg.get("end", 0.0)
         if (end - start) < min_duration:
             continue
+        start_sample = int(start * sr)
+        end_sample = min(int(end * sr), len(data))
+        if start_sample < end_sample and overall_rms > 0:
+            seg_rms = float(np.sqrt(np.mean(data[start_sample:end_sample] ** 2)))
+            if seg_rms < threshold * overall_rms:
+                continue
         segments.append(DiarSegment(
             speaker=speaker,
             start=round(start, 3),

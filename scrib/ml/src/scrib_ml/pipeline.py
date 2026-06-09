@@ -7,6 +7,7 @@ call that scrib-server can invoke.
 import logging
 from dataclasses import asdict, dataclass, field
 
+import noisereduce as nr
 import numpy as np
 import soundfile as sf
 
@@ -26,8 +27,70 @@ class PipelineResult:
     speaker_embeddings: dict[str, list[float]] = field(default_factory=dict)
 
 
+_TARGET_DBFS = -20.0
+_MAX_GAIN = 20.0
+_MIN_GAIN = 0.1
+_SILENCE_FLOOR_RMS = 1e-6
+_TRIM_THRESHOLD = 0.005
+_TRIM_MIN_SILENCE_SECS = 1.0
+
+
+def _trim_silence(data: np.ndarray, sr: int) -> tuple[np.ndarray, float]:
+    """Trim leading and trailing silence. Returns trimmed data and offset in seconds.
+
+    Only trims silence regions longer than _TRIM_MIN_SILENCE_SECS.
+    Internal silence is preserved for timestamp alignment.
+    """
+    frame_len = int(0.02 * sr)
+    energy = np.array([
+        np.sqrt(np.mean(data[i:i + frame_len] ** 2))
+        for i in range(0, len(data) - frame_len, frame_len)
+    ])
+
+    above = np.where(energy > _TRIM_THRESHOLD)[0]
+    if len(above) == 0:
+        return data, 0.0
+
+    first_voice = above[0] * frame_len
+    last_voice = (above[-1] + 1) * frame_len
+
+    min_samples = int(_TRIM_MIN_SILENCE_SECS * sr)
+    start = first_voice if first_voice > min_samples else 0
+    end = last_voice if (len(data) - last_voice) > min_samples else len(data)
+
+    offset = start / sr
+    return data[start:end], offset
+
+
+def _rms_normalize(data: np.ndarray, target_dbfs: float = _TARGET_DBFS) -> np.ndarray:
+    """Normalize audio RMS to target dBFS. Gain is capped to avoid amplifying noise."""
+    rms = float(np.sqrt(np.mean(data**2)))
+    if rms < _SILENCE_FLOOR_RMS:
+        return data
+    target_rms = 10.0 ** (target_dbfs / 20.0)
+    gain = target_rms / rms
+    gain = max(_MIN_GAIN, min(_MAX_GAIN, gain))
+    normalized = data * gain
+    peak = float(np.max(np.abs(normalized)))
+    if peak > 1.0:
+        normalized = normalized / peak
+    return normalized
+
+
+def _reduce_noise(data: np.ndarray, sr: int) -> np.ndarray:
+    """Apply stationary noise reduction (fan, HVAC, hum). Conservative to preserve speech."""
+    return nr.reduce_noise(
+        y=data,
+        sr=sr,
+        stationary=True,
+        prop_decrease=0.6,
+        n_fft=512,
+        freq_mask_smooth_hz=200,
+    )
+
+
 def _load_and_normalise(audio_path: str) -> tuple[np.ndarray, int]:
-    """Read audio → float32 mono 16kHz. Single normalisation point for the pipeline."""
+    """Read audio → float32 mono 16kHz, trimmed, noise-reduced, RMS-normalized."""
     data, sr = sf.read(audio_path, dtype="float32")
     if data.ndim > 1 and data.shape[1] > 1:
         data = np.mean(data, axis=1)
@@ -37,6 +100,16 @@ def _load_and_normalise(audio_path: str) -> tuple[np.ndarray, int]:
         sr = 16000
     if data.ndim != 1:
         data = data.reshape(-1)
+    original_dur = len(data) / sr
+    data, offset = _trim_silence(data, sr)
+    trimmed_dur = len(data) / sr
+    if offset > 0 or trimmed_dur < original_dur:
+        log.info(
+            "pipeline: trimmed %.1fs silence (offset=%.1fs, %.1fs → %.1fs)",
+            original_dur - trimmed_dur, offset, original_dur, trimmed_dur,
+        )
+    data = _reduce_noise(data, sr)
+    data = _rms_normalize(data)
     return data, sr
 
 
