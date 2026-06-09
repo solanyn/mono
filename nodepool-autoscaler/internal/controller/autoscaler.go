@@ -77,6 +77,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	maxSizeField := nodepool.ParseFieldPath(scaler.Spec.TargetRef.MaxSizeField)
 
 	currentSize, _ := nodepool.GetFieldInt64(obj, sizeField)
+	readyNodes, err := r.countReadyNodes(ctx, scaler.Spec.Selector)
+	if err != nil {
+		r.Log.Error("counting ready nodes", "error", err, "scaler", req.NamespacedName)
+		return ctrl.Result{RequeueAfter: reconcileInterval}, nil
+	}
+	metrics.ReadyNodes.WithLabelValues(req.String()).Set(float64(readyNodes))
+
 	maxSize := scaler.Spec.Scaling.MaxSize
 	if scaler.Spec.TargetRef.MaxSizeField != "" {
 		if crMax, ok := nodepool.GetFieldInt64(obj, maxSizeField); ok && crMax < maxSize {
@@ -113,8 +120,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			desired = 1
 		}
 
-		if desired > currentSize {
-			r.Log.Info("scaling up", "current", currentSize, "desired", desired, "pending_pods", len(pendingPods), "scaler", req.NamespacedName)
+		if desired > readyNodes {
+			newTarget := desired
+			if currentSize > newTarget {
+				newTarget = currentSize
+			}
+			r.Log.Info("scaling up", "current", currentSize, "ready_nodes", readyNodes, "desired", newTarget, "pending_pods", len(pendingPods), "scaler", req.NamespacedName)
 			tc := nodepool.TargetConfig{
 				Group:     targetGVK.Group,
 				Version:   targetGVK.Version,
@@ -123,11 +134,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 				Namespace: scaler.Spec.TargetRef.Namespace,
 				SizeField: sizeField,
 			}
-			if err := nodepool.PatchTargetSize(ctx, r.Client, tc, desired); err != nil {
+			if err := nodepool.PatchTargetSize(ctx, r.Client, tc, newTarget); err != nil {
 				r.Log.Error("patching target size", "error", err)
 				return ctrl.Result{RequeueAfter: reconcileInterval}, nil
 			}
-			metrics.TargetSize.WithLabelValues(req.String()).Set(float64(desired))
+			metrics.TargetSize.WithLabelValues(req.String()).Set(float64(newTarget))
 			metrics.ScaleUpTotal.WithLabelValues(req.String()).Inc()
 			metrics.LastScaleUpTime.WithLabelValues(req.String()).Set(float64(now.Unix()))
 
@@ -308,6 +319,28 @@ func isUnschedulable(pod *corev1.Pod) bool {
 		}
 	}
 	return false
+}
+
+func (r *Reconciler) countReadyNodes(ctx context.Context, selector v1alpha1.PodSelector) (int64, error) {
+	var nodeList corev1.NodeList
+	opts := []client.ListOption{}
+	if len(selector.NodeSelector) > 0 {
+		opts = append(opts, client.MatchingLabels(selector.NodeSelector))
+	}
+	if err := r.List(ctx, &nodeList, opts...); err != nil {
+		return 0, err
+	}
+
+	var count int64
+	for _, node := range nodeList.Items {
+		for _, cond := range node.Status.Conditions {
+			if cond.Type == corev1.NodeReady && cond.Status == corev1.ConditionTrue {
+				count++
+				break
+			}
+		}
+	}
+	return count, nil
 }
 
 func parseGVK(ref v1alpha1.TargetRef) schema.GroupVersionKind {
