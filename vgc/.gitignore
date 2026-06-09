@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 *.egg-info/
 .venv/
+dist/
 node_modules/
 testdata/*.parquet
 .marimo/
