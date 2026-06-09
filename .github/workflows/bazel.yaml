@@ -67,6 +67,7 @@ jobs:
               - 'line/**'
               - 'nodepool-autoscaler/**'
               - 'tools/**'
+              - 'vgc/**'
               - 'yield/**'
             scrib:
               - 'scrib/**'

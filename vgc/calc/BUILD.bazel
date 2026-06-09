@@ -1,0 +1,39 @@
+load("@aspect_rules_js//js:defs.bzl", "js_binary")
+load("@npm//:defs.bzl", "npm_link_all_packages")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
+load("@aspect_bazel_lib//lib:tar.bzl", "tar")
+
+npm_link_all_packages()
+
+js_binary(
+    name = "calc",
+    entry_point = "calc_server.mjs",
+    data = [
+        ":node_modules/@smogon/calc",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+tar(
+    name = "calc_layer",
+    srcs = [":calc"],
+)
+
+oci_image(
+    name = "image",
+    base = "@node_slim_linux_amd64",
+    entrypoint = ["/vgc/calc/calc"],
+    tars = [":calc_layer"],
+)
+
+oci_load(
+    name = "load",
+    image = ":image",
+    repo_tags = ["vgc-calc:latest"],
+)
+
+oci_push(
+    name = "push",
+    image = ":image",
+    repository = "ghcr.io/solanyn/vgc-calc",
+)

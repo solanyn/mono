@@ -1,0 +1,78 @@
+load("@rules_python//python:py_binary.bzl", "py_binary")
+load("@rules_python//python:py_library.bzl", "py_library")
+load("@rules_python//python:py_test.bzl", "py_test")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
+load("@aspect_bazel_lib//lib:tar.bzl", "tar")
+
+py_library(
+    name = "vgc_lib",
+    srcs = glob(
+        ["**/*.py"],
+        exclude = [
+            "**/test_*.py",
+            "tests/**",
+            "reports/**",
+            "pipeline.py",
+        ],
+    ),
+    imports = ["."],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@vgc_pypi//httpx",
+        "@vgc_pypi//pyarrow",
+        "@vgc_pypi//polars",
+        "@vgc_pypi//pyiceberg",
+        "@vgc_pypi//boto3",
+    ],
+)
+
+py_binary(
+    name = "pipeline",
+    srcs = ["pipeline.py"],
+    imports = ["."],
+    main = "pipeline.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":vgc_lib",
+        "@vgc_pypi//marimo",
+    ],
+    data = [
+        "reports/meta_report.py",
+    ],
+)
+
+py_test(
+    name = "test_schema",
+    size = "small",
+    srcs = ["tests/test_schema.py"],
+    imports = ["."],
+    deps = [
+        ":vgc_lib",
+        "@vgc_pypi//pytest",
+    ],
+    args = ["-v"],
+)
+
+tar(
+    name = "pipeline_layer",
+    srcs = [":pipeline"],
+)
+
+oci_image(
+    name = "image",
+    base = "@python_slim_linux_amd64",
+    entrypoint = ["/vgc/pipeline"],
+    tars = [":pipeline_layer"],
+)
+
+oci_load(
+    name = "load",
+    image = ":image",
+    repo_tags = ["vgc-pipeline:latest"],
+)
+
+oci_push(
+    name = "push",
+    image = ":image",
+    repository = "ghcr.io/solanyn/vgc-pipeline",
+)
