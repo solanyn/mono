@@ -1,5 +1,11 @@
-export const onRequest: PagesFunction = async () => {
-	const r2Url = 'https://assets.goyangi.io/vgc/reports/meta-report-latest.html';
+export const onRequest: PagesFunction = async ({ request }) => {
+	const url = new URL(request.url);
+	const period = url.searchParams.get('period');
+	const key = period
+		? `vgc/reports/meta-report-${period}.html`
+		: 'vgc/reports/meta-report-latest.html';
+	const r2Url = `https://assets.goyangi.io/${key}`;
+
 	const response = await fetch(r2Url);
 
 	if (!response.ok) {

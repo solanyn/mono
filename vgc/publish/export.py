@@ -1,10 +1,29 @@
 from __future__ import annotations
 
+import json
 import os
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 
 import boto3
+
+
+def _get_s3_client():
+    endpoint = os.getenv("R2_ENDPOINT")
+    access_key = os.getenv("CLOUDFLARE_R2_ACCESS_KEY_ID")
+    secret_key = os.getenv("CLOUDFLARE_R2_SECRET_ACCESS_KEY")
+
+    if not endpoint or not access_key:
+        raise RuntimeError("R2 credentials not configured (R2_ENDPOINT, CLOUDFLARE_R2_ACCESS_KEY_ID)")
+
+    return boto3.client(
+        "s3",
+        endpoint_url=endpoint,
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
+        region_name="auto",
+    )
 
 
 def export_report(report_path: str, output_path: str, data_dir: str | None = None) -> str:
@@ -24,29 +43,46 @@ def export_report(report_path: str, output_path: str, data_dir: str | None = Non
 
 
 def upload_to_r2(local_path: str, bucket: str, key: str) -> str:
-    endpoint = os.getenv("R2_ENDPOINT")
-    access_key = os.getenv("CLOUDFLARE_R2_ACCESS_KEY_ID")
-    secret_key = os.getenv("CLOUDFLARE_R2_SECRET_ACCESS_KEY")
-
-    if not endpoint or not access_key:
-        raise RuntimeError("R2 credentials not configured (R2_ENDPOINT, CLOUDFLARE_R2_ACCESS_KEY_ID)")
-
-    s3 = boto3.client(
-        "s3",
-        endpoint_url=endpoint,
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        region_name="auto",
-    )
-
+    s3 = _get_s3_client()
     s3.upload_file(
         local_path,
         bucket,
         key,
         ExtraArgs={"ContentType": "text/html", "CacheControl": "public, max-age=3600"},
     )
-
     return f"https://assets.goyangi.io/{key}"
+
+
+def update_report_manifest(bucket: str, period: str, report_type: str = "meta-report"):
+    s3 = _get_s3_client()
+    manifest_key = "vgc/reports/index.json"
+
+    try:
+        obj = s3.get_object(Bucket=bucket, Key=manifest_key)
+        manifest = json.loads(obj["Body"].read())
+    except Exception:
+        manifest = {"reports": []}
+
+    entry = {
+        "period": period,
+        "type": report_type,
+        "key": f"vgc/reports/{report_type}-{period}.html",
+        "url": f"/vgc/report?period={period}",
+        "published_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    existing = [r for r in manifest["reports"] if r["period"] != period or r["type"] != report_type]
+    existing.append(entry)
+    existing.sort(key=lambda r: r["period"], reverse=True)
+    manifest["reports"] = existing
+
+    s3.put_object(
+        Bucket=bucket,
+        Key=manifest_key,
+        Body=json.dumps(manifest, indent=2),
+        ContentType="application/json",
+        CacheControl="public, max-age=300",
+    )
 
 
 def publish_meta_report(period: str, report_dir: str = "reports") -> str:
@@ -55,6 +91,8 @@ def publish_meta_report(period: str, report_dir: str = "reports") -> str:
 
     export_report(str(report_path), output_path)
     url = upload_to_r2(output_path, "assets", f"vgc/reports/meta-report-{period}.html")
+    upload_to_r2(output_path, "assets", "vgc/reports/meta-report-latest.html")
+    update_report_manifest("assets", period, "meta-report")
     return url
 
 

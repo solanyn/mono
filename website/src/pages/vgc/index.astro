@@ -16,43 +16,38 @@ import { SITE_TITLE } from '../../consts';
 			<div class="prose">
 				<h1>VGC Meta Analysis</h1>
 				<p>
-					Automated weekly analysis of the competitive Pokemon VGC (Video Game Championships) metagame.
+					Automated weekly analysis of the competitive Pokemon VGC metagame.
 					Data sourced from Smogon's ladder statistics and Limitless TCG tournament results.
-				</p>
-				<h2>Weekly Report</h2>
-				<p>
-					Each Monday, a pipeline ingests the latest ladder data, compares week-over-week trends,
-					and generates an interactive report with charts covering usage, speed tiers, team cores
-					and more.
 				</p>
 				<p>
 					<a href="/vgc/report" class="report-link">
-						View Latest Meta Report →
+						View Latest Report →
 					</a>
 				</p>
-				<h2>What's Tracked</h2>
-				<ul>
-					<li><strong>Usage stats</strong> — top Pokemon by ELO bracket from Smogon's Champions ladder</li>
-					<li><strong>Speed tiers</strong> — actual speed stats at Lv50, showing whether the meta is fast or bulky</li>
-					<li><strong>Team cores</strong> — frequently paired Pokemon across ladder and tournaments</li>
-					<li><strong>Ladder vs tournament</strong> — what's popular on ladder vs what wins events</li>
-					<li><strong>Anti-meta picks</strong> — high-ELO exclusives and rising stars</li>
-					<li><strong>Items and abilities</strong> — most popular sets, highlighting solved vs flex slots</li>
+				<h2>Previous Reports</h2>
+				<ul id="report-list">
+					<li class="loading">Loading reports...</li>
 				</ul>
-				<h2>How It Works</h2>
-				<p>
-					Built as a data pipeline in a Bazel monorepo. Smogon chaos JSON provides raw ladder data,
-					Limitless TCG gives tournament team sheets, and PokeAPI supplies base stats for speed calculations.
-					Reports are generated with <a href="https://marimo.io">marimo</a> notebooks and published
-					as self-contained HTML to Cloudflare R2. A weekly LLM narrative (Gemma 4) provides written meta commentary.
-				</p>
-				<p>
-					The damage calculator runs as a standalone HTTP service wrapping
-					<a href="https://github.com/smogon/damage-calc">@smogon/calc</a>.
-				</p>
 			</div>
 		</main>
 		<Footer />
+		<script is:inline type="module">
+			try {
+				const res = await fetch('https://assets.goyangi.io/vgc/reports/index.json');
+				if (!res.ok) throw new Error('not found');
+				const manifest = await res.json();
+				const list = document.getElementById('report-list');
+				if (manifest.reports && manifest.reports.length > 0) {
+					list.innerHTML = manifest.reports.map(r =>
+						`<li><a href="${r.url}">${r.period}</a></li>`
+					).join('');
+				} else {
+					list.innerHTML = '<li>No reports published yet.</li>';
+				}
+			} catch {
+				document.getElementById('report-list').innerHTML = '<li>No reports published yet.</li>';
+			}
+		</script>
 	</body>
 </html>
 <style>
@@ -71,6 +66,9 @@ import { SITE_TITLE } from '../../consts';
 	}
 	.prose li {
 		margin-bottom: 0.4rem;
+	}
+	.loading {
+		color: var(--text-secondary);
 	}
 	.report-link {
 		font-weight: var(--font-weight-bold);
