@@ -5,52 +5,74 @@ tags: ["pokemon", "data-engineering", "bazel", "kubernetes"]
 description: "A data pipeline that ingests competitive Pokemon VGC ladder and tournament data, computes speed tiers, and publishes weekly meta reports."
 ---
 
-## The gap between ladder and tournaments
+## Ladder stats lie (a little)
 
-Here's something that bugged me about VGC resources: they all show you what's popular on ladder. Usage stats, top 30 Pokemon, common spreads. That's useful, but it's not the full picture.
+Every VGC resource shows you what's popular on ladder. Usage rates, top 30 Pokemon, most common items. I've been staring at Pikalytics and various stat dumps for years and something always bugged me: what wins on ladder doesn't always win events.
 
-What wins on ladder doesn't always win tournaments. Ladder rewards consistency over 100+ games. Tournaments reward preparation and matchup knowledge over 9 rounds. A mon that's 15th in usage but shows up in top 8 at three regionals in a row is telling you something, and most stat sites don't surface that signal.
+Ladder rewards consistency over hundreds of games. Tournaments reward preparation over 9 rounds. A mon sitting at 15th in usage that keeps showing up in top 8 at regionals is telling you something, and most stat sites just don't surface that signal.
 
-So I built a pipeline that merges both datasets and highlights where they disagree.
+So I built a pipeline that pulls from both, merges them, and highlights where they disagree.
 
-## What it actually does
+## Three data sources, one lakehouse
 
-Three data sources feed into an Iceberg lakehouse:
+**Smogon chaos JSON** is the good stuff. Per-Pokemon usage data for every format: abilities, items, EV spreads, moves, tera types, teammates, split by ELO bracket. This is the ladder: millions of games, updated continuously.
 
-- **Smogon chaos JSON** provides ladder stats. Usage, items, abilities, EV spreads, teammates, tera types. Updated continuously across ELO brackets.
-- **Limitless TCG** provides tournament results. Full team sheets with placements from real events.
-- **PokeAPI** provides base stats for computing actual speed values.
+**Limitless TCG** gives you tournament results. Full team sheets from real events with actual placements. This is what wins when people are trying their hardest.
 
-A weekly CronJob pulls everything, runs analysis, generates a [marimo](https://marimo.io) report, and a Gemma 4 model writes a short meta commentary. The output is published to the site.
+**PokeAPI** for base stats. Needed because I don't want to compute speed tiers by hand.
 
-## Speed tiers are the interesting bit
+Everything lands in Iceberg tables on [Lakekeeper](https://github.com/lakekeeper/lakekeeper) (backed by Garage S3). A weekly CronJob pulls, processes, and generates a [marimo](https://marimo.io) report. A Gemma 4 model writes a short meta commentary via agentgateway because why not.
 
-Most meta resources show you EV spreads. "252 Spe Jolly" is cool, but what's the actual number at level 50? And more importantly, where does that sit relative to everything else in the format?
+## Speed tiers are where it gets interesting
 
-The report computes final speed stats for every popular spread across the top 30 Pokemon, weighted by usage. Aggregate that and you get a single "meta speed" number. Is the format fast and offensive, or slow and bulky? Are people investing in speed control or dumping into survivability?
+Most meta resources show EV spreads. "252 Spe Jolly" is cool, but what's the actual speed stat at level 50? And where does that sit relative to everything else in the format?
 
-You can watch this shift week to week. After a big regional where Trick Room dominates, ladder speeds drop for two weeks as everyone copies the winning archetype. Then the fast stuff comes back to punish it. The cycle is real and you can see it in the numbers.
+The report computes final speed for every popular spread across the top 30 mons, weighted by usage. Aggregate that and you get a "meta speed" number. Is the format fast and offensive? Slow and bulky? Are people investing in speed control or dumping into survivability?
 
-## Ladder vs tournament divergence
+You can watch this shift week to week. After a regional where Trick Room dominates, ladder speeds drop as everyone copies the winning archetype. Then the fast stuff comes back to punish it. The cycle is real and it shows up in the numbers.
 
-This is the part I actually built this for. When a Pokemon is significantly more successful in tournaments than its ladder usage would suggest, that's a signal. It usually means one of three things:
+## The actual point: ladder vs tournament divergence
 
-1. The mon rewards preparation because you need to know your matchups.
-2. It's good in best-of-3 but bad in best-of-1 due to side game adaptation.
-3. It's a meta call that only works when you know exactly what you're targeting.
+This is what I built the whole thing for.
 
-Conversely, stuff that's everywhere on ladder but missing from top cuts is usually autopilot-friendly but exploitable by anyone who preps for it.
+When a Pokemon is way more successful in tournaments than its ladder usage suggests, that usually means one of three things:
+
+1. It rewards preparation. You need to know your matchups cold.
+2. It's a best-of-3 pick. Adapts in side games, mediocre in best-of-1 ladder.
+3. It's a meta call. Only works when you know exactly what you're targeting.
+
+The flip side is interesting too. Stuff that's everywhere on ladder but missing from top cuts is usually autopilot-friendly but exploitable by anyone who preps for it. If you're heading into a regional, these are the mons you want answers to but probably don't need to bring yourself.
+
+## EV spread divergence (the surprise)
+
+I expected the biggest ladder/tournament gap to be in Pokemon choice. It's not. It's in EV spreads.
+
+Tournament players run way more specific speed tiers targeting exact threats. "I need to outspeed max speed Kingambit after one Electro Drift boost" kind of precision. Ladder players just go max speed or max bulk because it's safe and doesn't require thinking about the matchup.
+
+That spread optimization is where the skill gap actually lives. And it's completely invisible if you're only looking at usage percentages.
 
 ## The calc service
 
-The Smogon damage calculator runs as an HTTP service in the cluster. TypeScript bundled into a single file, always on. Any part of the system can ask "does this KO?" without needing Node locally. It's overkill for now but I want it available for an interactive teambuilder eventually.
+[`@smogon/calc`](https://github.com/smogon/damage-calc) runs as a standalone HTTP service in the cluster. TypeScript bundled into a single file, always available. Any part of the system can ask "does this KO?" without needing Node locally.
 
-## Infrastructure (briefly)
+Overkill for just reports but I want it for an interactive teambuilder eventually.
 
-Bazel monorepo, FluxCD, home k8s cluster. Two OCI images for the Python pipeline and Node calc service. Iceberg on Lakekeeper makes the raw data queryable if I want to explore beyond the published reports. Output lands on R2 behind Cloudflare.
+## Infra
 
-I went with Iceberg over plain parquet because I want to query across weeks without managing file paths manually. Table evolution is nice when you inevitably want to add a column three weeks in.
+Bazel monorepo, FluxCD, home k8s cluster. Two OCI images: Python pipeline and Node calc service. Reports land on R2 behind Cloudflare.
 
-## What surprised me
+I went with Iceberg over plain parquet because querying across weeks without managing file paths manually is nice. And table evolution means I can add columns three weeks in without rewriting everything, which I already had to do twice during development. Glad I didn't go with raw files.
 
-The biggest gap between ladder and tournaments isn't in Pokemon choice. It's in EV spreads. Tournament players run way more specific speed tiers targeting exact threats. Ladder players just go max speed or max bulk. That spread optimization is where the skill gap lives, and it's invisible if you're only looking at usage percentages.
+## What I learned
+
+The meta moves in predictable cycles if you have enough data. Big tournament, then the meta copies winners, then counter-meta emerges, then it stabilizes, then the next tournament disrupts again. The speed tier aggregate makes this legible at a glance instead of requiring you to manually track 30 different Pokemon's spreads.
+
+Also: Smogon's data quality is incredible for a community-run project. Limitless is good but inconsistent. Some events have full sheets, others just have top cut. The merge logic handles gaps gracefully but it means some weeks have better tournament signal than others.
+
+## Where this is going
+
+The meta analysis pipeline is step one. All this data collection and the calc service exist because I want to build something more ambitious: an AI agent that actually plays VGC.
+
+The structured knowledge base (what beats what, speed tiers, optimal spreads, team cores) is exactly the kind of context an LLM agent needs to make turn-by-turn decisions. And the damage calculator gives it ground truth for "will this KO" without hallucinating numbers.
+
+The longer term dream is an RL agent trained on replay data that learns positioning, prediction patterns, and endgame play. The meta analysis pipeline feeds it the current metagame so it adapts as the format shifts. More on that when I have something worth showing.
