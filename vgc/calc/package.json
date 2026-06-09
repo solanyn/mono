@@ -6,13 +6,8 @@
   "bin": {
     "vgc-calc": "./calc_server.mjs"
   },
-  "scripts": {
-    "bundle": "esbuild calc_server.mjs --bundle --platform=node --format=esm --outfile=dist/calc_server.mjs"
-  },
   "dependencies": {
-    "@smogon/calc": "^0.11.0"
-  },
-  "devDependencies": {
+    "@smogon/calc": "^0.11.0",
     "esbuild": "^0.25.0"
   }
 }
