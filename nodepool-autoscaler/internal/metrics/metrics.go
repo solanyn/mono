@@ -35,6 +35,11 @@ var (
 		Name: "nodepool_autoscaler_idle_seconds",
 		Help: "Seconds since last pod activity",
 	}, []string{"scaler"})
+
+	ReadyNodes = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "nodepool_autoscaler_ready_nodes",
+		Help: "Number of ready nodes matching the selector",
+	}, []string{"scaler"})
 )
 
 func init() {
@@ -45,5 +50,6 @@ func init() {
 		ScaleDownTotal,
 		LastScaleUpTime,
 		IdleSeconds,
+		ReadyNodes,
 	)
 }
