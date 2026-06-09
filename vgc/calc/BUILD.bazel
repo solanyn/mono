@@ -1,5 +1,4 @@
 load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_run_binary")
-load("@npm//vgc/calc:esbuild/package_json.bzl", esbuild_bin = "bin")
 load("@npm//:defs.bzl", "npm_link_all_packages")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
 load("@aspect_bazel_lib//lib:tar.bzl", "tar")
@@ -15,9 +14,12 @@ js_binary(
     visibility = ["//visibility:public"],
 )
 
-esbuild_bin.esbuild_binary(
+js_binary(
     name = "esbuild",
-    chdir = package_name(),
+    entry_point = "build.mjs",
+    data = [
+        ":node_modules/esbuild",
+    ],
 )
 
 js_run_binary(
@@ -26,16 +28,9 @@ js_run_binary(
         "calc_server.mjs",
         ":node_modules/@smogon/calc",
     ],
-    args = [
-        "calc_server.mjs",
-        "--bundle",
-        "--platform=node",
-        "--format=esm",
-        "--outdir=vgc/calc/dist",
-    ],
+    tool = ":esbuild",
     mnemonic = "ESBuild",
     out_dirs = ["dist"],
-    tool = ":esbuild",
 )
 
 tar(
