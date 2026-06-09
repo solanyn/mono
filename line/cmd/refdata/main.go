@@ -1,16 +1,19 @@
 package main
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/csv"
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -21,8 +24,7 @@ import (
 )
 
 const (
-	repoURL = "https://github.com/ddm999/gt7info.git"
-	branch  = "master"
+	tarballURL = "https://github.com/ddm999/gt7info/archive/refs/heads/master.tar.gz"
 )
 
 type CarRow struct {
@@ -55,13 +57,10 @@ func main() {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	repoDir := filepath.Join(tmpDir, "gt7info")
-	slog.Info("cloning repo", "url", repoURL, "branch", branch)
-	cmd := exec.Command("git", "clone", "--depth=1", "--branch", branch, repoURL, repoDir)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		slog.Error("git clone failed", "err", err)
+	slog.Info("downloading tarball", "url", tarballURL)
+	repoDir, err := downloadAndExtract(tmpDir, tarballURL)
+	if err != nil {
+		slog.Error("download tarball failed", "err", err)
 		os.Exit(1)
 	}
 
@@ -364,4 +363,74 @@ func envOr(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func downloadAndExtract(destDir, url string) (string, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", fmt.Errorf("new request: %w", err)
+	}
+	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("http get: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("unexpected status: %s", resp.Status)
+	}
+
+	gz, err := gzip.NewReader(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("gzip reader: %w", err)
+	}
+	defer gz.Close()
+
+	var topDir string
+	tr := tar.NewReader(gz)
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return "", fmt.Errorf("tar next: %w", err)
+		}
+
+		if topDir == "" {
+			topDir = strings.SplitN(hdr.Name, "/", 2)[0]
+		}
+
+		target := filepath.Join(destDir, filepath.Clean(hdr.Name))
+		if !strings.HasPrefix(target, filepath.Clean(destDir)+string(os.PathSeparator)) {
+			continue
+		}
+
+		switch hdr.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(target, 0o755); err != nil {
+				return "", err
+			}
+		case tar.TypeReg:
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				return "", err
+			}
+			f, err := os.Create(target)
+			if err != nil {
+				return "", err
+			}
+			if _, err := io.Copy(f, io.LimitReader(tr, 50<<20)); err != nil {
+				f.Close()
+				return "", err
+			}
+			f.Close()
+		}
+	}
+
+	if topDir == "" {
+		return "", fmt.Errorf("empty archive")
+	}
+	return filepath.Join(destDir, topDir), nil
 }
