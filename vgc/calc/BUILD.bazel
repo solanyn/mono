@@ -16,13 +16,13 @@ js_binary(
 
 tar(
     name = "calc_layer",
-    srcs = [":calc"],
+    srcs = ["dist/calc_server.mjs"],
 )
 
 oci_image(
     name = "image",
     base = "@node_slim_linux_amd64",
-    entrypoint = ["/vgc/calc/calc"],
+    entrypoint = ["node", "/vgc/calc/dist/calc_server.mjs"],
     tars = [":calc_layer"],
 )
 
