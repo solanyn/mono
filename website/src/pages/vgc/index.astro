@@ -1,0 +1,79 @@
+---
+import BaseHead from '../components/BaseHead.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { SITE_TITLE } from '../consts';
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead title={`VGC Meta Analysis — ${SITE_TITLE}`} description="Weekly competitive Pokemon VGC meta analysis — usage stats, speed tiers, team cores and tournament insights." />
+	</head>
+	<body>
+		<Header />
+		<main>
+			<div class="prose">
+				<h1>VGC Meta Analysis</h1>
+				<p>
+					Automated weekly analysis of the competitive Pokemon VGC (Video Game Championships) metagame.
+					Data sourced from Smogon's ladder statistics and Limitless TCG tournament results.
+				</p>
+				<h2>Weekly Report</h2>
+				<p>
+					Each Monday, a pipeline ingests the latest ladder data, compares week-over-week trends,
+					and generates an interactive report with charts covering usage, speed tiers, team cores
+					and more.
+				</p>
+				<p>
+					<a href="https://assets.goyangi.io/vgc/reports/meta-report-latest.html" class="report-link">
+						View Latest Meta Report →
+					</a>
+				</p>
+				<h2>What's Tracked</h2>
+				<ul>
+					<li><strong>Usage stats</strong> — top Pokemon by ELO bracket from Smogon's Champions ladder</li>
+					<li><strong>Speed tiers</strong> — actual speed stats at Lv50, showing whether the meta is fast or bulky</li>
+					<li><strong>Team cores</strong> — frequently paired Pokemon across ladder and tournaments</li>
+					<li><strong>Ladder vs tournament</strong> — what's popular on ladder vs what wins events</li>
+					<li><strong>Anti-meta picks</strong> — high-ELO exclusives and rising stars</li>
+					<li><strong>Items and abilities</strong> — most popular sets, highlighting solved vs flex slots</li>
+				</ul>
+				<h2>How It Works</h2>
+				<p>
+					Built as a data pipeline in a Bazel monorepo. Smogon chaos JSON provides raw ladder data,
+					Limitless TCG gives tournament team sheets, and PokeAPI supplies base stats for speed calculations.
+					Reports are generated with <a href="https://marimo.io">marimo</a> notebooks and published
+					as self-contained HTML to Cloudflare R2. A weekly LLM narrative (Gemma 4) provides written meta commentary.
+				</p>
+				<p>
+					The damage calculator runs as a standalone HTTP service wrapping
+					<a href="https://github.com/smogon/damage-calc">@smogon/calc</a>.
+				</p>
+			</div>
+		</main>
+		<Footer />
+	</body>
+</html>
+<style>
+	.prose {
+		line-height: 1.7;
+	}
+	.prose h1 {
+		margin-bottom: 0.5rem;
+	}
+	.prose h2 {
+		margin-top: 2rem;
+		margin-bottom: 0.5rem;
+	}
+	.prose ul {
+		padding-left: 1.25rem;
+	}
+	.prose li {
+		margin-bottom: 0.4rem;
+	}
+	.report-link {
+		font-weight: var(--font-weight-bold);
+		color: var(--text-primary);
+	}
+</style>
