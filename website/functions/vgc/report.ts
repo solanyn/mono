@@ -1,0 +1,19 @@
+export const onRequest: PagesFunction = async () => {
+	const r2Url = 'https://assets.goyangi.io/vgc/reports/meta-report-latest.html';
+	const response = await fetch(r2Url);
+
+	if (!response.ok) {
+		return new Response('<h1>Report not yet available</h1><p>The first weekly report will be published after the pipeline runs.</p>', {
+			status: 404,
+			headers: { 'Content-Type': 'text/html; charset=utf-8' },
+		});
+	}
+
+	const html = await response.text();
+	return new Response(html, {
+		headers: {
+			'Content-Type': 'text/html; charset=utf-8',
+			'Cache-Control': 'public, max-age=3600',
+		},
+	});
+};
