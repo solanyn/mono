@@ -391,6 +391,7 @@ func (m model) runSave() tea.Cmd {
 		// Pre-compute mono WAV to disk so retry doesn't re-downmix and doesn't
 		// hold the full stereo buffer in RAM across the upload.
 		mono := audio.StereoToMono(samples)
+		mono = audio.HighPass(mono, m.opts.SampleRate, 80)
 		monoPath, err := audio.WriteWAVTemp(mono, m.opts.SampleRate, 1)
 		if err != nil {
 			return savedMsg{err: fmt.Errorf("mono wav: %w", err)}

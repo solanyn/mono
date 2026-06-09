@@ -175,17 +175,17 @@ func runUpload(cfg *config.Config, wavPath, template string) error {
 		return fmt.Errorf("read wav: %w", err)
 	}
 
-	uploadPath := abs
 	if channels == 2 {
 		fmt.Fprintf(os.Stderr, "Stereo WAV detected, downmixing to mono...\n")
 		samples = audio.StereoToMono(samples)
-		monoPath, err := audio.WriteWAVTemp(samples, cfg.SampleRate, 1)
-		if err != nil {
-			return fmt.Errorf("write mono wav: %w", err)
-		}
-		defer os.Remove(monoPath)
-		uploadPath = monoPath
 	}
+	samples = audio.HighPass(samples, cfg.SampleRate, 80)
+	monoPath, err := audio.WriteWAVTemp(samples, cfg.SampleRate, 1)
+	if err != nil {
+		return fmt.Errorf("write processed wav: %w", err)
+	}
+	defer os.Remove(monoPath)
+	uploadPath := monoPath
 
 	dur := time.Duration(len(samples)/cfg.SampleRate) * time.Second
 

@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 	"os"
 )
 
@@ -50,6 +51,45 @@ func StereoToMono(samples []int16) []int16 {
 		mono[i] = int16((int32(samples[i*2]) + int32(samples[i*2+1])) / 2)
 	}
 	return mono
+}
+
+func HighPass(samples []int16, sampleRate int, cutoffHz float64) []int16 {
+	if len(samples) == 0 {
+		return samples
+	}
+	omega := 2.0 * math.Pi * cutoffHz / float64(sampleRate)
+	alpha := math.Sin(omega) / (2.0 * 0.7071)
+
+	b0 := (1.0 + math.Cos(omega)) / 2.0
+	b1 := -(1.0 + math.Cos(omega))
+	b2 := (1.0 + math.Cos(omega)) / 2.0
+	a0 := 1.0 + alpha
+	a1 := -2.0 * math.Cos(omega)
+	a2 := 1.0 - alpha
+
+	b0 /= a0
+	b1 /= a0
+	b2 /= a0
+	a1 /= a0
+	a2 /= a0
+
+	out := make([]int16, len(samples))
+	var x1, x2, y1, y2 float64
+	for i, s := range samples {
+		x0 := float64(s)
+		y0 := b0*x0 + b1*x1 + b2*x2 - a1*y1 - a2*y2
+		if y0 > 32767 {
+			y0 = 32767
+		} else if y0 < -32768 {
+			y0 = -32768
+		}
+		out[i] = int16(y0)
+		x2 = x1
+		x1 = x0
+		y2 = y1
+		y1 = y0
+	}
+	return out
 }
 
 // WriteWAVTemp writes samples to a temporary WAV file and returns the path.
