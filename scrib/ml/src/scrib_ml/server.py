@@ -337,3 +337,69 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+@app.post("/asr")
+async def asr_endpoint(
+    audio_file: UploadFile = File(...),
+    task: str = "transcribe",
+    language: str | None = None,
+    initial_prompt: str | None = None,
+    hotwords: str | None = None,
+    word_timestamps: bool = True,
+    output_format: str = "json",
+    output: str | None = None,
+    model: str | None = None,
+    num_speakers: int | None = None,
+    min_speakers: int | None = None,
+    max_speakers: int | None = None,
+    diarize: bool | None = None,
+    enable_diarization: bool | None = None,
+    return_speaker_embeddings: bool | None = None,
+):
+    """WhisperX-compatible ASR endpoint for Speakr integration.
+
+    Wraps the existing scrib-ml pipeline and returns results in the format
+    expected by Speakr (openai-whisper-asr-webservice compatible).
+    """
+    tmp_path = await _save_upload(audio_file)
+    t0 = time.monotonic()
+    try:
+        result = await _run_with_timeout(process, tmp_path)
+        elapsed = time.monotonic() - t0
+        _record("asr", elapsed)
+        log.info("asr: %.1fs wall", elapsed)
+
+        # Build whisperx-compatible response
+        segments = []
+        for seg in result.segments:
+            segments.append({
+                "start": seg.start,
+                "end": seg.end,
+                "text": seg.text,
+                "speaker": seg.speaker,
+                "words": [],
+            })
+
+        response = {
+            "text": result.transcript_text,
+            "language": language or "en",
+            "segments": segments,
+            "word_segments": [],
+        }
+
+        if return_speaker_embeddings and result.speaker_embeddings:
+            response["speaker_embeddings"] = [
+                {"speaker": speaker, "embedding": embedding}
+                for speaker, embedding in sorted(result.speaker_embeddings.items())
+            ]
+
+        return JSONResponse(response)
+    except asyncio.TimeoutError:
+        return JSONResponse({"error": "timeout"}, status_code=504)
+    except Exception as e:
+        log.exception("asr failed")
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp_path)
