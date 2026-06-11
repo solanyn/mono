@@ -322,21 +322,7 @@ async def transcribe_endpoint(file: UploadFile = File(...)):
             os.unlink(tmp_path)
 
 
-def main():
-    import argparse
-    import uvicorn
 
-    parser = argparse.ArgumentParser(description="scrib-ml server")
-    parser.add_argument("--host", default="0.0.0.0")
-    parser.add_argument("--port", type=int, default=8000)
-    parser.add_argument("--workers", type=int, default=1)
-    args = parser.parse_args()
-
-    uvicorn.run(app, host=args.host, port=args.port, workers=args.workers)
-
-
-if __name__ == "__main__":
-    main()
 
 
 @app.post("/asr")
@@ -403,3 +389,20 @@ async def asr_endpoint(
     finally:
         with contextlib.suppress(OSError):
             os.unlink(tmp_path)
+
+
+def main():
+    import argparse
+    import uvicorn
+
+    parser = argparse.ArgumentParser(description="scrib-ml server")
+    parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--workers", type=int, default=1)
+    args = parser.parse_args()
+
+    uvicorn.run(app, host=args.host, port=args.port, workers=args.workers)
+
+
+if __name__ == "__main__":
+    main()
