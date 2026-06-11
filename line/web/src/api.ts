@@ -274,7 +274,7 @@ let carsCache: Car[] | null = null
 export async function fetchCars(): Promise<Car[]> {
   if (carsCache) return carsCache
   const res = await fetch(`${API_BASE}/cars`)
-  carsCache = await res.json()
+  carsCache = (await res.json()) ?? []
   return carsCache!
 }
 
