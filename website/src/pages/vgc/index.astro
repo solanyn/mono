@@ -16,17 +16,16 @@ import { SITE_TITLE } from '../../consts';
 			<div class="prose">
 				<h1>VGC Meta Analysis</h1>
 				<p>
-					Automated weekly analysis of the competitive Pokemon VGC metagame.
-					Data sourced from Smogon's ladder statistics and Limitless TCG tournament results.
+					Automated weekly analysis of the competitive Pokemon VGC metagame. Ingests ladder stats
+					from Smogon and tournament results from Limitless TCG, computes speed tiers, identifies
+					team cores, and highlights where ladder popularity diverges from tournament success.
 				</p>
 				<p>
-					<a href="/vgc/report" class="report-link">
-						View Latest Report →
-					</a>
+					<a href="/vgc/report" class="report-link">View Latest Report →</a>
 				</p>
-				<h2>Previous Reports</h2>
+				<h2>Reports</h2>
 				<ul id="report-list">
-					<li class="loading">Loading reports...</li>
+					<li class="loading">Loading...</li>
 				</ul>
 			</div>
 		</main>
@@ -42,7 +41,7 @@ import { SITE_TITLE } from '../../consts';
 						`<li><a href="${r.url}">${r.period}</a></li>`
 					).join('');
 				} else {
-					list.innerHTML = '<li>No reports published yet.</li>';
+					list.innerHTML = '<li>No reports published yet. First report generates after the pipeline runs.</li>';
 				}
 			} catch {
 				document.getElementById('report-list').innerHTML = '<li>No reports published yet.</li>';
