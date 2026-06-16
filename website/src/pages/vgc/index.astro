@@ -1,0 +1,76 @@
+---
+import BaseHead from '../../components/BaseHead.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+import { SITE_TITLE } from '../../consts';
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead title={`VGC Meta Analysis — ${SITE_TITLE}`} description="Weekly competitive Pokemon VGC meta analysis — usage stats, speed tiers, team cores and tournament insights." />
+	</head>
+	<body>
+		<Header />
+		<main>
+			<div class="prose">
+				<h1>VGC Meta Analysis</h1>
+				<p>
+					Automated weekly analysis of the competitive Pokemon VGC metagame. Ingests ladder stats
+					from Smogon and tournament results from Limitless TCG, computes speed tiers, identifies
+					team cores, and highlights where ladder popularity diverges from tournament success.
+				</p>
+				<p>
+					<a href="/vgc/report" class="report-link">View Latest Report →</a>
+				</p>
+				<h2>Reports</h2>
+				<ul id="report-list">
+					<li class="loading">Loading...</li>
+				</ul>
+			</div>
+		</main>
+		<Footer />
+		<script is:inline type="module">
+			try {
+				const res = await fetch('https://assets.goyangi.io/vgc/reports/index.json');
+				if (!res.ok) throw new Error('not found');
+				const manifest = await res.json();
+				const list = document.getElementById('report-list');
+				if (manifest.reports && manifest.reports.length > 0) {
+					list.innerHTML = manifest.reports.map(r =>
+						`<li><a href="${r.url}">${r.period}</a></li>`
+					).join('');
+				} else {
+					list.innerHTML = '<li>No reports published yet. First report generates after the pipeline runs.</li>';
+				}
+			} catch {
+				document.getElementById('report-list').innerHTML = '<li>No reports published yet.</li>';
+			}
+		</script>
+	</body>
+</html>
+<style>
+	.prose {
+		line-height: 1.7;
+	}
+	.prose h1 {
+		margin-bottom: 0.5rem;
+	}
+	.prose h2 {
+		margin-top: 2rem;
+		margin-bottom: 0.5rem;
+	}
+	.prose ul {
+		padding-left: 1.25rem;
+	}
+	.prose li {
+		margin-bottom: 0.4rem;
+	}
+	.loading {
+		color: var(--text-secondary);
+	}
+	.report-link {
+		font-weight: var(--font-weight-bold);
+		color: var(--text-primary);
+	}
+</style>

@@ -6,8 +6,6 @@ draft: false
 tags: [kubernetes, gpu, liqo, gke, home-lab]
 ---
 
-import Mermaid from "../../components/Mermaid.astro";
-
 I run a Kubernetes cluster at home with three low-power Talos nodes, enough for most things, but when I want to train models or run GPU workloads, I don't have a good solution. I'm not interested in dropping money on a dedicated GPU for subpar performance.
 
 What if we could just build something to burst to cloud GPUs when we need to?
@@ -28,8 +26,8 @@ Kinda neat, but didn't entirely fit the bill.
 
 I found Liqo when looking at CNCF projects. Maybe I needed cloud federation. Liqo peers clusters together to make them _relatively_ seamlessly. Kubernetes will happily schedule onto Liqo nodes in a second cluster as "virtual nodes".
 
-<Mermaid
-  code={`graph LR
+```mermaid
+graph LR
   subgraph Home["Home Cluster (Talos)"]
     API[API Server]
     N1[Node 1]
@@ -44,8 +42,7 @@ I found Liqo when looking at CNCF projects. Maybe I needed cloud federation. Liq
   API --> VN
   VN -.->|Liqo Tunnel| GPU1
   VN -.->|Liqo Tunnel| GPU2
-`}
-/>
+```
 
 Paired it with GKE using spot instances:
 
@@ -56,8 +53,8 @@ Paired it with GKE using spot instances:
 
 When I submit a GPU workload, Liqo:
 
-<Mermaid
-  code={`sequenceDiagram
+```mermaid
+sequenceDiagram
   participant User
   participant Home as Home API Server
   participant Liqo as Liqo Controller
@@ -72,8 +69,7 @@ When I submit a GPU workload, Liqo:
   GKE-->>VN: Pod running
   VN-->>Home: Status update
   Home-->>User: Pod ready
-`}
-/>
+```
 
 The pod runs on GKE hardware but appears in my home cluster and monitoring, ingress/egress work transparently.
 

@@ -2,3 +2,4 @@ packages:
   - website
   - yield/web
   - line/web
+  - vgc/calc

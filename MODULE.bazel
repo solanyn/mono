@@ -4,6 +4,7 @@ module(
 )
 
 bazel_dep(name = "aspect_bazel_lib", version = "2.22.5")
+bazel_dep(name = "aspect_rules_esbuild", version = "0.26.0")
 bazel_dep(name = "aspect_rules_js", version = "3.0.3")
 bazel_dep(name = "aspect_rules_lint", version = "2.5.0")
 bazel_dep(name = "bazel_skylib", version = "1.9.0")
@@ -2226,11 +2227,16 @@ pip.parse(
     requirements_lock = "//scrib/ml:requirements_lock.txt",
 )
 pip.parse(
+    hub_name = "vgc_pypi",
+    python_version = "3.12",
+    requirements_lock = "//vgc:requirements_lock.txt",
+)
+pip.parse(
     hub_name = "line_pypi",
     python_version = "3.12",
     requirements_lock = "//line/analytics:requirements_lock.txt",
 )
-use_repo(pip, "lake_pypi", "line_pypi", "pypi", "scrib_ml_pypi")
+use_repo(pip, "lake_pypi", "line_pypi", "pypi", "scrib_ml_pypi", "vgc_pypi")
 
 # js
 node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node", dev_dependency = True)
@@ -2277,7 +2283,14 @@ oci.pull(
     platforms = ["linux/amd64"],
     tag = "3.13-slim",
 )
-use_repo(oci, "distroless_base", "distroless_base_linux_amd64", "distroless_static", "distroless_static_linux_amd64", "distroless_static_linux_arm64_v8", "python_slim", "python_slim_linux_amd64")
+oci.pull(
+    name = "node_slim",
+    digest = "sha256:7af03b14a13c8cdd38e45058fd957bf00a72bbe17feac43b1c15a689c029c732",
+    image = "docker.io/library/node",
+    platforms = ["linux/amd64"],
+    tag = "22-slim",
+)
+use_repo(oci, "distroless_base", "distroless_base_linux_amd64", "distroless_static", "distroless_static_linux_amd64", "distroless_static_linux_arm64_v8", "node_slim", "node_slim_linux_amd64", "python_slim", "python_slim_linux_amd64")
 
 # tools
 http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
