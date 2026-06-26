@@ -1,0 +1,52 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_cross_binary", "go_library")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
+load("@aspect_bazel_lib//lib:tar.bzl", "tar")
+
+go_library(
+    name = "lib",
+    srcs = glob(["*.go"]),
+    importpath = "github.com/solanyn/mono/pii-adapter",
+    visibility = ["//visibility:public"],
+)
+
+go_binary(
+    name = "pii-adapter",
+    embed = [":lib"],
+    visibility = ["//visibility:public"],
+)
+
+go_cross_binary(
+    name = "pii-adapter_linux_amd64",
+    platform = "@rules_go//go/toolchain:linux_amd64",
+    target = ":pii-adapter",
+)
+
+go_cross_binary(
+    name = "pii-adapter_linux_arm64",
+    platform = "@rules_go//go/toolchain:linux_arm64",
+    target = ":pii-adapter",
+)
+
+tar(
+    name = "layer",
+    srcs = [":pii-adapter_linux_amd64"],
+)
+
+oci_image(
+    name = "image",
+    base = "@distroless_static",
+    entrypoint = ["/pii-adapter_linux_amd64"],
+    tars = [":layer"],
+)
+
+oci_load(
+    name = "load",
+    image = ":image",
+    repo_tags = ["pii-adapter:latest"],
+)
+
+oci_push(
+    name = "push",
+    image = ":image",
+    repository = "ghcr.io/solanyn/pii-adapter",
+)

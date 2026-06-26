@@ -66,6 +66,7 @@ jobs:
               - 'kobo/**'
               - 'line/**'
               - 'nodepool-autoscaler/**'
+              - 'pii-adapter/**'
               - 'tools/**'
               - 'vgc/**'
               - 'yield/**'
