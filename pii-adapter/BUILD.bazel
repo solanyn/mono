@@ -1,12 +1,21 @@
-load("@rules_go//go:def.bzl", "go_binary", "go_library")
+load("@rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
 load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 
 go_library(
     name = "lib",
-    srcs = glob(["*.go"]),
+    srcs = glob(
+        ["*.go"],
+        exclude = ["*_test.go"],
+    ),
     importpath = "github.com/solanyn/mono/pii-adapter",
     visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "pii-adapter_test",
+    srcs = glob(["*_test.go"]),
+    embed = [":lib"],
 )
 
 go_binary(

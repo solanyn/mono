@@ -22,7 +22,7 @@ type analyzeResult struct {
 type presidioClient struct {
 	baseURL        string
 	language       string
-	scoreThreshold string
+	scoreThreshold float64
 	http           *http.Client
 }
 
@@ -39,7 +39,9 @@ func newPresidioClient(cfg Config) *presidioClient {
 
 // analyze calls Presidio POST /analyze and returns the detected PII spans.
 func (c *presidioClient) analyze(ctx context.Context, text string) ([]analyzeResult, error) {
-	payload, err := json.Marshal(map[string]string{
+	// score_threshold MUST be encoded as a JSON number; Presidio rejects a
+	// string value with HTTP 400.
+	payload, err := json.Marshal(map[string]any{
 		"text":            text,
 		"language":        c.language,
 		"score_threshold": c.scoreThreshold,
