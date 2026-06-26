@@ -1,6 +1,6 @@
-load("@rules_go//go:def.bzl", "go_binary", "go_cross_binary", "go_library")
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
-load("@aspect_bazel_lib//lib:tar.bzl", "tar")
+load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 
 go_library(
     name = "lib",
@@ -19,27 +19,35 @@ go_binary(
     visibility = ["//visibility:public"],
 )
 
-go_cross_binary(
+go_binary(
     name = "cronprint_linux_amd64",
-    platform = "@rules_go//go/toolchain:linux_amd64",
-    target = ":cronprint",
+    embed = [":lib"],
+    goarch = "amd64",
+    goos = "linux",
+    pure = "on",
+    visibility = ["//visibility:public"],
 )
 
-go_cross_binary(
+go_binary(
     name = "cronprint_linux_arm64",
-    platform = "@rules_go//go/toolchain:linux_arm64",
-    target = ":cronprint",
+    embed = [":lib"],
+    goarch = "arm64",
+    goos = "linux",
+    pure = "on",
+    visibility = ["//visibility:public"],
 )
 
-tar(
+pkg_tar(
     name = "layer",
     srcs = [":cronprint_linux_amd64"],
+    strip_prefix = ".",
 )
 
 oci_image(
     name = "image",
     base = "@distroless_static",
-    entrypoint = ["/cronprint_linux_amd64"],
+    entrypoint = ["/cronprint_linux_amd64_/cronprint_linux_amd64"],
+    labels = {"org.opencontainers.image.source": "https://github.com/solanyn/mono"},
     tars = [":layer"],
 )
 
