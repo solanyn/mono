@@ -43,7 +43,12 @@ oci_image(
     name = "image",
     base = "@distroless_static",
     entrypoint = ["/agentgateway-discovery_linux_amd64_/agentgateway-discovery_linux_amd64"],
-    labels = {"org.opencontainers.image.source": "https://github.com/solanyn/mono"},
+    labels = {
+        "org.opencontainers.image.source": "https://github.com/solanyn/mono/tree/main/agentgateway-discovery",
+        "org.opencontainers.image.title": "agentgateway-discovery",
+        "org.opencontainers.image.description": "On-demand /v1/models aggregator for AgentGateway. Fetches upstream LLM providers in parallel, merges responses, caches for 30s.",
+        "org.opencontainers.image.licenses": "MIT",
+    },
     tars = [":layer"],
 )
 
