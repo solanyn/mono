@@ -28,20 +28,102 @@ const (
 )
 
 // Provider describes one upstream OpenAI-compatible /v1/models endpoint.
-// APIKeyEnv names an environment variable that — when set — supplies the
-// Bearer token sent to that provider. An empty APIKeyEnv disables auth.
+// APIKey is the literal Bearer token sent to that provider. An empty
+// APIKey disables auth (request goes out without an Authorization header).
 type Provider struct {
-	Name      string
-	URL       string
-	APIKeyEnv string
+	Name   string
+	URL    string
+	APIKey string
 }
 
-// providers is the static upstream set. Order is preserved in the merged
-// output so the response is stable for clients that key off position.
-var providers = []Provider{
-	{Name: "mlx", URL: "http://mac.internal:8080/v1/models", APIKeyEnv: ""},
-	{Name: "minimax", URL: "https://api.minimaxi.chat/v1/models", APIKeyEnv: "MINIMAX_API_KEY"},
-	{Name: "deepseek", URL: "https://api.deepseek.com/v1/models", APIKeyEnv: "DEEPSEEK_API_KEY"},
+// providers is populated at startup from env. The assignment happens before
+// any HTTP serving, so subsequent reads from request goroutines are safe.
+var providers []Provider
+
+// defaultProviders is the fallback used when no DISCOVERY_PROVIDER_* env
+// vars are set, so the service works out of the box with sensible defaults.
+func defaultProviders() []Provider {
+	return []Provider{
+		{Name: "mlx", URL: "http://mac.internal:8080/v1/models"},
+		{Name: "minimax", URL: "https://api.minimaxi.chat/v1/models"},
+		{Name: "deepseek", URL: "https://api.deepseek.com/v1/models"},
+	}
+}
+
+// loadProviders discovers providers from env vars of the form:
+//
+//	DISCOVERY_PROVIDER_<NAME>_URL=https://...          (required per provider)
+//	DISCOVERY_PROVIDER_<NAME>_API_KEY=<bearer-token>   (optional)
+//
+// <NAME> is lowercased on read. Order is the order in which URLs first
+// appear in os.Environ(). If no DISCOVERY_PROVIDER_* env vars are set at
+// all, returns defaultProviders(). A provider with an _API_KEY but no
+// _URL is a config error and aborts startup — better to crash loudly than
+// ship a silently-broken config.
+func loadProviders() []Provider {
+	type partial struct {
+		url    string
+		apiKey string
+		urlSet bool
+	}
+	byName := make(map[string]*partial)
+	var order []string
+
+	for _, kv := range os.Environ() {
+		eq := strings.IndexByte(kv, '=')
+		if eq < 0 {
+			continue
+		}
+		key, val := kv[:eq], kv[eq+1:]
+		if !strings.HasPrefix(key, "DISCOVERY_PROVIDER_") {
+			continue
+		}
+		suffix := key[len("DISCOVERY_PROVIDER_"):]
+		var name, field string
+		switch {
+		case strings.HasSuffix(suffix, "_URL"):
+			name = strings.TrimSuffix(suffix, "_URL")
+			field = "url"
+		case strings.HasSuffix(suffix, "_API_KEY"):
+			name = strings.TrimSuffix(suffix, "_API_KEY")
+			field = "apikey"
+		default:
+			continue
+		}
+		if name == "" {
+			slog.Warn("ignoring DISCOVERY_PROVIDER env var with empty provider name", "key", key)
+			continue
+		}
+		name = strings.ToLower(name)
+		p, ok := byName[name]
+		if !ok {
+			p = &partial{}
+			byName[name] = p
+			order = append(order, name)
+		}
+		switch field {
+		case "url":
+			p.url = val
+			p.urlSet = true
+		case "apikey":
+			p.apiKey = val
+		}
+	}
+
+	if len(order) == 0 {
+		return defaultProviders()
+	}
+
+	out := make([]Provider, 0, len(order))
+	for _, name := range order {
+		p := byName[name]
+		if !p.urlSet {
+			slog.Error("DISCOVERY_PROVIDER env: provider has _API_KEY but no _URL", "provider", name)
+			os.Exit(1)
+		}
+		out = append(out, Provider{Name: name, URL: p.url, APIKey: p.apiKey})
+	}
+	return out
 }
 
 // Model is the OpenAI-compatible model object emitted in the response.
@@ -100,17 +182,15 @@ func (c *modelCache) set(b []byte, expiresAt time.Time) {
 }
 
 // fetchProvider GETs /v1/models from one upstream and returns its models.
-// Auth: if the named env var is set, send Authorization: Bearer <value>.
-// Otherwise the request goes out without an Authorization header.
+// Auth: if p.APIKey is set, send Authorization: Bearer <value>. Otherwise
+// the request goes out without an Authorization header.
 func fetchProvider(ctx context.Context, p Provider) ([]Model, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, p.URL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("%s: build request: %w", p.Name, err)
 	}
-	if p.APIKeyEnv != "" {
-		if key := os.Getenv(p.APIKeyEnv); key != "" {
-			req.Header.Set("Authorization", "Bearer "+key)
-		}
+	if p.APIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+p.APIKey)
 	}
 
 	client := &http.Client{Timeout: upstreamTTL}
@@ -269,6 +349,7 @@ func main() {
 	// service name so downstream filters can scope to this workload.
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)).With("service", "agentgateway-discovery"))
 
+	providers = loadProviders()
 	addr := ":" + envOr("PORT", "8080")
 	cache := &modelCache{}
 

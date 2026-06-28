@@ -23,13 +23,42 @@ docker run --rm -p 8080:8080 \
 
 ## Config
 
-| Env var           | Default | Purpose                                       |
-| ----------------- | ------- | --------------------------------------------- |
-| `PORT`            | `8080`  | Listen port                                   |
-| `MINIMAX_API_KEY` | (unset) | Bearer token for `api.minimaxi.chat`         |
-| `DEEPSEEK_API_KEY`| (unset) | Bearer token for `api.deepseek.com`          |
+Providers and their API keys come from env vars. Recognized variables:
 
-The `mlx` provider targets `http://mac.internal:8080/v1/models` and never sends an Authorization header. Other providers send `Authorization: Bearer <env>` only when the env var is non-empty.
+```
+DISCOVERY_PROVIDER_<NAME>_URL=https://...          (required per provider)
+DISCOVERY_PROVIDER_<NAME>_API_KEY=<bearer-token>   (optional)
+```
+
+`<NAME>` is lowercased and used as the provider identifier (logs and `owned_by` default). If no `DISCOVERY_PROVIDER_*` env vars are set, three built-in defaults are used:
+
+| Provider  | URL                                          | Auth         |
+| --------- | -------------------------------------------- | ------------ |
+| `mlx`     | `http://mac.internal:8080/v1/models`         | none         |
+| `minimax` | `https://api.minimaxi.chat/v1/models`        | via env      |
+| `deepseek`| `https://api.deepseek.com/v1/models`         | via env      |
+
+Other env vars:
+
+| Env var | Default | Purpose     |
+| ------- | ------- | ----------- |
+| `PORT`  | `8080`  | Listen port |
+
+In Kubernetes, source each provider's API key from its own Secret via `valueFrom.secretKeyRef`:
+
+```yaml
+env:
+  - name: DISCOVERY_PROVIDER_MLX_URL
+    value: "http://mac.internal:8080/v1/models"
+  - name: DISCOVERY_PROVIDER_MINIMAX_URL
+    value: "https://api.minimaxi.chat/v1/models"
+  - name: DISCOVERY_PROVIDER_MINIMAX_API_KEY
+    valueFrom: { secretKeyRef: { name: minimax-auth, key: api-key } }
+  - name: DISCOVERY_PROVIDER_DEEPSEEK_URL
+    value: "https://api.deepseek.com/v1/models"
+  - name: DISCOVERY_PROVIDER_DEEPSEEK_API_KEY
+    valueFrom: { secretKeyRef: { name: deepseek-auth, key: api-key } }
+```
 
 ## Endpoints
 
