@@ -66,6 +66,7 @@ jobs:
               - 'kobo/**'
               - 'line/**'
               - 'nodepool-autoscaler/**'
+              - 'agentgateway-discovery/**'
               - 'pii-adapter/**'
               - 'tools/**'
               - 'vgc/**'
