@@ -129,13 +129,26 @@ func decodeWebhook(w http.ResponseWriter, r *http.Request) (webhookRequest, bool
 }
 
 // writePass emits the fail-open / no-change response.
+// agentgateway expects an externally-tagged serde enum: {"action":{"pass":{}}}
 func writePass(w http.ResponseWriter) {
-	writeJSON(w, map[string]interface{}{"action": "pass"})
+	writeJSON(w, map[string]interface{}{
+		"action": map[string]interface{}{
+			"pass": map[string]interface{}{},
+		},
+	})
 }
 
 // writeMask emits a mask response carrying the modified body.
+// agentgateway expects an externally-tagged serde enum:
+// {"action":{"mask":{"body":{...}}}}
 func writeMask(w http.ResponseWriter, body map[string]interface{}) {
-	writeJSON(w, map[string]interface{}{"action": "mask", "body": body})
+	writeJSON(w, map[string]interface{}{
+		"action": map[string]interface{}{
+			"mask": map[string]interface{}{
+				"body": body,
+			},
+		},
+	})
 }
 
 // writeJSON writes v as a JSON response. Encoding failures are logged but not
