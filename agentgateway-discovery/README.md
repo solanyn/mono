@@ -53,11 +53,11 @@ env:
   - name: DISCOVERY_PROVIDER_MINIMAX_URL
     value: "https://api.minimaxi.chat/v1/models"
   - name: DISCOVERY_PROVIDER_MINIMAX_API_KEY
-    valueFrom: { secretKeyRef: { name: minimax-auth, key: api-key } }
+    valueFrom: { secretKeyRef: { name: minimax-auth, key: MINIMAX_API_KEY } }
   - name: DISCOVERY_PROVIDER_DEEPSEEK_URL
     value: "https://api.deepseek.com/v1/models"
   - name: DISCOVERY_PROVIDER_DEEPSEEK_API_KEY
-    valueFrom: { secretKeyRef: { name: deepseek-auth, key: api-key } }
+    valueFrom: { secretKeyRef: { name: deepseek-auth, key: DEEPSEEK_API_KEY } }
 ```
 
 ## Endpoints
