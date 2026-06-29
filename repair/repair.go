@@ -192,15 +192,28 @@ func Repair(body []byte, cache *Engine) []byte {
 	timer := prometheus.NewTimer(durationSeconds.WithLabelValues("request"))
 	defer timer.ObserveDuration()
 
-	var req struct {
-		Messages []rawMsg `json:"messages"`
-	}
-	if err := json.Unmarshal(body, &req); err != nil || req.Messages == nil {
+	var req map[string]any
+	if err := json.Unmarshal(body, &req); err != nil {
 		parseErrors.WithLabelValues("request").Inc()
 		return body
 	}
 
-	repair(req.Messages, cache)
+	messages, ok := req["messages"].([]any)
+	if !ok {
+		return body
+	}
+
+	rawMsgs := make([]rawMsg, len(messages))
+	for i, m := range messages {
+		rawMsgs[i] = m.(map[string]any)
+	}
+	repair(rawMsgs, cache)
+
+	repairedMsgs := make([]any, len(rawMsgs))
+	for i, m := range rawMsgs {
+		repairedMsgs[i] = m
+	}
+	req["messages"] = repairedMsgs
 
 	out, err := json.Marshal(req)
 	if err != nil {
