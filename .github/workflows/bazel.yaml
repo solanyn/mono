@@ -68,6 +68,7 @@ jobs:
               - 'nodepool-autoscaler/**'
               - 'agentgateway-discovery/**'
               - 'pii-adapter/**'
+              - 'repair/**'
               - 'tools/**'
               - 'vgc/**'
               - 'yield/**'
