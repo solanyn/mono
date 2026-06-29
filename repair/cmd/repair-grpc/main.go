@@ -42,57 +42,71 @@ func (s *ExtProcServer) Process(stream ext_proc.ExternalProcessor_ProcessServer)
 		case *ext_proc.ProcessingRequest_RequestBody:
 			requestBuf = append(requestBuf, v.RequestBody.Body...)
 
-			if v.RequestBody.EndOfStream {
-				slog.Debug("request body complete", "bytes", len(requestBuf))
-				repaired := repair.Repair(requestBuf, s.engine)
-				slog.Debug("repair complete", "originalBytes", len(requestBuf), "repairedBytes", len(repaired))
+			if !v.RequestBody.EndOfStream {
 				_ = stream.Send(&ext_proc.ProcessingResponse{
 					Response: &ext_proc.ProcessingResponse_RequestBody{
 						RequestBody: &ext_proc.BodyResponse{
-							Response: &ext_proc.CommonResponse{
-								BodyMutation: &ext_proc.BodyMutation{
-									Mutation: &ext_proc.BodyMutation_StreamedResponse{
-										StreamedResponse: &ext_proc.StreamedBodyResponse{
-											Body:        repaired,
-											EndOfStream: true,
-										},
+							Response: &ext_proc.CommonResponse{},
+						},
+					},
+				})
+				continue
+			}
+
+			slog.Debug("request body complete", "bytes", len(requestBuf))
+			repaired := repair.Repair(requestBuf, s.engine)
+			slog.Debug("repair complete", "originalBytes", len(requestBuf), "repairedBytes", len(repaired))
+			_ = stream.Send(&ext_proc.ProcessingResponse{
+				Response: &ext_proc.ProcessingResponse_RequestBody{
+					RequestBody: &ext_proc.BodyResponse{
+						Response: &ext_proc.CommonResponse{
+							BodyMutation: &ext_proc.BodyMutation{
+								Mutation: &ext_proc.BodyMutation_StreamedResponse{
+									StreamedResponse: &ext_proc.StreamedBodyResponse{
+										Body:        repaired,
+										EndOfStream: true,
 									},
 								},
 							},
 						},
 					},
-				})
-				requestBuf = requestBuf[:0]
-			} else {
-				_ = stream.Send(&ext_proc.ProcessingResponse{})
-			}
+				},
+			})
+			requestBuf = requestBuf[:0]
 
 		case *ext_proc.ProcessingRequest_ResponseBody:
 			responseBuf = append(responseBuf, v.ResponseBody.Body...)
 
-			if v.ResponseBody.EndOfStream {
-				slog.Debug("response body complete", "bytes", len(responseBuf))
-				repair.CacheToolCalls(responseBuf, s.engine)
+			if !v.ResponseBody.EndOfStream {
 				_ = stream.Send(&ext_proc.ProcessingResponse{
 					Response: &ext_proc.ProcessingResponse_ResponseBody{
 						ResponseBody: &ext_proc.BodyResponse{
-							Response: &ext_proc.CommonResponse{
-								BodyMutation: &ext_proc.BodyMutation{
-									Mutation: &ext_proc.BodyMutation_StreamedResponse{
-										StreamedResponse: &ext_proc.StreamedBodyResponse{
-											Body:        responseBuf,
-											EndOfStream: true,
-										},
+							Response: &ext_proc.CommonResponse{},
+						},
+					},
+				})
+				continue
+			}
+
+			slog.Debug("response body complete", "bytes", len(responseBuf))
+			repair.CacheToolCalls(responseBuf, s.engine)
+			_ = stream.Send(&ext_proc.ProcessingResponse{
+				Response: &ext_proc.ProcessingResponse_ResponseBody{
+					ResponseBody: &ext_proc.BodyResponse{
+						Response: &ext_proc.CommonResponse{
+							BodyMutation: &ext_proc.BodyMutation{
+								Mutation: &ext_proc.BodyMutation_StreamedResponse{
+									StreamedResponse: &ext_proc.StreamedBodyResponse{
+										Body:        responseBuf,
+										EndOfStream: true,
 									},
 								},
 							},
 						},
 					},
-				})
-				responseBuf = responseBuf[:0]
-			} else {
-				_ = stream.Send(&ext_proc.ProcessingResponse{})
-			}
+				},
+			})
+			responseBuf = responseBuf[:0]
 
 		default:
 			_ = stream.Send(&ext_proc.ProcessingResponse{})
