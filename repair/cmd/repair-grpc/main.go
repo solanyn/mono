@@ -25,8 +25,12 @@ type ExtProcServer struct {
 }
 
 type WebhookResponse struct {
-	Action      string `json:"action"`
-	RequestBody string `json:"requestBody"`
+	Action WebhookAction `json:"action"`
+}
+
+type WebhookAction struct {
+	Body   map[string]any `json:"body"`
+	Reason string         `json:"reason"`
 }
 
 func (s *ExtProcServer) Process(stream ext_proc.ExternalProcessor_ProcessServer) error {
@@ -184,9 +188,18 @@ func (s *ExtProcServer) repairWebhook(w http.ResponseWriter, r *http.Request) {
 	repaired := repair.Repair(body, s.engine)
 	slog.Info("webhook repair complete", "originalBytes", len(body), "repairedBytes", len(repaired))
 
+	var bodyJSON map[string]any
+	if err := json.Unmarshal(repaired, &bodyJSON); err != nil {
+		slog.Error("webhook unmarshal repaired body", "err", err)
+		http.Error(w, "unmarshal error", http.StatusInternalServerError)
+		return
+	}
+
 	resp := WebhookResponse{
-		Action:      "ACCEPT",
-		RequestBody: string(repaired),
+		Action: WebhookAction{
+			Body:   bodyJSON,
+			Reason: "repaired",
+		},
 	}
 	respJSON, err := json.Marshal(resp)
 	if err != nil {
