@@ -43,7 +43,9 @@ func (s *ExtProcServer) Process(stream ext_proc.ExternalProcessor_ProcessServer)
 			requestBuf = append(requestBuf, v.RequestBody.Body...)
 
 			if v.RequestBody.EndOfStream {
+				slog.Debug("request body complete", "bytes", len(requestBuf))
 				repaired := repair.Repair(requestBuf, s.engine)
+				slog.Debug("repair complete", "originalBytes", len(requestBuf), "repairedBytes", len(repaired))
 				_ = stream.Send(&ext_proc.ProcessingResponse{
 					Response: &ext_proc.ProcessingResponse_RequestBody{
 						RequestBody: &ext_proc.BodyResponse{
@@ -61,12 +63,15 @@ func (s *ExtProcServer) Process(stream ext_proc.ExternalProcessor_ProcessServer)
 					},
 				})
 				requestBuf = requestBuf[:0]
+			} else {
+				_ = stream.Send(&ext_proc.ProcessingResponse{})
 			}
 
 		case *ext_proc.ProcessingRequest_ResponseBody:
 			responseBuf = append(responseBuf, v.ResponseBody.Body...)
 
 			if v.ResponseBody.EndOfStream {
+				slog.Debug("response body complete", "bytes", len(responseBuf))
 				repair.CacheToolCalls(responseBuf, s.engine)
 				_ = stream.Send(&ext_proc.ProcessingResponse{
 					Response: &ext_proc.ProcessingResponse_ResponseBody{
@@ -85,6 +90,8 @@ func (s *ExtProcServer) Process(stream ext_proc.ExternalProcessor_ProcessServer)
 					},
 				})
 				responseBuf = responseBuf[:0]
+			} else {
+				_ = stream.Send(&ext_proc.ProcessingResponse{})
 			}
 
 		default:
