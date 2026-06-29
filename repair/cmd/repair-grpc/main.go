@@ -185,8 +185,18 @@ func (s *ExtProcServer) repairWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Info("webhook request", "bytes", len(body))
-	repaired := repair.Repair(body, s.engine)
-	slog.Info("webhook repair complete", "originalBytes", len(body), "repairedBytes", len(repaired))
+
+	var guardrailReq struct {
+		Body json.RawMessage `json:"body"`
+	}
+	if err := json.Unmarshal(body, &guardrailReq); err != nil {
+		slog.Error("webhook unmarshal guardrail body", "err", err)
+		http.Error(w, "unmarshal error", http.StatusInternalServerError)
+		return
+	}
+
+	repaired := repair.Repair(guardrailReq.Body, s.engine)
+	slog.Info("webhook repair complete", "originalBytes", len(guardrailReq.Body), "repairedBytes", len(repaired))
 
 	var bodyJSON map[string]any
 	if err := json.Unmarshal(repaired, &bodyJSON); err != nil {
