@@ -67,8 +67,9 @@ jobs:
               - 'line/**'
               - 'nodepool-autoscaler/**'
               - 'agentgateway-discovery/**'
-              - 'pii-adapter/**'
-              - 'tools/**'
+            - 'pii-adapter/**'
+            - 'repair/**'
+            - 'tools/**'
               - 'vgc/**'
               - 'yield/**'
             scrib:
