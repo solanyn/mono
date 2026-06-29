@@ -39,6 +39,16 @@ func (s *ExtProcServer) Process(stream ext_proc.ExternalProcessor_ProcessServer)
 		}
 
 		switch v := req.Request.(type) {
+		case *ext_proc.ProcessingRequest_RequestHeaders:
+			slog.Info("ext_proc request headers", "headers", len(v.RequestHeaders.Headers.Headers))
+			_ = stream.Send(&ext_proc.ProcessingResponse{
+				Response: &ext_proc.ProcessingResponse_RequestHeaders{
+					RequestHeaders: &ext_proc.HeadersResponse{
+						Response: &ext_proc.CommonResponse{},
+					},
+				},
+			})
+
 		case *ext_proc.ProcessingRequest_RequestBody:
 			requestBuf = append(requestBuf, v.RequestBody.Body...)
 
@@ -53,9 +63,9 @@ func (s *ExtProcServer) Process(stream ext_proc.ExternalProcessor_ProcessServer)
 				continue
 			}
 
-			slog.Debug("request body complete", "bytes", len(requestBuf))
+			slog.Info("request body complete", "bytes", len(requestBuf))
 			repaired := repair.Repair(requestBuf, s.engine)
-			slog.Debug("repair complete", "originalBytes", len(requestBuf), "repairedBytes", len(repaired))
+			slog.Info("repair complete", "originalBytes", len(requestBuf), "repairedBytes", len(repaired))
 			_ = stream.Send(&ext_proc.ProcessingResponse{
 				Response: &ext_proc.ProcessingResponse_RequestBody{
 					RequestBody: &ext_proc.BodyResponse{
@@ -74,6 +84,25 @@ func (s *ExtProcServer) Process(stream ext_proc.ExternalProcessor_ProcessServer)
 			})
 			requestBuf = requestBuf[:0]
 
+		case *ext_proc.ProcessingRequest_RequestTrailers:
+			_ = stream.Send(&ext_proc.ProcessingResponse{
+				Response: &ext_proc.ProcessingResponse_RequestTrailers{
+					RequestTrailers: &ext_proc.TrailersResponse{
+						HeaderMutation: &ext_proc.HeaderMutation{},
+					},
+				},
+			})
+
+		case *ext_proc.ProcessingRequest_ResponseHeaders:
+			slog.Info("ext_proc response headers", "headers", len(v.ResponseHeaders.Headers.Headers))
+			_ = stream.Send(&ext_proc.ProcessingResponse{
+				Response: &ext_proc.ProcessingResponse_ResponseHeaders{
+					ResponseHeaders: &ext_proc.HeadersResponse{
+						Response: &ext_proc.CommonResponse{},
+					},
+				},
+			})
+
 		case *ext_proc.ProcessingRequest_ResponseBody:
 			responseBuf = append(responseBuf, v.ResponseBody.Body...)
 
@@ -88,7 +117,7 @@ func (s *ExtProcServer) Process(stream ext_proc.ExternalProcessor_ProcessServer)
 				continue
 			}
 
-			slog.Debug("response body complete", "bytes", len(responseBuf))
+			slog.Info("response body complete", "bytes", len(responseBuf))
 			repair.CacheToolCalls(responseBuf, s.engine)
 			_ = stream.Send(&ext_proc.ProcessingResponse{
 				Response: &ext_proc.ProcessingResponse_ResponseBody{
@@ -108,7 +137,17 @@ func (s *ExtProcServer) Process(stream ext_proc.ExternalProcessor_ProcessServer)
 			})
 			responseBuf = responseBuf[:0]
 
+		case *ext_proc.ProcessingRequest_ResponseTrailers:
+			_ = stream.Send(&ext_proc.ProcessingResponse{
+				Response: &ext_proc.ProcessingResponse_ResponseTrailers{
+					ResponseTrailers: &ext_proc.TrailersResponse{
+						HeaderMutation: &ext_proc.HeaderMutation{},
+					},
+				},
+			})
+
 		default:
+			slog.Warn("unknown ext_proc request type", "type", v)
 			_ = stream.Send(&ext_proc.ProcessingResponse{})
 		}
 	}
@@ -122,7 +161,16 @@ func envOr(key, fallback string) string {
 }
 
 func main() {
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)).With("service", "repair-grpc"))
+	level := slog.LevelInfo
+	switch os.Getenv("LOG_LEVEL") {
+	case "debug":
+		level = slog.LevelDebug
+	case "warn":
+		level = slog.LevelWarn
+	case "error":
+		level = slog.LevelError
+	}
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level})).With("service", "repair-grpc"))
 
 	grpcAddr := envOr("LISTEN_ADDR", "0.0.0.0:4444")
 	metricsAddr := envOr("METRICS_ADDR", "0.0.0.0:9090")
