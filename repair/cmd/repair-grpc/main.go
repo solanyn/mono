@@ -160,6 +160,29 @@ func envOr(key, fallback string) string {
 	return fallback
 }
 
+func (s *ExtProcServer) repairWebhook(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	defer r.Body.Close()
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		slog.Error("webhook read error", "err", err)
+		http.Error(w, "read error", http.StatusInternalServerError)
+		return
+	}
+
+	slog.Info("webhook request", "bytes", len(body))
+	repaired := repair.Repair(body, s.engine)
+	slog.Info("webhook repair complete", "originalBytes", len(body), "repairedBytes", len(repaired))
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(repaired)
+}
+
 func main() {
 	level := slog.LevelInfo
 	switch os.Getenv("LOG_LEVEL") {
@@ -174,14 +197,16 @@ func main() {
 
 	grpcAddr := envOr("LISTEN_ADDR", "0.0.0.0:4444")
 	metricsAddr := envOr("METRICS_ADDR", "0.0.0.0:9090")
+	webhookAddr := envOr("WEBHOOK_ADDR", "0.0.0.0:8080")
 
 	engine := repair.NewEngine()
+	extProcSrv := &ExtProcServer{engine: engine}
 
 	grpcServer := grpc.NewServer()
 	healthServer := health.NewServer()
 	healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
 
-	ext_proc.RegisterExternalProcessorServer(grpcServer, &ExtProcServer{engine: engine})
+	ext_proc.RegisterExternalProcessorServer(grpcServer, extProcSrv)
 	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
 
 	lis, err := net.Listen("tcp", grpcAddr)
@@ -220,11 +245,34 @@ func main() {
 		}
 	}()
 
+	webhookMux := http.NewServeMux()
+	webhookMux.HandleFunc("/", extProcSrv.repairWebhook)
+	webhookMux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, "ok")
+	})
+
+	webhookSrv := &http.Server{
+		Addr:              webhookAddr,
+		Handler:           webhookMux,
+		ReadHeaderTimeout: 30 * time.Second,
+	}
+
+	go func() {
+		slog.Info("webhook listening", "addr", webhookAddr)
+		if err := webhookSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("webhook server error", "err", err)
+			os.Exit(1)
+		}
+	}()
+
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	<-sig
 
 	slog.Info("shutting down")
 	grpcServer.GracefulStop()
+	_ = webhookSrv.Close()
 	_ = metricsSrv.Close()
 }
