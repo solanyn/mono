@@ -1,13 +1,19 @@
 package main
 
 import (
+	"bytes"
+	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -223,6 +229,64 @@ func (s *ExtProcServer) repairWebhook(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(respJSON)
 }
 
+func (s *ExtProcServer) proxyHandler(upstream string) http.Handler {
+	target, err := url.Parse(upstream)
+	if err != nil {
+		slog.Error("invalid upstream URL", "url", upstream, "err", err)
+		os.Exit(1)
+	}
+
+	rp := httputil.NewSingleHostReverseProxy(target)
+	rp.Transport = &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		MaxIdleConns:    100,
+	}
+	rp.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+		slog.Error("upstream error", "method", r.Method, "path", r.URL.Path, "err", err)
+		http.Error(w, fmt.Sprintf("upstream error: %v", err), http.StatusBadGateway)
+	}
+	rp.ModifyResponse = func(r *http.Response) error {
+		if r.Body != nil {
+			body, err := io.ReadAll(r.Body)
+			r.Body.Close()
+			if err != nil {
+				slog.Error("upstream response read error", "err", err)
+				return err
+			}
+			slog.Debug("upstream response", "bytes", len(body))
+			repair.CacheToolCalls(body, s.engine)
+			r.Body = io.NopCloser(bytes.NewReader(body))
+			r.ContentLength = int64(len(body))
+			r.Header.Set("Content-Length", strconv.Itoa(len(body)))
+		}
+		return nil
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		slog.Debug("proxy request", "method", r.Method, "path", r.URL.Path, "host", r.Host)
+
+		if r.Method == "POST" && r.URL.Path == "/v1/chat/completions" {
+			body, err := io.ReadAll(r.Body)
+			r.Body.Close()
+			if err != nil {
+				slog.Error("proxy body read error", "err", err)
+				http.Error(w, "read error", http.StatusInternalServerError)
+				return
+			}
+
+			slog.Info("proxy request body", "bytes", len(body))
+			repaired := repair.Repair(body, s.engine)
+			slog.Info("proxy repair complete", "originalBytes", len(body), "repairedBytes", len(repaired))
+
+			r.Body = io.NopCloser(bytes.NewReader(repaired))
+			r.ContentLength = int64(len(repaired))
+			r.Header.Set("Content-Length", strconv.Itoa(len(repaired)))
+		}
+
+		rp.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	level := slog.LevelInfo
 	switch os.Getenv("LOG_LEVEL") {
@@ -316,6 +380,26 @@ func main() {
 		}()
 	}
 
+	var proxySrv *http.Server
+	if mode == "proxy" || mode == "both" {
+		upstream := envOr("UPSTREAM", "https://gateway.goyangi.io")
+		proxyAddr := envOr("PROXY_ADDR", "0.0.0.0:8080")
+
+		proxySrv = &http.Server{
+			Addr:              proxyAddr,
+			Handler:           extProcSrv.proxyHandler(upstream),
+			ReadHeaderTimeout: 30 * time.Second,
+		}
+
+		go func() {
+			slog.Info("proxy listening", "addr", proxyAddr, "upstream", upstream)
+			if err := proxySrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				slog.Error("proxy server error", "err", err)
+				os.Exit(1)
+			}
+		}()
+	}
+
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	<-sig
@@ -326,6 +410,9 @@ func main() {
 	}
 	if webhookSrv != nil {
 		_ = webhookSrv.Close()
+	}
+	if proxySrv != nil {
+		_ = proxySrv.Close()
 	}
 	_ = metricsSrv.Close()
 }
