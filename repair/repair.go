@@ -29,6 +29,10 @@ var (
 		Name: "repair_content_flattened",
 		Help: "Case 3: JSON-encoded tool result content flattened to plain text",
 	})
+	contentTruncated = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "repair_content_truncated",
+		Help: "Case 4: tool result content truncated to max length",
+	})
 	cacheHits = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "repair_cache_hits",
 		Help: "Cache lookup hits",
@@ -124,8 +128,15 @@ func repair(messages []rawMsg, cache *Engine) {
 					if inner, ok := parsed["content"].(string); ok {
 						tm.m["content"] = inner
 						contentFlattened.Inc()
+						content = inner
 					}
 				}
+			}
+
+			const maxToolContent = 4000
+			if len(content) > maxToolContent {
+				tm.m["content"] = content[:maxToolContent]
+				contentTruncated.Inc()
 			}
 		}
 
