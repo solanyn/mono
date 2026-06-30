@@ -165,7 +165,7 @@ func repair(messages []rawMsg, cache *Engine) {
 				}
 			}
 
-			const maxToolContent = 2000
+			const maxToolContent = 100
 			if len(content) > maxToolContent {
 				tm.m["content"] = content[:maxToolContent]
 				contentTruncated.Inc()
