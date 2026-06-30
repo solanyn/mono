@@ -33,6 +33,10 @@ var (
 		Name: "repair_content_truncated",
 		Help: "Case 4: tool result content truncated to max length",
 	})
+	badToolCallsFiltered = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "repair_bad_tool_calls_filtered",
+		Help: "Case 5: malformed tool_calls with empty IDs stripped from assistant messages",
+	})
 	cacheHits = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "repair_cache_hits",
 		Help: "Cache lookup hits",
@@ -91,6 +95,25 @@ func getSlice(m rawMsg, key string) []any {
 	return v
 }
 
+func filterBadToolCalls(tcs []any) []any {
+	var filtered []any
+	for _, tcRaw := range tcs {
+		tc, ok := tcRaw.(map[string]any)
+		if !ok {
+			continue
+		}
+		id, _ := tc["id"].(string)
+		if id == "" {
+			continue
+		}
+		filtered = append(filtered, tc)
+	}
+	if filtered == nil {
+		return nil
+	}
+	return filtered
+}
+
 func repair(messages []rawMsg, cache *Engine) {
 	for i, msg := range messages {
 		if getStr(msg, "role") != "assistant" {
@@ -110,6 +133,15 @@ func repair(messages []rawMsg, cache *Engine) {
 			j++
 		}
 		if len(toolMsgs) == 0 {
+			// Strip malformed tool_calls with empty IDs (MiniMax returns these occasionally,
+			// corrupting session history — see openclaw/openclaw#19523).
+			if tcs := getSlice(msg, "tool_calls"); len(tcs) > 0 {
+				filtered := filterBadToolCalls(tcs)
+				if len(filtered) < len(tcs) {
+					msg["tool_calls"] = filtered
+					badToolCallsFiltered.Add(float64(len(tcs) - len(filtered)))
+				}
+			}
 			continue
 		}
 
