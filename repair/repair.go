@@ -313,3 +313,4 @@ func extractToolCalls(msg rawMsg, cache *Engine) {
 		}
 	}
 }
+
