@@ -54,6 +54,7 @@ go_binary(
 pkg_tar(
     name = "layer",
     srcs = [":repair-grpc_linux_amd64"],
+    package_dir = "/",
     strip_prefix = ".",
 )
 
@@ -64,7 +65,7 @@ oci_image(
     labels = {
         "org.opencontainers.image.source": "https://github.com/solanyn/mono/tree/main/repair",
         "org.opencontainers.image.title": "repair-grpc",
-        "org.opencontainers.image.description": "ExtProc gRPC server that repairs tool_call/tool_call_id fields in OpenAI-compatible chat completion requests",
+        "org.opencontainers.image.description": "Transparent proxy that repairs tool_call/tool_call_id fields in LLM API requests for MiniMax and DeepSeek compatibility",
         "org.opencontainers.image.licenses": "MIT",
     },
     tars = [":layer"],
@@ -80,4 +81,5 @@ oci_push(
     name = "push",
     image = ":image",
     repository = "ghcr.io/solanyn/repair-grpc",
+    remote_tags = ["latest"],
 )
