@@ -5,6 +5,7 @@ import (
 	"math/rand/v2"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -23,6 +24,10 @@ var (
 	toolIDsAdded = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "repair_tool_ids_added",
 		Help: "Case 2: synthetic tool_call_ids added to tool messages",
+	})
+	contentFlattened = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "repair_content_flattened",
+		Help: "Case 3: JSON-encoded tool result content flattened to plain text",
 	})
 	cacheHits = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "repair_cache_hits",
@@ -110,6 +115,17 @@ func repair(messages []rawMsg, cache *Engine) {
 				synth := "call_repair_" + strconv.FormatUint(uint64(rand.Uint32()), 16)
 				tm.m["tool_call_id"] = synth
 				toolIDsAdded.Inc()
+			}
+
+			content, _ := tm.m["content"].(string)
+			if content != "" && strings.HasPrefix(content, "{") {
+				var parsed map[string]any
+				if json.Unmarshal([]byte(content), &parsed) == nil {
+					if inner, ok := parsed["content"].(string); ok {
+						tm.m["content"] = inner
+						contentFlattened.Inc()
+					}
+				}
 			}
 		}
 

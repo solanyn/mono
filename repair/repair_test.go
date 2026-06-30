@@ -378,3 +378,133 @@ func TestRepair_MultipleAssistantBlocks(t *testing.T) {
 		t.Fatal("second assistant tool_call has wrong id")
 	}
 }
+
+// Case 3: JSON-encoded tool result content is flattened to plain text.
+func TestRepair_FlattenJSONContent(t *testing.T) {
+	cache := NewEngine()
+	body := req(
+		msg("user", nil),
+		msg("assistant", map[string]any{
+			"content": "ok",
+			"tool_calls": []any{
+				map[string]any{
+					"id":   "call_abc",
+					"type": "function",
+					"function": map[string]any{
+						"name":      "get_weather",
+						"arguments": "{}",
+					},
+				},
+			},
+		}),
+		msg("tool", map[string]any{
+			"tool_call_id": "call_abc",
+			"content":      `{"success":true,"content":"sunny and warm"}`,
+		}),
+		msg("user", nil),
+	)
+
+	result := Repair(body, cache)
+	msgs := getMessages(result)
+
+	toolMsg := msgs[2].(map[string]any)
+	content, _ := toolMsg["content"].(string)
+	if content != "sunny and warm" {
+		t.Fatalf("JSON content not flattened: got %q", content)
+	}
+}
+
+// Content that is not JSON is left unchanged.
+func TestRepair_NonJSONContentUnchanged(t *testing.T) {
+	cache := NewEngine()
+	body := req(
+		msg("user", nil),
+		msg("assistant", map[string]any{
+			"content": "ok",
+			"tool_calls": []any{
+				map[string]any{
+					"id":   "call_x",
+					"type": "function",
+					"function": map[string]any{
+						"name":      "test",
+						"arguments": "{}",
+					},
+				},
+			},
+		}),
+		msg("tool", map[string]any{
+			"tool_call_id": "call_x",
+			"content":      "plain text result",
+		}),
+		msg("user", nil),
+	)
+
+	result := Repair(body, cache)
+	msgs := getMessages(result)
+
+	toolMsg := msgs[2].(map[string]any)
+	content, _ := toolMsg["content"].(string)
+	if content != "plain text result" {
+		t.Fatalf("plain text content was modified: got %q", content)
+	}
+}
+
+// JSON content without a 'content' key is left unchanged.
+func TestRepair_JSONContentNoContentKey(t *testing.T) {
+	cache := NewEngine()
+	body := req(
+		msg("user", nil),
+		msg("assistant", map[string]any{
+			"content": "ok",
+			"tool_calls": []any{
+				map[string]any{
+					"id":   "call_x",
+					"type": "function",
+					"function": map[string]any{
+						"name":      "test",
+						"arguments": "{}",
+					},
+				},
+			},
+		}),
+		msg("tool", map[string]any{
+			"tool_call_id": "call_x",
+			"content":      `{"error":"not found","status":404}`,
+		}),
+		msg("user", nil),
+	)
+
+	result := Repair(body, cache)
+	msgs := getMessages(result)
+
+	toolMsg := msgs[2].(map[string]any)
+	content, _ := toolMsg["content"].(string)
+	if content != `{"error":"not found","status":404}` {
+		t.Fatalf("JSON without content key was modified: got %q", content)
+	}
+}
+
+// Case 3 + Case 2 together: missing tool_call_id AND JSON content.
+func TestRepair_FlattenAndAddID(t *testing.T) {
+	cache := NewEngine()
+	body := req(
+		msg("user", nil),
+		msg("assistant", map[string]any{"content": "ok"}),
+		msg("tool", map[string]any{
+			"content": `{"success":true,"content":"result here"}`,
+		}),
+		msg("user", nil),
+	)
+
+	result := Repair(body, cache)
+	msgs := getMessages(result)
+
+	toolMsg := msgs[2].(map[string]any)
+	if _, ok := toolMsg["tool_call_id"]; !ok {
+		t.Fatal("tool_call_id not added")
+	}
+	content, _ := toolMsg["content"].(string)
+	if content != "result here" {
+		t.Fatalf("content not flattened and id not added: got %q", content)
+	}
+}
