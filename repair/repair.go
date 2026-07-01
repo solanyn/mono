@@ -261,14 +261,6 @@ func Repair(body []byte, cache *Engine) []byte {
 	}
 	repair(rawMsgs, cache)
 
-	// Truncate system prompt to keep body under provider limits
-	const maxSystemContent = 4000
-	if len(rawMsgs) > 0 && getStr(rawMsgs[0], "role") == "system" {
-		if content, ok := rawMsgs[0]["content"].(string); ok && len(content) > maxSystemContent {
-			rawMsgs[0]["content"] = content[:maxSystemContent]
-		}
-	}
-
 	repairedMsgs := make([]any, len(rawMsgs))
 	for i, m := range rawMsgs {
 		repairedMsgs[i] = m
