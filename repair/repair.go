@@ -165,13 +165,6 @@ func repair(messages []rawMsg, cache *Engine) {
 				}
 			}
 
-			const maxToolContent = 50
-			if len(content) > maxToolContent {
-				tm.m["content"] = content[:maxToolContent]
-				contentTruncated.Inc()
-			}
-		}
-
 		var existingIDs []string
 		for _, tcRaw := range getSlice(msg, "tool_calls") {
 			tc, ok := tcRaw.(map[string]any)
