@@ -2290,7 +2290,15 @@ oci.pull(
     platforms = ["linux/amd64"],
     tag = "22-slim",
 )
-use_repo(oci, "distroless_base", "distroless_base_linux_amd64", "distroless_static", "distroless_static_linux_amd64", "distroless_static_linux_arm64_v8", "node_slim", "node_slim_linux_amd64", "python_slim", "python_slim_linux_amd64")
+
+oci.pull(
+    name = "nginx_alpine",
+    digest = "sha256:42a516af16b852e33b7682d5ef8acbd5d13fe08fecadc7ed98605ba5e3b26ab8",
+    image = "docker.io/library/nginx",
+    platforms = ["linux/amd64"],
+    tag = "1.29.1-alpine",
+)
+use_repo(oci, "distroless_base", "distroless_base_linux_amd64", "distroless_static", "distroless_static_linux_amd64", "distroless_static_linux_arm64_v8", "node_slim", "node_slim_linux_amd64", "nginx_alpine", "nginx_alpine_linux_amd64", "python_slim", "python_slim_linux_amd64")
 
 # tools
 http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
