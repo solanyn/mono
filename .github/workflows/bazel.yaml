@@ -1,20 +1,22 @@
 name: Bazel
+
 on:
   workflow_dispatch:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
 permissions:
-  packages: write
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
     env:
       BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
     steps:
@@ -32,260 +34,35 @@ jobs:
           bazelisk-cache: true
           disk-cache: ${{ github.workflow }}
           repository-cache: true
-      - name: Build website image
-        if: ${{ github.event_name != 'pull_request' }}
-        run: bazel build //website:image --config=ci
       - name: Build all targets
-        if: ${{ github.event_name == 'pull_request' }}
         run: bazel build //... --config=ci
       - name: Test all targets
-        if: ${{ github.event_name == 'pull_request' }}
         run: bazel test //... --config=ci
-      - name: Compute version
-        id: version
-        run: |
-          VERSION=$(./tools/get-version.sh .)
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
-  changes:
-    runs-on: ubuntu-latest
-    outputs:
-      services: ${{ steps.filter.outputs.services }}
-      scrib: ${{ steps.filter.outputs.scrib }}
-      kobo: ${{ steps.filter.outputs.kobo }}
-      resume: ${{ steps.filter.outputs.resume }}
-      website: ${{ steps.filter.outputs.website }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Detect changes
-        id: filter
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            services:
-              - 'lake/**'
-              - 'libs/datalake/**'
-              - 'scrib/**'
-              - 'cronprint/**'
-              - 'kobo/**'
-              - 'line/**'
-              - 'nodepool-autoscaler/**'
-              - 'agentgateway-discovery/**'
-              - 'pii-adapter/**'
-              - 'repair/**'
-              - 'tools/**'
-              - 'vgc/**'
-              - 'yield/**'
-            scrib:
-              - 'scrib/**'
-            kobo:
-              - 'kobo/**'
-            resume:
-              - 'resume/**'
-            website:
-              - 'website/**'
-
-  push-images:
-    runs-on: ubuntu-latest
-    needs: [test, changes]
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.services == 'true' }}
-    env:
-      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@0.19.0
-        with:
-          bazelisk-cache: true
-          disk-cache: ${{ github.workflow }}
-          repository-cache: true
-      - name: Push OCI images
-        run: |
-          VERSION="${{ needs.test.outputs.version }}"
-          OCI_TARGETS=$(bazel query 'kind("oci_push", //...)' 2>/dev/null || echo "")
-          if [ -z "$OCI_TARGETS" ]; then
-            echo "No OCI push targets found"
-            exit 0
-          fi
-          for target in $OCI_TARGETS; do
-            echo "Pushing $target"
-            bazel run "$target" --config=ci -- --tag "$VERSION"
-            bazel run "$target" --config=ci -- --tag latest
-          done
 
   deploy-resume:
     runs-on: ubuntu-latest
-    needs: [test, changes]
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.resume == 'true' }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Detect resume changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            resume:
+              - 'resume/**'
       - name: Setup Typst
+        if: steps.changes.outputs.resume == 'true'
         uses: typst-community/setup-typst@v5
       - name: Build PDF
+        if: steps.changes.outputs.resume == 'true'
         run: typst compile resume/resume.typ cv.pdf
       - name: Upload to R2
+        if: steps.changes.outputs.resume == 'true'
         run: |
           aws s3 cp cv.pdf s3://assets/cv.pdf \
             --endpoint-url https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
-
-  push-website:
-    runs-on: ubuntu-latest
-    needs: [test, changes]
-    if: ${{ github.event_name != 'pull_request' }}
-    permissions:
-      packages: write
-    env:
-      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@0.19.0
-        with:
-          bazelisk-cache: true
-          disk-cache: ${{ github.workflow }}
-          repository-cache: true
-      - name: Push website image
-        run: |
-          bazel run //website:push --config=ci -- --tag "${{ needs.test.outputs.version }}"
-          bazel run //website:push --config=ci -- --tag latest
-
-  release:
-    runs-on: ubuntu-latest
-    needs: [test, changes]
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.changes.outputs.scrib == 'true' || needs.changes.outputs.kobo == 'true') }}
-    permissions:
-      contents: write
-    env:
-      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@0.19.0
-        with:
-          bazelisk-cache: true
-          disk-cache: ${{ github.workflow }}
-          repository-cache: true
-      - name: Build kobo binaries
-        run: bazel build //kobo/kobo-dash:kobo-dash_linux_arm --config=ci
-      - name: Build scrib-server
-        run: bazel build //scrib:scrib-server --config=ci
-      - name: Create release
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: v${{ needs.test.outputs.version }}
-          name: v${{ needs.test.outputs.version }}
-          generate_release_notes: true
-          files: |
-            bazel-bin/kobo/kobo-dash/kobo-dash_linux_arm
-            bazel-bin/scrib/scrib-server_/scrib-server
-
-  release-scrib-client:
-    runs-on: macos-latest
-    needs: [test, changes, release]
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.scrib == 'true' }}
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: scrib/go.mod
-          cache-dependency-path: scrib/go.sum
-      - name: Build scrib (darwin/arm64)
-        working-directory: scrib
-        env:
-          CGO_ENABLED: "1"
-          GOOS: darwin
-          GOARCH: arm64
-        run: go build -ldflags="-s -w -X main.version=${{ needs.test.outputs.version }}" -o scrib-darwin-arm64 .
-      - name: Build scrib (darwin/amd64)
-        working-directory: scrib
-        env:
-          CGO_ENABLED: "1"
-          GOOS: darwin
-          GOARCH: amd64
-        run: go build -ldflags="-s -w -X main.version=${{ needs.test.outputs.version }}" -o scrib-darwin-amd64 .
-      - name: Upload to release
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: v${{ needs.test.outputs.version }}
-          files: |
-            scrib/scrib-darwin-arm64
-            scrib/scrib-darwin-amd64
-
-  bump-homebrew-scrib:
-    runs-on: ubuntu-latest
-    needs: [test, changes, release-scrib-client]
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.scrib == 'true' }}
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Wait for release assets
-        run: sleep 30
-      - name: Download release assets
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          VERSION="v${{ needs.test.outputs.version }}"
-          gh release download "$VERSION" -R ${{ github.repository }} -p 'scrib-darwin-*' -D /tmp/scrib
-      - name: Compute SHA256
-        id: sha
-        run: |
-          echo "arm64=$(sha256sum /tmp/scrib/scrib-darwin-arm64 | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
-          echo "amd64=$(sha256sum /tmp/scrib/scrib-darwin-amd64 | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
-      - name: Generate app token
-        id: app-token
-        uses: actions/create-github-app-token@v3
-        with:
-          app-id: ${{ secrets.BOT_APP_ID }}
-          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-          repositories: homebrew-tap
-      - name: Checkout homebrew-tap
-        uses: actions/checkout@v4
-        with:
-          repository: solanyn/homebrew-tap
-          token: ${{ steps.app-token.outputs.token }}
-          path: homebrew-tap
-      - name: Update formula
-        env:
-          VERSION: ${{ needs.test.outputs.version }}
-          REPO: ${{ github.repository }}
-          SHA_ARM64: ${{ steps.sha.outputs.arm64 }}
-          SHA_AMD64: ${{ steps.sha.outputs.amd64 }}
-        run: |
-          sed -i "s|version \".*\"|version \"${VERSION}\"|" homebrew-tap/Formula/scrib.rb
-          sed -i "s|download/v[^/]*/scrib-darwin|download/v${VERSION}/scrib-darwin|g" homebrew-tap/Formula/scrib.rb
-          sed -i "/arm64/{n;s|sha256 \".*\"|sha256 \"${SHA_ARM64}\"|;}" homebrew-tap/Formula/scrib.rb
-          sed -i "/amd64/{n;s|sha256 \".*\"|sha256 \"${SHA_AMD64}\"|;}" homebrew-tap/Formula/scrib.rb
-      - name: Push formula update
-        working-directory: homebrew-tap
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Formula/scrib.rb
-          git commit -m "bump scrib to ${{ needs.test.outputs.version }}"
-          git push

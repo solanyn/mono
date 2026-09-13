@@ -2222,11 +2222,6 @@ pip.parse(
     requirements_lock = "//lake/mcp:requirements_lock.txt",
 )
 pip.parse(
-    hub_name = "scrib_ml_pypi",
-    python_version = "3.12",
-    requirements_lock = "//scrib/ml:requirements_lock.txt",
-)
-pip.parse(
     hub_name = "vgc_pypi",
     python_version = "3.12",
     requirements_lock = "//vgc:requirements_lock.txt",
@@ -2236,7 +2231,7 @@ pip.parse(
     python_version = "3.12",
     requirements_lock = "//line/analytics:requirements_lock.txt",
 )
-use_repo(pip, "lake_pypi", "line_pypi", "pypi", "scrib_ml_pypi", "vgc_pypi")
+use_repo(pip, "lake_pypi", "line_pypi", "pypi", "vgc_pypi")
 
 # js
 node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node", dev_dependency = True)

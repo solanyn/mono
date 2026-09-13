@@ -1,0 +1,95 @@
+name: Release
+on:
+  workflow_call:
+    inputs:
+      mode:
+        required: true
+        type: string
+    secrets:
+      BUILDBUDDY_API_KEY:
+        required: false
+
+concurrency:
+  group: mono-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Classify changes
+        id: classify
+        uses: ./.github/actions/classify
+        with:
+          mode: ${{ inputs.mode }}
+
+      - name: Calculate version
+        id: version
+        if: steps.classify.outputs.should_release == 'true'
+        uses: ./.github/actions/version
+
+      - name: Install build dependencies
+        if: steps.classify.outputs.should_release == 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq build-essential
+
+      - name: Setup Bazel
+        if: steps.classify.outputs.should_release == 'true'
+        uses: bazel-contrib/setup-bazel@0.19.0
+        with:
+          bazelisk-cache: true
+          disk-cache: release
+          repository-cache: true
+
+      - name: Build and test
+        if: steps.classify.outputs.should_release == 'true'
+        env:
+          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+        run: |
+          bazel build //... --config=ci
+          bazel test //... --config=ci
+
+      - name: Login to GitHub Container Registry
+        if: steps.classify.outputs.should_release == 'true'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Publish images
+        if: steps.classify.outputs.should_release == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          targets=$(bazel query 'kind("oci_push", //...)' 2>/dev/null || true)
+          for target in $targets; do
+            bazel run "$target" --config=ci -- --tag "$VERSION"
+            bazel run "$target" --config=ci -- --tag latest
+          done
+
+      - name: Build Kobo binary
+        if: steps.classify.outputs.should_release == 'true' && steps.classify.outputs.kobo_changed == 'true'
+        run: bazel build //kobo/kobo-dash:kobo-dash_linux_arm --config=ci
+
+      - name: Create release
+        if: steps.classify.outputs.should_release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          REASON: ${{ steps.classify.outputs.reason }}
+        run: |
+          git tag "$TAG"
+          git push origin "$TAG"
+          gh release create "$TAG" --title "$TAG" --generate-notes --notes "Release reason: $REASON"

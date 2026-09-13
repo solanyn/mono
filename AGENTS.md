@@ -23,13 +23,6 @@ mono/
 │   ├── analytics/      #   Analytics code
 │   └── internal/       #   Shared Go packages
 ├── resume/             # Typst — Resume/CV (data in JSON)
-├── scrib/              # Meeting audio capture + processing
-│   ├── audio/          #   macOS audio capture (ScreenCaptureKit, cgo)
-│   ├── client/         #   HTTP client for server API
-│   ├── cmd/            #   Server binary entry point
-│   ├── server/         #   Go HTTP server (transcription orchestration)
-│   ├── tui/            #   Bubble Tea TUI
-│   └── ml/             #   Python ML pipeline (diarization, transcription)
 ├── tools/              # Build tooling (lint rules, remote toolchains, scripts)
 ├── website/            # TypeScript/Astro 6 — Personal blog (goyangi.io)
 ├── yield/              # Go + Python + TS — Property analysis tool
@@ -51,8 +44,6 @@ mono/
 | `libs/datalake/` | Python | Shared S3 parquet library (PyArrow, boto3, s3fs) |
 | `line/` | Go + TS | Market data platform (gRPC, Kafka, Postgres, S3) |
 | `resume/` | Typst | Resume/CV |
-| `scrib/` | Go | Meeting audio capture, transcription & annotation (Bubble Tea TUI) |
-| `scrib/ml/` | Python | ML audio pipeline — diarization (Senko), transcription (MLX Parakeet) |
 | `website/` | Astro 6 | Personal blog (goyangi.io) |
 | `yield/` | Go + Python + TS | Property analysis — rent fairness, investment, listings |
 

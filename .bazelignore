@@ -3,4 +3,3 @@ bazel-*
 .git
 .venv
 tldr/frontend/node_modules
-scrib/diar

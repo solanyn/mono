@@ -1,0 +1,119 @@
+name: Classify changes
+description: Classify unreleased changes for the mono release policy
+inputs:
+  mode:
+    description: source, dependency, or manual
+    required: true
+outputs:
+  should_release:
+    description: Whether this invocation should publish a release
+    value: ${{ steps.classify.outputs.should_release }}
+  reason:
+    description: Release decision reason
+    value: ${{ steps.classify.outputs.reason }}
+  source_changed:
+    description: Whether source or runtime files changed
+    value: ${{ steps.classify.outputs.source_changed }}
+  dependency_changed:
+    description: Whether dependency files changed
+    value: ${{ steps.classify.outputs.dependency_changed }}
+  kobo_changed:
+    description: Whether Kobo files changed
+    value: ${{ steps.classify.outputs.kobo_changed }}
+runs:
+  using: composite
+  steps:
+    - id: classify
+      shell: bash
+      env:
+        RELEASE_MODE: ${{ inputs.mode }}
+      run: |
+        set -euo pipefail
+        git fetch --tags --force origin main
+
+        latest_tag=$(git tag --list 'v20*' --sort=-version:refname | head -n1 || true)
+        if [[ -n "$latest_tag" ]]; then
+          mapfile -t files < <(git diff --name-only "$latest_tag"..HEAD)
+          mapfile -t subjects < <(git log --format='%s' "$latest_tag"..HEAD)
+        else
+          mapfile -t files < <(git ls-files)
+          mapfile -t subjects < <(git log --format='%s')
+        fi
+
+        source_changed=false
+        dependency_changed=false
+        relevant_changed=false
+        kobo_changed=false
+        all_renovate=true
+
+        while IFS=$'\t' read -r commit subject; do
+          commit_relevant=false
+          while IFS= read -r path; do
+            case "$path" in
+              .github/*|README.md|docs/*|AGENTS.md)
+                ;;
+              *)
+                commit_relevant=true
+                ;;
+            esac
+          done < <(git diff-tree --no-commit-id --name-only -r "$commit")
+          if [[ "$commit_relevant" == true && ! "$subject" =~ ^chore\(deps(-dev)?\): ]]; then
+            all_renovate=false
+          fi
+        done < <(git log --format='%H%x09%s' "$latest_tag"..HEAD 2>/dev/null || true)
+
+        for path in "${files[@]}"; do
+          case "$path" in
+            .github/*|README.md|docs/*|AGENTS.md)
+              ;;
+            MODULE.bazel|MODULE.bazel.lock|flake.lock|pnpm-lock.yaml|package-lock.json|yarn.lock|uv.lock|poetry.lock|requirements*.txt|*/go.mod|*/go.sum|go.mod|go.sum)
+              dependency_changed=true
+              relevant_changed=true
+              ;;
+            kobo/*)
+              source_changed=true
+              relevant_changed=true
+              kobo_changed=true
+              ;;
+            *)
+              source_changed=true
+              relevant_changed=true
+              ;;
+          esac
+        done
+
+        should_release=false
+        reason=none
+        case "$RELEASE_MODE" in
+          source)
+            if [[ "$source_changed" == true ]]; then
+              should_release=true
+              reason=source-change
+            fi
+            ;;
+          dependency)
+            if [[ "$relevant_changed" == true && "$source_changed" == false && "$dependency_changed" == true && "$all_renovate" == true ]]; then
+              should_release=true
+              reason=weekly-renovate
+            fi
+            ;;
+          manual)
+            if [[ "$relevant_changed" == true ]]; then
+              should_release=true
+              reason=manual
+            fi
+            ;;
+          *)
+            echo "Unknown release mode: $RELEASE_MODE" >&2
+            exit 1
+            ;;
+        esac
+
+        {
+          echo "should_release=$should_release"
+          echo "reason=$reason"
+          echo "source_changed=$source_changed"
+          echo "dependency_changed=$dependency_changed"
+          echo "kobo_changed=$kobo_changed"
+        } >> "$GITHUB_OUTPUT"
+        echo "Release decision: $reason"

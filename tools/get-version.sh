@@ -1,14 +1,10 @@
 #!/bin/bash
-# get-version.sh <directory>
-# Generates version in format YYYY.MM.MICRO where MICRO is commits in current month for specified directory
+set -euo pipefail
 
-DIR=${1:-.}
-YEAR=$(date +%Y)
-MONTH=$(date +%m)
-
-# Get commits in current month for this directory
-SINCE="${YEAR}-${MONTH}-01"
-MICRO=$(git rev-list --count --since="${SINCE}" HEAD -- "${DIR}/")
-
-VERSION="${YEAR}.${MONTH}.${MICRO}"
-echo $VERSION
+# Return the current release version in YYYY.MM.N format.
+latest_tag=$(git tag --list 'v20*' --sort=-version:refname | head -n1 || true)
+if [[ -n "$latest_tag" ]]; then
+  echo "${latest_tag#v}"
+else
+  echo "0.0.0"
+fi

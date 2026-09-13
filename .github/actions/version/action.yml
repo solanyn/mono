@@ -1,0 +1,27 @@
+name: Calculate version
+description: Calculate the next calendar release version
+outputs:
+  version:
+    description: Version without the v prefix
+    value: ${{ steps.version.outputs.version }}
+  tag:
+    description: Git tag including the v prefix
+    value: ${{ steps.version.outputs.tag }}
+runs:
+  using: composite
+  steps:
+    - id: version
+      shell: bash
+      run: |
+        set -euo pipefail
+        current_month=$(date -u +%Y.%m)
+        latest_tag=$(git tag --list 'v20*' --sort=-version:refname | head -n1 || true)
+        if [[ "$latest_tag" =~ ^v${current_month//./\.}\.([0-9]+)$ ]]; then
+          next=$((BASH_REMATCH[1] + 1))
+        else
+          next=1
+        fi
+        version="${current_month}.${next}"
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+        echo "tag=v$version" >> "$GITHUB_OUTPUT"
+        echo "Next version: v$version"
