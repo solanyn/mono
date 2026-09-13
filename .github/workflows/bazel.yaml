@@ -32,9 +32,14 @@ jobs:
           bazelisk-cache: true
           disk-cache: ${{ github.workflow }}
           repository-cache: true
+      - name: Build website image
+        if: ${{ github.event_name != 'pull_request' }}
+        run: bazel build //website:image --config=ci
       - name: Build all targets
+        if: ${{ github.event_name == 'pull_request' }}
         run: bazel build //... --config=ci
       - name: Test all targets
+        if: ${{ github.event_name == 'pull_request' }}
         run: bazel test //... --config=ci
       - name: Compute version
         id: version
