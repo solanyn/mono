@@ -56,7 +56,7 @@ pkg_tar(
     name = "assets_layer",
     srcs = [":build"],
     package_dir = "/",
-)
+    strip_prefix = "dist",
 
 oci_image(
     name = "assets",
