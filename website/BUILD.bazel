@@ -56,7 +56,7 @@ js_run_binary(
 pkg_files(
     name = "assets_files",
     srcs = [":build"],
-    strip_prefix = strip_prefix.from_pkg(),
+    strip_prefix = strip_prefix.from_pkg("dist"),
 )
 
 pkg_tar(
