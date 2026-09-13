@@ -53,26 +53,25 @@ js_run_binary(
 )
 
 pkg_tar(
-    name = "static_layer",
+    name = "assets_layer",
     srcs = [":build"],
-    package_dir = "/usr/share/nginx/html",
+    package_dir = "/",
 )
 
 oci_image(
-    name = "image",
-    base = "@nginx_alpine",
-    tars = [":static_layer"],
+    name = "assets",
+    tars = [":assets_layer"],
     labels = {
         "org.opencontainers.image.source": "https://github.com/solanyn/mono/tree/main/website",
-        "org.opencontainers.image.title": "goyangi.io",
-        "org.opencontainers.image.description": "Static Astro website",
+        "org.opencontainers.image.title": "goyangi.io static assets",
+        "org.opencontainers.image.description": "Static Astro website assets",
     },
 )
 
 oci_push(
-    name = "push",
-    image = ":image",
-    repository = "ghcr.io/solanyn/website",
+    name = "assets_push",
+    image = ":assets",
+    repository = "ghcr.io/solanyn/website-assets",
 )
 
 astro_bin.astro_binary(
