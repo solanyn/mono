@@ -16,11 +16,12 @@ import (
 )
 
 type Config struct {
-	Host       string
-	Port       string
-	PrinterURI string
-	Timezone   string
-	Jobs       []JobConfig
+	Host        string
+	Port        string
+	PrinterName string
+	PrinterURI  string
+	Timezone    string
+	Jobs        []JobConfig
 }
 
 type JobConfig struct {
@@ -32,10 +33,11 @@ type JobConfig struct {
 
 func loadConfig() Config {
 	cfg := Config{
-		Host:       envOr("CRONPRINT_HOST", "0.0.0.0"),
-		Port:       envOr("CRONPRINT_PORT", "8080"),
-		PrinterURI: os.Getenv("CRONPRINT_PRINTER_URI"),
-		Timezone:   envOr("CRONPRINT_TIMEZONE", "UTC"),
+		Host:        envOr("CRONPRINT_HOST", "0.0.0.0"),
+		Port:        envOr("CRONPRINT_PORT", "8080"),
+		PrinterName: envOr("CRONPRINT_PRINTER_NAME", "epson"),
+		PrinterURI:  os.Getenv("CRONPRINT_PRINTER_URI"),
+		Timezone:    envOr("CRONPRINT_TIMEZONE", "UTC"),
 	}
 
 	for _, kv := range os.Environ() {
@@ -70,16 +72,13 @@ func envOr(key, fallback string) string {
 func main() {
 	cfg := loadConfig()
 
-	if cfg.PrinterURI == "" {
-		log.Fatal("CRONPRINT_PRINTER_URI is required")
-	}
-
 	loc, err := time.LoadLocation(cfg.Timezone)
 	if err != nil {
 		log.Fatalf("invalid timezone %q: %v", cfg.Timezone, err)
 	}
 
-	printer := NewIPPPrinter(cfg.PrinterURI)
+	printer := NewPrinter(cfg.PrinterName)
+	printer.URI = cfg.PrinterURI
 
 	c := cron.New(cron.WithLocation(loc))
 
@@ -109,7 +108,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		attrs, err := printer.GetPrinterAttributes()
+		attrs, err := printer.Health()
 		status := "healthy"
 		if err != nil {
 			status = "degraded"
@@ -118,7 +117,7 @@ func main() {
 		json.NewEncoder(w).Encode(map[string]any{
 			"status":     status,
 			"service":    "cronprint",
-			"printer":    cfg.PrinterURI,
+			"printer":    cfg.PrinterName,
 			"printer_ok": err == nil,
 			"attributes": attrs,
 			"jobs":       len(c.Entries()),

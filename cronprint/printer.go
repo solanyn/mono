@@ -3,148 +3,104 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
+	"os/exec"
 	"strings"
-
-	"github.com/OpenPrinting/goipp"
 )
 
-type IPPPrinter struct {
-	uri     string
-	httpURI string
+// Printer prints documents through the local CUPS daemon.
+//
+// The Epson ET-2810 advertises IPP Everywhere / PWG raster but does not
+// actually render it — jobs are accepted and silently dropped. The reliable
+// path is CUPS with the ESC/P-R driver (printer-driver-escpr), which talks
+// to the printer over a raw AppSocket (port 9100) using Epson's native
+// protocol. See cronprint-epson-notes in the Obsidian vault.
+type Printer struct {
+	// Name is the CUPS queue name (also used as lp -d target).
+	Name string
+	// URI is the device URI shown in lpstat; informational only.
+	URI string
 }
 
-func NewIPPPrinter(uri string) *IPPPrinter {
-	httpURI := uri
-	if strings.HasPrefix(httpURI, "ipp://") {
-		httpURI = "http://" + strings.TrimPrefix(httpURI, "ipp://")
-	} else if strings.HasPrefix(httpURI, "ipps://") {
-		httpURI = "https://" + strings.TrimPrefix(httpURI, "ipps://")
-	}
-	return &IPPPrinter{uri: uri, httpURI: httpURI}
+// NewPrinter returns a Printer for the named CUPS queue.
+func NewPrinter(name string) *Printer {
+	return &Printer{Name: name}
 }
 
-func (p *IPPPrinter) sendRequest(msg *goipp.Message, body io.Reader) (*goipp.Message, error) {
-	payload, err := msg.EncodeBytes()
+// Health returns the printer's current CUPS state ("idle", "printing",
+// "stopped", etc.) and whether the queue exists. It is used by /healthz.
+func (p *Printer) Health() (map[string]string, error) {
+	out, err := exec.Command("lpstat", "-p", p.Name).CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("encode IPP request: %w", err)
+		return nil, fmt.Errorf("lpstat -p %s: %w (%s)", p.Name, err, strings.TrimSpace(string(out)))
 	}
 
-	var reqBody io.Reader
-	if body != nil {
-		reqBody = io.MultiReader(bytes.NewReader(payload), body)
-	} else {
-		reqBody = bytes.NewReader(payload)
+	fields := strings.Fields(string(out))
+	// Expected first line: "printer NAME is idle.  enable since ..."
+	state := "unknown"
+	if len(fields) >= 4 && fields[0] == "printer" && fields[2] == "is" {
+		state = strings.TrimSuffix(fields[3], ".")
 	}
 
-	req, err := http.NewRequest(http.MethodPost, p.httpURI, reqBody)
-	if err != nil {
-		return nil, fmt.Errorf("create HTTP request: %w", err)
-	}
-	req.Header.Set("Content-Type", goipp.ContentType)
-	req.Header.Set("Accept", goipp.ContentType)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("HTTP request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode/100 != 2 {
-		return nil, fmt.Errorf("HTTP %s", resp.Status)
-	}
-
-	var rsp goipp.Message
-	if err := rsp.Decode(resp.Body); err != nil {
-		return nil, fmt.Errorf("decode IPP response: %w", err)
-	}
-
-	if goipp.Status(rsp.Code) != goipp.StatusOk {
-		return &rsp, fmt.Errorf("IPP error: %s", goipp.Status(rsp.Code))
-	}
-
-	return &rsp, nil
+	return map[string]string{
+		"name":  p.Name,
+		"state": state,
+		"uri":   p.URI,
+	}, nil
 }
 
-func (p *IPPPrinter) newRequest(op goipp.Op) *goipp.Message {
-	msg := goipp.NewRequest(goipp.DefaultVersion, op, 1)
-	msg.Operation.Add(goipp.MakeAttribute("attributes-charset",
-		goipp.TagCharset, goipp.String("utf-8")))
-	msg.Operation.Add(goipp.MakeAttribute("attributes-natural-language",
-		goipp.TagLanguage, goipp.String("en-US")))
-	msg.Operation.Add(goipp.MakeAttribute("printer-uri",
-		goipp.TagURI, goipp.String(p.uri)))
-	return msg
-}
+// PrintFile sends an existing file to the CUPS queue. CUPS handles format
+// conversion (PDF/PostScript/plain text) to ESC/P-R via the escpr driver.
+func (p *Printer) PrintFile(filePath, jobName string) error {
+	if _, err := os.Stat(filePath); err != nil {
+		return fmt.Errorf("print file: %w", err)
+	}
 
-func (p *IPPPrinter) GetPrinterAttributes() (map[string]string, error) {
-	msg := p.newRequest(goipp.OpGetPrinterAttributes)
-	msg.Operation.Add(goipp.MakeAttr("requested-attributes",
-		goipp.TagKeyword, goipp.String("printer-state"),
-		goipp.String("printer-state-reasons"),
-		goipp.String("printer-make-and-model")))
+	args := []string{"-d", p.Name}
+	if jobName != "" {
+		args = append(args, "-t", jobName)
+	}
+	args = append(args, filePath)
 
-	rsp, err := p.sendRequest(msg, nil)
+	out, err := exec.Command("lp", args...).CombinedOutput()
 	if err != nil {
-		return nil, err
-	}
-
-	attrs := make(map[string]string)
-	for _, group := range rsp.AttrGroups() {
-		for _, attr := range group.Attrs {
-			attrs[attr.Name] = attr.Values.String()
-		}
-	}
-	return attrs, nil
-}
-
-func (p *IPPPrinter) PrintFile(filePath string, jobName string) error {
-	f, err := os.Open(filePath)
-	if err != nil {
-		return fmt.Errorf("open file: %w", err)
-	}
-	defer f.Close()
-
-	mimeType := "application/octet-stream"
-	if strings.HasSuffix(filePath, ".pdf") {
-		mimeType = "application/pdf"
-	} else if strings.HasSuffix(filePath, ".ps") {
-		mimeType = "application/postscript"
-	}
-
-	msg := p.newRequest(goipp.OpPrintJob)
-	msg.Operation.Add(goipp.MakeAttribute("requesting-user-name",
-		goipp.TagName, goipp.String("cronprint")))
-	msg.Operation.Add(goipp.MakeAttribute("job-name",
-		goipp.TagName, goipp.String(jobName)))
-	msg.Operation.Add(goipp.MakeAttribute("document-format",
-		goipp.TagMimeType, goipp.String(mimeType)))
-
-	_, err = p.sendRequest(msg, f)
-	return err
-}
-
-func (p *IPPPrinter) PrintTestPage(jobName string) error {
-	testPDF := generateMinimalPDF()
-
-	msg := p.newRequest(goipp.OpPrintJob)
-	msg.Operation.Add(goipp.MakeAttribute("requesting-user-name",
-		goipp.TagName, goipp.String("cronprint")))
-	msg.Operation.Add(goipp.MakeAttribute("job-name",
-		goipp.TagName, goipp.String(jobName)))
-	msg.Operation.Add(goipp.MakeAttribute("document-format",
-		goipp.TagMimeType, goipp.String("application/pdf")))
-
-	_, err := p.sendRequest(msg, bytes.NewReader(testPDF))
-	if err != nil {
-		return err
+		return fmt.Errorf("lp -d %s: %w (%s)", p.Name, err, strings.TrimSpace(string(out)))
 	}
 	return nil
 }
 
-func generateMinimalPDF() []byte {
+// PrintTestPage prints a minimal self-contained PDF via CUPS. The job name
+// is passed through so scheduled "nozzle check" runs are identifiable in
+// the queue.
+func (p *Printer) PrintTestPage(jobName string) error {
+	if jobName == "" {
+		jobName = "cronprint-test-page"
+	}
+	tmp, err := os.CreateTemp("", "cronprint-*.pdf")
+	if err != nil {
+		return fmt.Errorf("create temp PDF: %w", err)
+	}
+	defer os.Remove(tmp.Name())
+
+	if _, err := tmp.Write(generateTestPagePDF()); err != nil {
+		tmp.Close()
+		return fmt.Errorf("write temp PDF: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("close temp PDF: %w", err)
+	}
+
+	return p.PrintFile(tmp.Name(), jobName)
+}
+
+// generateTestPagePDF returns a tiny valid PDF with a printable page. Kept
+// dependency-free so the binary stays static and the page is guaranteed to
+// render through CUPS's pdftops filter.
+//
+// The page is A4 with a large "cronprint" label so a weekly nozzle-check
+// print is visibly identifiable on the output tray. Offsets are computed
+// so the xref table is always correct.
+func generateTestPagePDF() []byte {
 	var buf bytes.Buffer
 	offsets := make([]int, 5)
 
@@ -157,9 +113,16 @@ func generateMinimalPDF() []byte {
 	buf.WriteString("2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n")
 
 	offsets[2] = buf.Len()
-	buf.WriteString("3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n")
+	buf.WriteString("3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>\nendobj\n")
 
-	stream := "BT /F1 24 Tf 100 400 Td (cronprint test page) Tj ET"
+	stream := `BT
+/F1 48 Tf
+72 720 Td
+(cronprint) Tj
+0 -70 Td
+/F1 14 Tf
+(weekly nozzle check) Tj
+ET`
 	offsets[3] = buf.Len()
 	buf.WriteString(fmt.Sprintf("4 0 obj\n<< /Length %d >>\nstream\n%s\nendstream\nendobj\n", len(stream), stream))
 

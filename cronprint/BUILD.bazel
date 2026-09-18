@@ -1,13 +1,10 @@
 load("@rules_go//go:def.bzl", "go_binary", "go_library")
-load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
-load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 
 go_library(
     name = "lib",
     srcs = glob(["*.go"]),
     importpath = "github.com/solanyn/mono/cronprint",
     deps = [
-        "@com_github_openprinting_goipp//:goipp",
         "@com_github_robfig_cron_v3//:cron",
     ],
     visibility = ["//visibility:public"],
@@ -17,48 +14,4 @@ go_binary(
     name = "cronprint",
     embed = [":lib"],
     visibility = ["//visibility:public"],
-)
-
-go_binary(
-    name = "cronprint_linux_amd64",
-    embed = [":lib"],
-    goarch = "amd64",
-    goos = "linux",
-    pure = "on",
-    visibility = ["//visibility:public"],
-)
-
-go_binary(
-    name = "cronprint_linux_arm64",
-    embed = [":lib"],
-    goarch = "arm64",
-    goos = "linux",
-    pure = "on",
-    visibility = ["//visibility:public"],
-)
-
-pkg_tar(
-    name = "layer",
-    srcs = [":cronprint_linux_amd64"],
-    strip_prefix = ".",
-)
-
-oci_image(
-    name = "image",
-    base = "@distroless_static",
-    entrypoint = ["/cronprint_linux_amd64_/cronprint_linux_amd64"],
-    labels = {"org.opencontainers.image.source": "https://github.com/solanyn/mono"},
-    tars = [":layer"],
-)
-
-oci_load(
-    name = "load",
-    image = ":image",
-    repo_tags = ["cronprint:latest"],
-)
-
-oci_push(
-    name = "push",
-    image = ":image",
-    repository = "ghcr.io/solanyn/cronprint",
 )

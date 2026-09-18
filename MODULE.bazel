@@ -2046,7 +2046,6 @@ use_repo(
     "com_github_olekukonko_tablewriter",
     "com_github_opencontainers_go_digest",
     "com_github_opencontainers_image_spec",
-    "com_github_openprinting_goipp",
     "com_github_parquet_go_bitpack",
     "com_github_parquet_go_jsonlite",
     "com_github_parquet_go_parquet_go",
