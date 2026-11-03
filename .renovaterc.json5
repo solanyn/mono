@@ -1,0 +1,150 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  // home-ops runs Renovate from the in-cluster RenovateJob (renovate-operator),
+  // and mono is already in that job's discoveryFilters. The in-repo GitHub Action
+  // workflow was a second scheduler for the same repo, so it is removed here.
+  extends: [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    "docker:enableMajor",
+    "helpers:pinGitHubActionDigestsToSemver",
+    ":skipStatusChecks",
+  ],
+  timezone: "Australia/Sydney",
+  // PR volume cap: mono has 5 npm packages plus Bazel, Go and Python modules.
+  schedule: ["* 22-23,0-5 * * *"],
+  prConcurrentLimit: 10,
+  prHourlyLimit: 4,
+  branchConcurrentLimit: 20,
+  forkProcessing: "disabled",
+  ignorePaths: ["**/node_modules/**", "**/.worktrees/**"],
+  lockFileMaintenance: {
+    enabled: true,
+    schedule: ["before 3am on the first day of the month"],
+  },
+  suppressNotifications: ["prEditedNotification", "prIgnoreNotification"],
+  packageRules: [
+    {
+      description: "Never automerge major updates",
+      matchUpdateTypes: ["major"],
+      automerge: false,
+    },
+    {
+      description: "Automerge patch updates once they have aged (supply-chain guard)",
+      matchUpdateTypes: ["patch"],
+      minimumReleaseAge: "3 days",
+      automerge: true,
+      automergeType: "pr",
+    },
+    {
+      description: "Minor updates need review; they can change behaviour across a monorepo",
+      matchUpdateTypes: ["minor"],
+      automerge: false,
+    },
+    {
+      description: "GitHub Actions: pin to a digest but keep the readable version in the comment",
+      matchManagers: ["github-actions"],
+      pinDigests: true,
+    },
+    {
+      description: "Automerge trusted GitHub Actions on minor/patch/digest",
+      matchManagers: ["github-actions"],
+      matchPackageNames: ["/^actions\//", "/^renovatebot\//"],
+      matchUpdateTypes: ["minor", "patch", "digest"],
+      minimumReleaseAge: "1 minute",
+      automerge: true,
+      automergeType: "branch",
+      ignoreTests: true,
+    },
+    {
+      description: "Auto-merge solanyn first-party container digests",
+      matchDatasources: ["docker"],
+      matchPackageNames: ['/^ghcr\\.io\\/solanyn\\//', '/^docker\\.io\\/solanyn\\//'],
+      matchUpdateTypes: ["digest", "pin", "pinDigest"],
+      automerge: true,
+      automergeType: "pr",
+      ignoreTests: false,
+    },
+    {
+      description: "Do not hand-edit generated Bazel lockfile",
+      matchFileNames: ["MODULE.bazel.lock"],
+      enabled: false,
+    },
+    {
+      description: "Bazel module dependencies: group them so one bump does not open a PR per dependency",
+      matchManagers: ["bazel-module"],
+      groupName: "bazel deps",
+      minimumGroupSize: 2,
+      group: {
+        commitMessageTopic: "{{{groupName}}} group",
+      },
+    },
+    {
+      description: "React and friends: one PR instead of one per package",
+      matchManagers: ["npm"],
+      matchPackageNames: [
+        "react",
+        "react-dom",
+        "/^@types/react(-dom)?$/",
+        "/^@react-three//",
+        "three",
+        "/^@types/three$/",
+      ],
+      groupName: "react",
+      minimumGroupSize: 2,
+      group: {
+        commitMessageTopic: "{{{groupName}}} group",
+      },
+    },
+    {
+      description: "Vite and its plugins move together",
+      matchManagers: ["npm"],
+      matchPackageNames: ["vite", "/^@vitejs//", "/^vite-plugin-/"],
+      groupName: "vite",
+      minimumGroupSize: 2,
+      group: {
+        commitMessageTopic: "{{{groupName}}} group",
+      },
+    },
+    {
+      description: "Astro and its integrations are released in lockstep",
+      matchManagers: ["npm"],
+      matchPackageNames: ["astro", "/^@astrojs//"],
+      groupName: "astro",
+      minimumGroupSize: 2,
+      group: {
+        commitMessageTopic: "{{{groupName}}} group",
+      },
+    },
+    {
+      description: "Tailwind v4 splits the engine and the Vite plugin across two packages",
+      matchManagers: ["npm"],
+      matchPackageNames: ["tailwindcss", "/^@tailwindcss//"],
+      groupName: "tailwind",
+      minimumGroupSize: 2,
+      group: {
+        commitMessageTopic: "{{{groupName}}} group",
+      },
+    },
+    {
+      description: "Cloudflare tooling",
+      matchManagers: ["npm"],
+      matchPackageNames: ["/^wrangler$/", "/^@cloudflare//"],
+      groupName: "cloudflare",
+      minimumGroupSize: 2,
+      group: {
+        commitMessageTopic: "{{{groupName}}} group",
+      },
+    },
+    {
+      description: "Python dependencies across uv projects: one PR",
+      matchManagers: ["pep621", "pip_requirements", "pip-compile", "uv"],
+      groupName: "python deps",
+      minimumGroupSize: 2,
+      group: {
+        commitMessageTopic: "{{{groupName}}} group",
+      },
+    },
+  ],
+}
