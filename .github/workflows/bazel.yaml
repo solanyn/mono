@@ -54,7 +54,7 @@ jobs:
               - 'resume/**'
       - name: Setup Typst
         if: steps.changes.outputs.resume == 'true'
-        uses: typst-community/setup-typst@v5
+        uses: typst-community/setup-typst@6a2cfaf0b28d636b00148f965e315bae81079aaa # v5.3.1
       - name: Build PDF
         if: steps.changes.outputs.resume == 'true'
         run: typst compile resume/resume.typ cv.pdf
