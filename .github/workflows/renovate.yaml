@@ -8,6 +8,8 @@ on:
       - main
     paths:
       - renovate.json
+      - .renovaterc.json5
+      - .renovate/**
   schedule:
     - cron: 20 * * * *
   workflow_dispatch:
