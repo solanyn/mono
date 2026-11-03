@@ -1,7 +1,8 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
   // home-ops runs Renovate from the in-cluster RenovateJob (renovate-operator),
-  // so mono's GitHub Action workflow was a duplicate scheduler and is removed.
+  // and mono is already in that job's discoveryFilters. The in-repo GitHub Action
+  // workflow was a second scheduler for the same repo, so it is removed here.
   extends: [
     "config:recommended",
     ":dependencyDashboard",
