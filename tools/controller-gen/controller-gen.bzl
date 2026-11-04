@@ -27,7 +27,7 @@ def _controller_gen_action(ctx, cg_cmd, outputs, output_path):
           export GOCACHE=$PWD/.gocache &&
           {cmd} {args}
         """.format(
-        godir = go_ctx.go.path[:-1 - len(go_ctx.go.basename)],
+        godir = go_ctx.sdk.go.path[:-1 - len(go_ctx.sdk.go.basename)],
         gopath = gopath,
         cmd = "$(pwd)/" + cg_info.controller_gen_bin.path,
         args = " ".join([
@@ -43,7 +43,7 @@ def _controller_gen_action(ctx, cg_cmd, outputs, output_path):
         env = {"GO111MODULE": "off"},
         command = cmd,
         tools = [
-            go_ctx.go,
+            go_ctx.sdk.go,
             cg_info.controller_gen_bin,
         ],
     )
