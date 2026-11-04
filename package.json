@@ -6,7 +6,7 @@
       "sharp"
     ],
     "patchedDependencies": {
-      "vite@7.3.1": "patches/vite@7.3.1.patch"
+      "vite@7.3.7": "patches/vite@7.3.7.patch"
     }
   },
   "devDependencies": {
