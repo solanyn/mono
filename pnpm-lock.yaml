@@ -67,8 +67,8 @@ importers:
   vgc/calc:
     dependencies:
       '@smogon/calc':
-        specifier: ^0.11.0
-        version: 0.11.0
+        specifier: ^0.12.0
+        version: 0.12.0
 
   website:
     dependencies:
@@ -2180,8 +2180,8 @@ packages:
     resolution: {integrity: sha512-P1Cz1dWaFfR4IR+U13mqqiGsLFf1KbayybWwdd2vfctdV6hDpUkgCY0nKOLLTMSoRd/jJNjtbqzf13K8DCCXQw==}
     engines: {node: '>=18'}
 
-  '@smogon/calc@0.11.0':
-    resolution: {integrity: sha512-ixP+IgQhI12R68FXxyt8+f4EZM/jdqBXZ2oCKu5zuUWXls4kYbIVdgE7t6+pkn/y6VxU+cXJhRgMkiU7wG8JHQ==}
+  '@smogon/calc@0.12.0':
+    resolution: {integrity: sha512-rNkdYV/ZGIugxD+hZlHdDaZLdGPYRIm+AaMFM18X2T2Pf8jpuuro9aoeiaZh51zcRR4tN3NRjSPoEXZ5ZDTuuA==}
 
   '@speed-highlight/core@1.2.15':
     resolution: {integrity: sha512-BMq1K3DsElxDWawkX6eLg9+CKJrTVGCBAWVuHXVUV2u0s2711qiChLSId6ikYPfxhdYocLNt3wWwSvDiTvFabw==}
@@ -7368,7 +7368,7 @@ snapshots:
 
   '@sindresorhus/is@7.2.0': {}
 
-  '@smogon/calc@0.11.0':
+  '@smogon/calc@0.12.0':
     dependencies:
       '@types/node': 18.19.130
 
