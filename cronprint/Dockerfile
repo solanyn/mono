@@ -2,7 +2,7 @@
 
 # Stage 1: build the cronprint binary. Mirror the Bazel go_binary target
 # using the Go toolchain directly so the runtime image stays self-contained.
-FROM golang:1.26-bookworm AS build
+FROM golang:1.27-bookworm AS build
 WORKDIR /src
 COPY cronprint/go.mod cronprint/go.sum ./
 RUN go mod download
