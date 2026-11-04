@@ -10,7 +10,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/jackc/pgx/v5 v5.9.2
-	github.com/parquet-go/parquet-go v0.29.0
+	github.com/parquet-go/parquet-go v0.32.0
 	github.com/pressly/goose/v3 v3.27.1
 	github.com/twmb/franz-go v1.21.0
 	golang.org/x/crypto v0.50.0
