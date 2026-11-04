@@ -116,6 +116,8 @@ fastavro==1.13.1
     # via cohere
 fastmcp==3.4.11
     # via lake-mcp (lake-mcp/pyproject.toml)
+feedparser-sgmllib==2.1.0
+    # via feedparser
 feedparser==6.0.14
     # via lake-mcp (lake-mcp/pyproject.toml)
 filelock==3.32.7
@@ -402,8 +404,6 @@ s3fs==2026.9.0
     # via datalake (libs/datalake/pyproject.toml)
 s3transfer==0.19.3
     # via boto3
-sgmllib3k==1.0.0
-    # via feedparser
 shellingham==1.5.4
     # via typer
 six==1.17.0
