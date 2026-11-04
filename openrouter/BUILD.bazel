@@ -1,0 +1,33 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+
+go_library(
+    name = "lib",
+    srcs = glob(
+        ["*.go"],
+        exclude = ["*_test.go"],
+    ),
+    importpath = "github.com/solanyn/mono/openrouter",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_prometheus_client_golang//prometheus/promhttp",
+    ],
+)
+
+go_binary(
+    name = "openrouter-credits-exporter",
+    embed = [":lib"],
+    pure = "on",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "openrouter_test",
+    size = "small",
+    srcs = glob(["*_test.go"]),
+    embed = [":lib"],
+    deps = [
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_prometheus_client_model//go",
+    ],
+)
