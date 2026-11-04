@@ -3,7 +3,7 @@ module github.com/solanyn/mono/yield/api
 go 1.26.3
 
 require (
-	github.com/go-chi/chi/v5 v5.2.5
+	github.com/go-chi/chi/v5 v5.5.0
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/jonas-p/go-shp v0.1.1
 	github.com/pressly/goose/v3 v3.27.1
