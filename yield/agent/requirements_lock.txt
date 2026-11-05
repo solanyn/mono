@@ -132,7 +132,7 @@ jmespath==1.1.0
     # via
     #   boto3
     #   botocore
-jsonpatch==1.41
+jsonpatch==1.42
     # via langchain-core
 jsonpath-python==1.1.6
     # via mistralai
@@ -180,7 +180,7 @@ mdurl==0.1.2
     # via markdown-it-py
 mistralai==1.12.4
     # via pydantic-ai-slim
-mypy-extensions==1.1.0
+mypy-extensions==1.2.0
     # via typing-inspect
 openai==2.54.0
     # via pydantic-ai-slim
@@ -257,7 +257,7 @@ python-dateutil==2.9.0.post0
     #   mistralai
 python-dotenv==1.2.4
     # via pydantic-settings
-python-multipart==0.0.32
+python-multipart==0.0.33
     # via mcp
 pyyaml==6.0.3
     # via

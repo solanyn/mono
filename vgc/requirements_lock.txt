@@ -110,13 +110,13 @@ python-dateutil==2.9.0.post0
     # via
     #   botocore
     #   strictyaml
-python-multipart==0.0.32
+python-multipart==0.0.33
     # via marimo
 pyyaml==6.0.3
     # via
     #   marimo
     #   pymdown-extensions
-pyzmq==27.2.0
+pyzmq==27.3.0
     # via marimo
 requests==2.34.2
     # via pyiceberg

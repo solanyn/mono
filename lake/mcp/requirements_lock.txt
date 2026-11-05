@@ -360,7 +360,7 @@ python-dotenv==1.2.4
     #   datalake
     #   fastmcp
     #   pydantic-settings
-python-multipart==0.0.32
+python-multipart==0.0.33
     # via mcp
 pytz==2026.6
     # via datalake
