@@ -5,7 +5,7 @@ module(
 
 bazel_dep(name = "aspect_bazel_lib", version = "2.22.5")
 bazel_dep(name = "aspect_rules_esbuild", version = "0.27.1")
-bazel_dep(name = "aspect_rules_js", version = "3.5.2")
+bazel_dep(name = "aspect_rules_js", version = "3.6.0")
 bazel_dep(name = "aspect_rules_lint", version = "2.9.1")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "buildifier_prebuilt", version = "8.5.1.4")
@@ -2272,14 +2272,14 @@ oci.pull(
 )
 oci.pull(
     name = "python_slim",
-    digest = "sha256:8c13a3f37a6a5b71498228e902c4b9f51c1f7900d49fabf71f9a650c6120e0d0",
+    digest = "sha256:e97b88e416c3c01eb427b21fd8cd3ebf006e6ee38afcfcc3cae1c54ee2ab0a75",
     image = "docker.io/library/python",
     platforms = ["linux/amd64"],
     tag = "3.15-slim",
 )
 oci.pull(
     name = "node_slim",
-    digest = "sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da",
+    digest = "sha256:5ec23b7c622b00547753bc6ffd78085dd868a68aeb41c8e0a1418f033e13d96d",
     image = "docker.io/library/node",
     platforms = ["linux/amd64"],
     tag = "22-slim",
@@ -2287,7 +2287,7 @@ oci.pull(
 
 oci.pull(
     name = "nginx_alpine",
-    digest = "sha256:785835ea65db4bba6f021acc0f3be91b0fef76a53fe41f8588c6698d2aed0606",
+    digest = "sha256:713fc2ebfd92e8217db451477182ee91944b123d2b1ee9fd5a8c6e91ca6c3a11",
     image = "docker.io/library/nginx",
     platforms = ["linux/amd64"],
     tag = "1.31.8-alpine",
